@@ -2,7 +2,7 @@ sudo: false  # Use container-based infrastructure
 language: python
 python:
   - "3.8"
-  - "3.10"
+  - "3.9"
 os:
   - linux
   - windows
