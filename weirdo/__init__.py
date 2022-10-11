@@ -8,12 +8,11 @@ from .amino_acid_alphabet import (
     amino_acid_name_indices,
 )
 from .peptide_vectorizer import PeptideVectorizer
-from . import iedb
+from .distances import hamming 
 
-__version__ = "1.0.7"
+__version__ = "1.0.0"
 
 __all__ = [
-    "iedb",
     "AminoAcid",
     "canonical_amino_acids",
     "canonical_amino_acid_letters",
@@ -22,4 +21,5 @@ __all__ = [
     "amino_acid_letter_indices",
     "amino_acid_name_indices",
     "PeptideVectorizer",
+    "hamming",
 ]
