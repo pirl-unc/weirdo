@@ -10,7 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def hamming(p1, p2):
-    n = min(len(p1), len(p2))
-    return sum([p1[i] != p2[i] for i in range(n)])
+import numpy as np
+
+def transform_peptide(peptide, property_dict):
+    return np.array([property_dict[amino_acid] for amino_acid in peptide])
+
+def transform_peptides(peptides, property_dict):
+    return np.array([
+        [property_dict[aa] for aa in peptide]
+        for peptide in peptides])
 

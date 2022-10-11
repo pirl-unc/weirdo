@@ -10,7 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def hamming(p1, p2):
-    n = min(len(p1), len(p2))
-    return sum([p1[i] != p2[i] for i in range(n)])
 
+from os.path import dirname, realpath, join
+
+PACKAGE_DIR = dirname(realpath(__file__))
+MATRIX_DIR = join(PACKAGE_DIR, 'matrices')
