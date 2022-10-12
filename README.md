@@ -10,7 +10,7 @@
 
 # weirdo
 
-Metrics of immunological foreignness for candidate T-cell epitopes. An extension of the [weirdo](https://www.github.com/peptdata) library.
+Metrics of immunological foreignness for candidate T-cell epitopes. An extension of the [pepdata](https://www.github.com/peptdata) library.
 
 **Amino Acid Properties**
 
