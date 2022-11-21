@@ -64,5 +64,7 @@ if __name__ == '__main__':
         long_description_content_type='text/markdown',
         packages=find_packages(),
         package_data={PACKAGE_NAME: ['logging.conf']},
-        entry_points={},
+        entry_points={
+       		'console_scripts': ['weirdo=weirdo.cli:run']
+	},
     )
