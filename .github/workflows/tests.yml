@@ -1,0 +1,94 @@
+# Run tests and linting on push and pull requests
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pylint numpy scikit-learn pandas
+
+      - name: Lint with PyLint
+        run: ./lint.sh
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          pip install -e ".[dev]"
+
+      - name: Create test fixture
+        run: |
+          # Create small test fixture from data if it exists
+          mkdir -p test/fixtures
+          if [ -f data/swissprot-8mers.csv ]; then
+            head -501 data/swissprot-8mers.csv > test/fixtures/swissprot-8mers-sample.csv
+          else
+            # Create minimal fixture for CI
+            echo ",seq,archaea,bacteria,fungi,human,invertebrates,mammals,plants,rodents,vertebrates,viruses,label_count" > test/fixtures/swissprot-8mers-sample.csv
+            echo "0,MTMDKSEL,False,False,False,True,False,True,False,True,False,False,3" >> test/fixtures/swissprot-8mers-sample.csv
+            echo "1,TMDKSELS,False,False,False,True,False,True,False,True,False,False,3" >> test/fixtures/swissprot-8mers-sample.csv
+          fi
+
+      - name: Run tests
+        run: |
+          pytest \
+            --cov=weirdo/ \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --ignore=test/test_amino_acids.py \
+            test/
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Combined status check for branch protection
+  all-tests:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all tests passed
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]] || [[ "${{ needs.test.result }}" != "success" ]]; then
+            echo "Some tests failed"
+            exit 1
+          fi
+          echo "All tests passed!"

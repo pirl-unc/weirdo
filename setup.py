@@ -23,10 +23,9 @@ readme_path = os.path.join(readme_dir, 'README.md')
 try:
     with open(readme_path, 'r') as f:
         readme_markdown = f.read()
-except:
+except Exception:
     logging.warning("Failed to load %s" % readme_path)
     readme_markdown = ""
-
 
 with open('%s/__init__.py' % PACKAGE_NAME, 'r') as f:
     version = re.search(
@@ -37,14 +36,21 @@ with open('%s/__init__.py' % PACKAGE_NAME, 'r') as f:
 if not version:
     raise RuntimeError("Cannot find version information")
 
+# Read requirements
+with open('requirements.txt') as f:
+    requirements = [
+        req.strip() for req in f.read().splitlines()
+        if req.strip() and not req.startswith('#')
+    ]
+
 if __name__ == '__main__':
     setup(
         name=PACKAGE_NAME,
         version=version,
-        description="Peptide similarity measures, distance functions, and attempts to quantify the 'self' proteome",
+        description="Metrics of immunological foreignness for candidate T-cell epitopes",
         author="Alex Rubinsteyn",
         author_email="alex.rubinsteyn@unc.edu",
-        url="https://github.com/pirl-unc/%s" % PACKAGE_NAME,
+        url="https://github.com/openvax/%s" % PACKAGE_NAME,
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
             'Development Status :: 4 - Beta',
@@ -52,19 +58,44 @@ if __name__ == '__main__':
             'Operating System :: OS Independent',
             'Intended Audience :: Science/Research',
             'License :: OSI Approved :: Apache Software License',
-            'Programming Language :: Python',
+            'Programming Language :: Python :: 3',
+            'Programming Language :: Python :: 3.9',
+            'Programming Language :: Python :: 3.10',
+            'Programming Language :: Python :: 3.11',
+            'Programming Language :: Python :: 3.12',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
-        install_requires=[         
-            'numpy',
-            'scikit-learn',
-            'pandas',
-        ],
+        python_requires='>=3.9',
+        install_requires=requirements,
+        extras_require={
+            'dev': [
+                'pytest>=7.0.0',
+                'pytest-cov>=4.0.0',
+                'pylint>=2.0.0',
+                'sphinx>=5.0.0',
+                'sphinx-rtd-theme>=1.0.0',
+                'sphinx-autodoc-typehints>=1.0.0',
+                'tqdm>=4.0.0',
+            ],
+            'docs': [
+                'sphinx>=5.0.0',
+                'sphinx-rtd-theme>=1.0.0',
+                'sphinx-autodoc-typehints>=1.0.0',
+            ],
+        },
         long_description=readme_markdown,
         long_description_content_type='text/markdown',
-        packages=find_packages(),
-        package_data={PACKAGE_NAME: ['logging.conf']},
+        packages=find_packages(exclude=['test', 'test.*', 'examples']),
+        package_data={
+            PACKAGE_NAME: [
+                'logging.conf',
+                'matrices/*',
+            ]
+        },
+        include_package_data=True,
         entry_points={
-       		'console_scripts': ['weirdo=weirdo.cli:run']
-	},
+            'console_scripts': [
+                'weirdo=weirdo.cli:run'
+            ]
+        },
     )

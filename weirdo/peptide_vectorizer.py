@@ -23,7 +23,7 @@ def make_count_vectorizer(reduced_alphabet, max_ngram):
     return CountVectorizer(
         analyzer='char',
         ngram_range=(1, max_ngram),
-        dtype=np.float,
+        dtype=np.float64,
         preprocessor=preprocessor)
 
 class PeptideVectorizer(object):
@@ -57,11 +57,11 @@ class PeptideVectorizer(object):
 
         if self.training_already_reduced:
             c = make_count_vectorizer(None, self.max_ngram)
-            X = c.fit_transform(amino_acid_strings).todense()
+            X = c.fit_transform(amino_acid_strings).toarray()
             self.count_vectorizer.vocabulary_ = c.vocabulary_
         else:
             c = self.count_vectorizer
-            X = c.fit_transform(amino_acid_strings).todense()
+            X = c.fit_transform(amino_acid_strings).toarray()
 
         if self.normalize_row:
             X = normalize(X, norm='l1')
@@ -72,7 +72,7 @@ class PeptideVectorizer(object):
 
     def transform(self, amino_acid_strings):
         assert self.count_vectorizer, "Must call 'fit' before 'transform'"
-        X = self.count_vectorizer.transform(amino_acid_strings).todense()
+        X = self.count_vectorizer.transform(amino_acid_strings).toarray()
         if self.normalize_row:
             X = normalize(X, norm='l1')
         return X

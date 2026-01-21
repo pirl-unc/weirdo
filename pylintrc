@@ -1,0 +1,22 @@
+[TYPECHECK]
+# Ignore false positives with numpy/pandas/sklearn
+ignored-modules = numpy,pandas,sklearn
+
+[MESSAGES CONTROL]
+# Disable specific warnings that cause false positives
+disable = unsubscriptable-object,
+          not-an-iterable,
+          no-member,
+          invalid-unary-operand-type
+
+[FORMAT]
+# Maximum line length
+max-line-length = 100
+
+[BASIC]
+# Good variable names
+good-names = i,j,k,x,y,z,X,Y,n,f,df,aa,_
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args = 10
