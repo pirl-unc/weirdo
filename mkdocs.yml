@@ -1,8 +1,8 @@
 site_name: WEIRDO
 site_description: Metrics of immunological foreignness for candidate T-cell epitopes
-site_url: https://openvax.github.io/weirdo
-repo_url: https://github.com/openvax/weirdo
-repo_name: openvax/weirdo
+site_url: https://pirl-unc.github.io/weirdo
+repo_url: https://github.com/pirl-unc/weirdo
+repo_name: pirl-unc/weirdo
 
 theme:
   name: material
@@ -62,4 +62,4 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/openvax/weirdo
+      link: https://github.com/pirl-unc/weirdo

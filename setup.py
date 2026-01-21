@@ -50,7 +50,7 @@ if __name__ == '__main__':
         description="Metrics of immunological foreignness for candidate T-cell epitopes",
         author="Alex Rubinsteyn",
         author_email="alex.rubinsteyn@unc.edu",
-        url="https://github.com/openvax/%s" % PACKAGE_NAME,
+        url="https://github.com/pirl-unc/%s" % PACKAGE_NAME,
         license="http://www.apache.org/licenses/LICENSE-2.0.html",
         classifiers=[
             'Development Status :: 4 - Beta',

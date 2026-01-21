@@ -1,5 +1,5 @@
-[![Tests](https://github.com/openvax/weirdo/actions/workflows/tests.yml/badge.svg)](https://github.com/openvax/weirdo/actions/workflows/tests.yml)
-[![Documentation](https://github.com/openvax/weirdo/actions/workflows/docs.yml/badge.svg)](https://github.com/openvax/weirdo/actions/workflows/docs.yml)
+[![Tests](https://github.com/pirl-unc/weirdo/actions/workflows/tests.yml/badge.svg)](https://github.com/pirl-unc/weirdo/actions/workflows/tests.yml)
+[![Documentation](https://github.com/pirl-unc/weirdo/actions/workflows/docs.yml/badge.svg)](https://github.com/pirl-unc/weirdo/actions/workflows/docs.yml)
 [![PyPI](https://img.shields.io/pypi/v/weirdo.svg)](https://pypi.python.org/pypi/weirdo/)
 [![Python Version](https://img.shields.io/pypi/pyversions/weirdo.svg)](https://pypi.python.org/pypi/weirdo/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -38,7 +38,7 @@ pip install weirdo
 For development:
 
 ```bash
-git clone https://github.com/openvax/weirdo.git
+git clone https://github.com/pirl-unc/weirdo.git
 cd weirdo
 ./develop.sh
 ```
@@ -214,7 +214,7 @@ If you use WEIRDO in your research, please cite:
 @software{weirdo,
   title = {WEIRDO: Widely Estimated Immunological Recognition and Detection of Outliers},
   author = {OpenVax},
-  url = {https://github.com/openvax/weirdo}
+  url = {https://github.com/pirl-unc/weirdo}
 }
 ```
 

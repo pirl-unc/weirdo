@@ -33,7 +33,7 @@ DEFAULT_DATA_DIR = Path.home() / '.weirdo'
 DATASETS = {
     'swissprot-8mers': {
         'description': 'SwissProt 8-mer reference data (~100M k-mers)',
-        'url': 'https://github.com/openvax/weirdo-data/releases/download/v1.0/swissprot-8mers.csv.gz',
+        'url': 'https://github.com/pirl-unc/weirdo-data/releases/download/v1.0/swissprot-8mers.csv.gz',
         'filename': 'swissprot-8mers.csv',
         'compressed': True,
         'size_mb': 2500,  # Compressed size

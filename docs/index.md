@@ -39,7 +39,7 @@ pip install weirdo
 For development:
 
 ```bash
-git clone https://github.com/openvax/weirdo.git
+git clone https://github.com/pirl-unc/weirdo.git
 cd weirdo
 ./develop.sh
 ```
