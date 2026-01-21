@@ -45,10 +45,12 @@ jobs:
           path: site/
 
   # Deploy to GitHub Pages (only on main branch)
+  # Note: Requires GitHub Pages to be enabled in repo Settings > Pages > Source: GitHub Actions
   deploy:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    continue-on-error: true  # Don't fail workflow if Pages not configured
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
