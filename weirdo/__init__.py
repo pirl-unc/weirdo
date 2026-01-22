@@ -54,11 +54,8 @@ from .scorers import (
     register_reference,
 )
 
-# ML scorer (optional torch dependency)
-try:
-    from .scorers import MLPScorer
-except ImportError:
-    MLPScorer = None
+# ML scorer
+from .scorers import MLPScorer
 
 __version__ = "1.1.0"
 

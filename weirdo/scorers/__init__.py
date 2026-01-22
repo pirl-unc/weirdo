@@ -63,13 +63,8 @@ from .swissprot import SwissProtReference
 from .frequency import FrequencyScorer
 from .similarity import SimilarityScorer
 
-# ML-based scorers (optional torch dependency)
-try:
-    from .mlp import MLPScorer
-    _HAS_TORCH = True
-except ImportError:
-    _HAS_TORCH = False
-    MLPScorer = None
+# ML-based scorer
+from .mlp import MLPScorer
 
 __all__ = [
     # Base classes

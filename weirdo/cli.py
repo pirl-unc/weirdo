@@ -206,22 +206,9 @@ def create_parser():
         help='K-mer size (default: 8)',
     )
     models_train_parser.add_argument(
-        '--embedding-dim',
-        type=int,
-        default=32,
-        help='Embedding dimension (default: 32)',
-    )
-    models_train_parser.add_argument(
-        '--hidden-dim',
-        type=int,
-        default=256,
-        help='Hidden dimension (default: 256)',
-    )
-    models_train_parser.add_argument(
-        '--num-layers',
-        type=int,
-        default=3,
-        help='Number of residual layers (default: 3)',
+        '--hidden-layers',
+        default='256,128,64',
+        help='Hidden layer sizes, comma-separated (default: 256,128,64)',
     )
     models_train_parser.add_argument(
         '--overwrite',
@@ -541,13 +528,11 @@ def cmd_models_train(args):
     print()
 
     from .scorers.mlp import MLPScorer
-    print(f"  Hidden dim: {args.hidden_dim}")
-    print(f"  Num layers: {args.num_layers}")
+    hidden_layers = tuple(int(x) for x in args.hidden_layers.split(','))
+    print(f"  Hidden layers: {hidden_layers}")
     scorer = MLPScorer(
         k=args.k,
-        embedding_dim=args.embedding_dim,
-        hidden_dim=args.hidden_dim,
-        num_layers=args.num_layers,
+        hidden_layer_sizes=hidden_layers,
     )
 
     print()

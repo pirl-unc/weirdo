@@ -82,13 +82,6 @@ if __name__ == '__main__':
                 'sphinx-rtd-theme>=1.0.0',
                 'sphinx-autodoc-typehints>=1.0.0',
             ],
-            'ml': [
-                'torch>=2.0.0',
-            ],
-            'all': [
-                'torch>=2.0.0',
-                'tqdm>=4.0.0',
-            ],
         },
         long_description=readme_markdown,
         long_description_content_type='text/markdown',
