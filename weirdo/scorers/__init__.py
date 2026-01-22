@@ -55,10 +55,21 @@ from .config import (
     list_presets,
 )
 
+# Trainable base class
+from .trainable import TrainableScorer
+
 # Concrete implementations (import to trigger registration)
 from .swissprot import SwissProtReference
 from .frequency import FrequencyScorer
 from .similarity import SimilarityScorer
+
+# ML-based scorers (optional torch dependency)
+try:
+    from .mlp import MLPScorer
+    _HAS_TORCH = True
+except ImportError:
+    _HAS_TORCH = False
+    MLPScorer = None
 
 __all__ = [
     # Base classes
@@ -66,6 +77,7 @@ __all__ = [
     'BatchScorer',
     'BaseReference',
     'StreamingReference',
+    'TrainableScorer',
     # Registry
     'ScorerRegistry',
     'registry',
@@ -86,4 +98,6 @@ __all__ = [
     'SwissProtReference',
     'FrequencyScorer',
     'SimilarityScorer',
+    # ML scorer (if torch available)
+    'MLPScorer',
 ]

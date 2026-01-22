@@ -18,6 +18,11 @@ from .api import (
     clear_cache,
     get_available_presets,
     get_preset_info,
+    # Model management
+    list_models,
+    load_model,
+    save_model,
+    get_available_scorers,
 )
 
 # Data management
@@ -27,12 +32,20 @@ from .data_manager import (
     ensure_data_available,
 )
 
+# Model management
+from .model_manager import (
+    ModelManager,
+    get_model_manager,
+    ModelInfo,
+)
+
 # Scorer classes (for advanced usage)
 from .scorers import (
     BaseScorer,
     BatchScorer,
     BaseReference,
     StreamingReference,
+    TrainableScorer,
     FrequencyScorer,
     SimilarityScorer,
     SwissProtReference,
@@ -40,6 +53,12 @@ from .scorers import (
     register_scorer,
     register_reference,
 )
+
+# ML scorer (optional torch dependency)
+try:
+    from .scorers import MLPScorer
+except ImportError:
+    MLPScorer = None
 
 __version__ = "1.1.0"
 
@@ -63,17 +82,28 @@ __all__ = [
     "clear_cache",
     "get_available_presets",
     "get_preset_info",
+    "get_available_scorers",
+    # Model management
+    "list_models",
+    "load_model",
+    "save_model",
+    "ModelManager",
+    "get_model_manager",
+    "ModelInfo",
     # Scorer classes
     "BaseScorer",
     "BatchScorer",
     "BaseReference",
     "StreamingReference",
+    "TrainableScorer",
     "FrequencyScorer",
     "SimilarityScorer",
     "SwissProtReference",
     "ScorerConfig",
     "register_scorer",
     "register_reference",
+    # ML scorer
+    "MLPScorer",
     # Data management
     "DataManager",
     "get_data_manager",

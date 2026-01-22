@@ -210,3 +210,107 @@ def get_preset_info(preset: str) -> Dict[str, Any]:
     """
     config = ScorerConfig.from_preset(preset)
     return config.to_dict()
+
+
+# =============================================================================
+# Model Management Functions
+# =============================================================================
+
+def list_models(model_dir: Optional[str] = None) -> List[Any]:
+    """List all available trained models.
+
+    Parameters
+    ----------
+    model_dir : str, optional
+        Custom model directory. Defaults to ~/.weirdo/models.
+
+    Returns
+    -------
+    models : list of ModelInfo
+        Information about each saved model.
+
+    Example
+    -------
+    >>> models = list_models()
+    >>> for m in models:
+    ...     print(f"{m.name}: {m.scorer_type}")
+    """
+    from .model_manager import list_models as _list_models
+    return _list_models(model_dir)
+
+
+def load_model(name: str, model_dir: Optional[str] = None) -> BaseScorer:
+    """Load a trained model by name.
+
+    Parameters
+    ----------
+    name : str
+        Model name.
+    model_dir : str, optional
+        Custom model directory.
+
+    Returns
+    -------
+    scorer : TrainableScorer
+        Loaded model ready for scoring.
+
+    Example
+    -------
+    >>> model = load_model('my-mlp')
+    >>> scores = model.score(['MTMDKSEL'])
+    """
+    from .model_manager import load_model as _load_model
+    return _load_model(name, model_dir)
+
+
+def save_model(
+    scorer: BaseScorer,
+    name: str,
+    model_dir: Optional[str] = None,
+    overwrite: bool = False,
+) -> str:
+    """Save a trained model.
+
+    Parameters
+    ----------
+    scorer : TrainableScorer
+        Trained model to save.
+    name : str
+        Name for the saved model.
+    model_dir : str, optional
+        Custom model directory.
+    overwrite : bool, default=False
+        Overwrite existing model.
+
+    Returns
+    -------
+    path : str
+        Path where model was saved.
+
+    Example
+    -------
+    >>> scorer = MLPScorer()
+    >>> scorer.train(peptides, labels)
+    >>> save_model(scorer, 'my-mlp')
+    """
+    from .model_manager import save_model as _save_model
+    return str(_save_model(scorer, name, model_dir, overwrite))
+
+
+def get_available_scorers() -> List[str]:
+    """Get list of available scorer types.
+
+    Returns both lookup-based and ML-based scorers.
+
+    Returns
+    -------
+    scorers : list of str
+        Available scorer names.
+
+    Example
+    -------
+    >>> print(get_available_scorers())
+    ['frequency', 'similarity', 'mlp', 'modern-mlp']
+    """
+    from .scorers import list_scorers
+    return list_scorers()

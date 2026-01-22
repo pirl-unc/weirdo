@@ -5,6 +5,9 @@ Usage:
     weirdo data download        # Download reference data
     weirdo data clear           # Clear all data
     weirdo score PEPTIDE        # Score a peptide
+    weirdo models list          # List trained models
+    weirdo models train         # Train a new model
+    weirdo models info NAME     # Show model info
 """
 
 import sys
@@ -142,6 +145,95 @@ def create_parser():
         action='store_true',
         help='Skip building indices (just download data)',
     )
+
+    # -------------------------------------------------------------------------
+    # Model management commands
+    # -------------------------------------------------------------------------
+    models_parser = subparsers.add_parser('models', help='Manage trained ML models')
+    models_subparsers = models_parser.add_subparsers(dest='models_command', help='Model commands')
+
+    # models list
+    models_list_parser = models_subparsers.add_parser('list', help='List trained models')
+    models_subparsers.add_parser('ls', help='Alias for list')
+
+    # models info
+    models_info_parser = models_subparsers.add_parser('info', help='Show model details')
+    models_info_parser.add_argument('name', help='Model name')
+
+    # models delete
+    models_delete_parser = models_subparsers.add_parser('delete', help='Delete a trained model')
+    models_delete_parser.add_argument('name', help='Model name to delete')
+    models_delete_parser.add_argument('-y', '--yes', action='store_true', help='Skip confirmation')
+
+    # models train
+    models_train_parser = models_subparsers.add_parser('train', help='Train a new model')
+    models_train_parser.add_argument(
+        '--type',
+        default='mlp',
+        choices=['mlp'],
+        help='Model type to train (default: mlp)',
+    )
+    models_train_parser.add_argument(
+        '--data',
+        required=True,
+        help='Training data CSV (columns: peptide, label)',
+    )
+    models_train_parser.add_argument(
+        '--val-data',
+        help='Validation data CSV (optional)',
+    )
+    models_train_parser.add_argument(
+        '--name',
+        required=True,
+        help='Name for saved model',
+    )
+    models_train_parser.add_argument(
+        '--epochs',
+        type=int,
+        default=100,
+        help='Training epochs (default: 100)',
+    )
+    models_train_parser.add_argument(
+        '--lr',
+        type=float,
+        default=1e-3,
+        help='Learning rate (default: 1e-3)',
+    )
+    models_train_parser.add_argument(
+        '--k',
+        type=int,
+        default=8,
+        help='K-mer size (default: 8)',
+    )
+    models_train_parser.add_argument(
+        '--embedding-dim',
+        type=int,
+        default=32,
+        help='Embedding dimension (default: 32)',
+    )
+    models_train_parser.add_argument(
+        '--hidden-dim',
+        type=int,
+        default=256,
+        help='Hidden dimension (default: 256)',
+    )
+    models_train_parser.add_argument(
+        '--num-layers',
+        type=int,
+        default=3,
+        help='Number of residual layers (default: 3)',
+    )
+    models_train_parser.add_argument(
+        '--overwrite',
+        action='store_true',
+        help='Overwrite existing model with same name',
+    )
+
+    # models path
+    models_path_parser = models_subparsers.add_parser('path', help='Show models directory')
+
+    # models scorers
+    models_scorers_parser = models_subparsers.add_parser('scorers', help='List available scorer types')
 
     return parser
 
@@ -319,6 +411,196 @@ def cmd_setup(args):
     return 0
 
 
+# -------------------------------------------------------------------------
+# Model command handlers
+# -------------------------------------------------------------------------
+
+def cmd_models_list(args):
+    """Handle: weirdo models list"""
+    from .model_manager import get_model_manager
+    mm = get_model_manager()
+    mm.print_models()
+    return 0
+
+
+def cmd_models_info(args):
+    """Handle: weirdo models info NAME"""
+    from .model_manager import get_model_manager
+    mm = get_model_manager()
+
+    info = mm.get_model_info(args.name)
+    if info is None:
+        print(f"Model not found: {args.name}")
+        return 1
+
+    print(f"Model: {info.name}")
+    print("=" * 60)
+    print(f"  Type: {info.scorer_type}")
+    print(f"  Path: {info.path}")
+    if info.created:
+        print(f"  Created: {info.created[:19]}")
+    print()
+
+    print("Parameters:")
+    for key, value in info.params.items():
+        print(f"  {key}: {value}")
+    print()
+
+    if info.metadata:
+        print("Training info:")
+        if 'n_train' in info.metadata:
+            print(f"  Training samples: {info.metadata['n_train']}")
+        if 'n_epochs' in info.metadata:
+            print(f"  Epochs trained: {info.metadata['n_epochs']}")
+        if 'final_train_loss' in info.metadata:
+            print(f"  Final train loss: {info.metadata['final_train_loss']:.4f}")
+        if 'best_val_loss' in info.metadata:
+            print(f"  Best val loss: {info.metadata['best_val_loss']:.4f}")
+
+    return 0
+
+
+def cmd_models_delete(args):
+    """Handle: weirdo models delete NAME"""
+    from .model_manager import get_model_manager
+    mm = get_model_manager()
+
+    info = mm.get_model_info(args.name)
+    if info is None:
+        print(f"Model not found: {args.name}")
+        return 1
+
+    if not args.yes:
+        response = input(f"Delete model '{args.name}'? [y/N] ")
+        if response.lower() not in ('y', 'yes'):
+            print("Aborted.")
+            return 1
+
+    if mm.delete(args.name):
+        print(f"Deleted model: {args.name}")
+    else:
+        print(f"Failed to delete model: {args.name}")
+        return 1
+
+    return 0
+
+
+def cmd_models_train(args):
+    """Handle: weirdo models train"""
+    import csv
+
+    # Check for torch
+    try:
+        import torch
+    except ImportError:
+        print("Error: PyTorch is required for training ML models.")
+        print("Install with: pip install torch")
+        return 1
+
+    from .model_manager import get_model_manager
+    mm = get_model_manager()
+
+    # Check if model already exists
+    if mm.get_model_info(args.name) and not args.overwrite:
+        print(f"Model already exists: {args.name}")
+        print("Use --overwrite to replace.")
+        return 1
+
+    # Load training data
+    print(f"Loading training data from {args.data}...")
+    peptides = []
+    labels = []
+    with open(args.data, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            peptides.append(row['peptide'])
+            labels.append(float(row['label']))
+    print(f"  Loaded {len(peptides)} samples")
+
+    # Load validation data if provided
+    val_peptides = None
+    val_labels = None
+    if args.val_data:
+        print(f"Loading validation data from {args.val_data}...")
+        val_peptides = []
+        val_labels = []
+        with open(args.val_data, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                val_peptides.append(row['peptide'])
+                val_labels.append(float(row['label']))
+        print(f"  Loaded {len(val_peptides)} validation samples")
+
+    # Create model
+    print()
+    print(f"Training {args.model_type} model...")
+    print(f"  K-mer size: {args.k}")
+    print(f"  Embedding dim: {args.embedding_dim}")
+    print(f"  Epochs: {args.epochs}")
+    print(f"  Learning rate: {args.lr}")
+    print()
+
+    from .scorers.mlp import MLPScorer
+    print(f"  Hidden dim: {args.hidden_dim}")
+    print(f"  Num layers: {args.num_layers}")
+    scorer = MLPScorer(
+        k=args.k,
+        embedding_dim=args.embedding_dim,
+        hidden_dim=args.hidden_dim,
+        num_layers=args.num_layers,
+    )
+
+    print()
+
+    # Train
+    scorer.train(
+        peptides=peptides,
+        labels=labels,
+        val_peptides=val_peptides,
+        val_labels=val_labels,
+        epochs=args.epochs,
+        learning_rate=args.lr,
+        verbose=True,
+    )
+
+    # Save
+    print()
+    print(f"Saving model as '{args.name}'...")
+    path = mm.save(scorer, args.name, overwrite=args.overwrite)
+    print(f"  Saved to: {path}")
+
+    return 0
+
+
+def cmd_models_path(args):
+    """Handle: weirdo models path"""
+    from .model_manager import get_model_manager
+    mm = get_model_manager()
+    print(mm.model_dir)
+    return 0
+
+
+def cmd_models_scorers(args):
+    """Handle: weirdo models scorers"""
+    from .scorers import list_scorers
+
+    print("Available scorer types:")
+    print()
+
+    scorers = list_scorers()
+    for name in scorers:
+        if name in ('frequency', 'similarity'):
+            print(f"  {name:<20} (lookup-based, no training)")
+        else:
+            print(f"  {name:<20} (ML-based, requires training)")
+
+    print()
+    print("Lookup-based scorers use fit() with a reference dataset.")
+    print("ML-based scorers use train() with labeled peptide data.")
+
+    return 0
+
+
 def run(args_list=None):
     """Main entry point for CLI."""
     if args_list is None:
@@ -355,6 +637,22 @@ def run(args_list=None):
 
     elif args.command == 'setup':
         return cmd_setup(args)
+
+    elif args.command == 'models':
+        if args.models_command is None:
+            return cmd_models_list(args)
+        elif args.models_command in ('list', 'ls'):
+            return cmd_models_list(args)
+        elif args.models_command == 'info':
+            return cmd_models_info(args)
+        elif args.models_command == 'delete':
+            return cmd_models_delete(args)
+        elif args.models_command == 'train':
+            return cmd_models_train(args)
+        elif args.models_command == 'path':
+            return cmd_models_path(args)
+        elif args.models_command == 'scorers':
+            return cmd_models_scorers(args)
 
     return 0
 
