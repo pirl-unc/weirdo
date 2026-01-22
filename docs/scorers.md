@@ -56,6 +56,87 @@ for kmer, score in kmer_scores:
     print(f"  {kmer}: {score:.3f}")
 ```
 
+## MLPScorer
+
+Trainable MLP (multi-layer perceptron) for learning foreignness from labeled data.
+Uses one-hot encoded amino acid features and scikit-learn's MLPRegressor.
+
+### How it works
+
+1. Convert peptides to one-hot encoded features (k positions × 21 amino acids)
+2. Train an MLP regressor on labeled peptide data
+3. Predict foreignness scores for new peptides
+
+```python
+from weirdo.scorers import MLPScorer
+
+# Create and train
+scorer = MLPScorer(
+    k=8,
+    hidden_layer_sizes=(256, 128, 64),
+    activation='relu',
+)
+scorer.train(peptides, labels, epochs=200)
+
+# Score new peptides
+scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
+
+# Save and load
+scorer.save('my_model')
+loaded = MLPScorer.load('my_model')
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `k` | int | 8 | K-mer size |
+| `hidden_layer_sizes` | tuple | (256, 128, 64) | Sizes of hidden layers |
+| `activation` | str | 'relu' | Activation function ('relu', 'tanh', 'logistic') |
+| `alpha` | float | 0.0001 | L2 regularization strength |
+| `early_stopping` | bool | True | Use early stopping with validation split |
+
+### Training Parameters
+
+```python
+scorer.train(
+    peptides=peptides,       # Training sequences
+    labels=labels,           # Target foreignness scores
+    epochs=200,              # Maximum iterations
+    learning_rate=0.001,     # Initial learning rate
+    verbose=True,            # Print progress
+)
+```
+
+### Model Management
+
+```python
+from weirdo import list_models, load_model, save_model
+
+# Save a trained model
+save_model(scorer, 'my-foreignness-model')
+
+# List available models
+for model in list_models():
+    print(f"{model.name}: {model.scorer_type}")
+
+# Load a model
+scorer = load_model('my-foreignness-model')
+```
+
+### CLI Training
+
+```bash
+# Train from CSV (columns: peptide, label)
+weirdo models train --data train.csv --name my-model --hidden-layers 256,128
+
+# List trained models
+weirdo models list
+
+# Show model info
+weirdo models info my-model
+```
+
 ## SimilarityScorer
 
 Scores peptides based on minimum distance to reference k-mers using
