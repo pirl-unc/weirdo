@@ -2,8 +2,10 @@
 
 import os
 import tempfile
+import warnings
 import pytest
 import numpy as np
+from sklearn.exceptions import ConvergenceWarning
 
 from weirdo.scorers.mlp import (
     MLPScorer,
@@ -113,12 +115,14 @@ class TestMLPScorer:
             random_state=42,
         )
 
-        scorer.train(
-            peptides=peptides,
-            labels=labels,
-            epochs=50,
-            verbose=False,
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            scorer.train(
+                peptides=peptides,
+                labels=labels,
+                epochs=50,
+                verbose=False,
+            )
 
         assert scorer.is_trained
         assert len(scorer.training_history) > 0
