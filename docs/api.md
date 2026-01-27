@@ -9,19 +9,23 @@ Complete API documentation for WEIRDO.
 ```python
 def score_peptide(
     peptide: str,
-    preset: str = 'default',
-    auto_download: bool = False,
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    preset: Optional[str] = None,
+    aggregate: str = 'mean',
     **kwargs
 ) -> float
 ```
 
-Score a single peptide for foreignness.
+Score a single peptide for foreignness using a trained model.
 
 **Parameters:**
 
 - `peptide`: Peptide sequence to score
-- `preset`: Scoring preset to use (default: 'default')
-- `auto_download`: If True, automatically download data if not present
+- `model`: Model name (from ModelManager) or an instantiated scorer
+- `model_dir`: Custom model directory when loading by name
+- `preset`: Preset for non-trainable scorers
+- `aggregate`: How to aggregate k-mer probabilities for long peptides
 - `**kwargs`: Additional arguments passed to `create_scorer()`
 
 **Returns:** Foreignness score (higher = more foreign)
@@ -29,11 +33,9 @@ Score a single peptide for foreignness.
 **Example:**
 
 ```python
-from weirdo import score_peptide
-score = score_peptide('MTMDKSEL')
-
-# Auto-download data on first use
-score = score_peptide('MTMDKSEL', auto_download=True)
+from weirdo import load_model, score_peptide
+scorer = load_model('my-mlp')
+score = score_peptide('MTMDKSEL', model=scorer)
 ```
 
 ---
@@ -43,19 +45,23 @@ score = score_peptide('MTMDKSEL', auto_download=True)
 ```python
 def score_peptides(
     peptides: Sequence[str],
-    preset: str = 'default',
-    auto_download: bool = False,
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    preset: Optional[str] = None,
+    aggregate: str = 'mean',
     **kwargs
 ) -> np.ndarray
 ```
 
-Score multiple peptides for foreignness.
+Score multiple peptides for foreignness using a trained model.
 
 **Parameters:**
 
 - `peptides`: Sequence of peptide strings
-- `preset`: Scoring preset to use
-- `auto_download`: If True, automatically download data if not present
+- `model`: Model name (from ModelManager) or an instantiated scorer
+- `model_dir`: Custom model directory when loading by name
+- `preset`: Preset for non-trainable scorers
+- `aggregate`: How to aggregate k-mer probabilities for long peptides
 - `**kwargs`: Additional arguments passed to `create_scorer()`
 
 **Returns:** Array of foreignness scores
@@ -69,6 +75,9 @@ def create_scorer(
     preset: str = 'default',
     cache: bool = True,
     auto_download: bool = False,
+    train_data: Optional[Sequence[str]] = None,
+    train_labels: Optional[Any] = None,
+    target_categories: Optional[List[str]] = None,
     **overrides
 ) -> BaseScorer
 ```
@@ -77,65 +86,48 @@ Create a scorer from a preset configuration.
 
 **Parameters:**
 
-- `preset`: Preset name ('default', 'human', 'pathogen', etc.)
+- `preset`: Preset name ('default', 'fast')
 - `cache`: Whether to cache the scorer instance
 - `auto_download`: If True, automatically download data if not present
+- `train_data`: Training peptides for trainable scorers
+- `train_labels`: Training labels for trainable scorers
+- `target_categories`: Category names for multi-label training
 - `**overrides`: Override specific config parameters
 
-**Returns:** Configured and fitted scorer
+**Returns:** Configured scorer (trainable scorers are untrained unless training data is provided)
 
 ---
 
 ## Scorer Classes
 
-### `weirdo.scorers.FrequencyScorer`
+### `weirdo.scorers.MLPScorer`
 
 ```python
-class FrequencyScorer(BatchScorer):
+class MLPScorer(TrainableScorer):
     def __init__(
         self,
         k: int = 8,
-        pseudocount: float = 1e-10,
-        aggregate: str = 'mean',
-        category: Optional[str] = None,
-        batch_size: int = 10000
+        hidden_layer_sizes: Tuple[int, ...] = (256, 128, 64),
+        activation: str = 'relu',
+        alpha: float = 0.0001,
+        learning_rate_init: float = 0.001,
+        max_iter: int = 200,
+        early_stopping: bool = True,
+        use_dipeptides: bool = True,
+        batch_size: int = 256,
+        random_state: Optional[int] = None
     )
 ```
 
-Frequency-based foreignness scorer.
+Parametric neural network scorer for category probabilities and foreignness.
 
 **Methods:**
 
-- `fit(reference)` → Fit to reference dataset
-- `score(peptides)` → Score peptide(s)
-- `fit_score(reference, peptides)` → Fit and score in one call
-- `get_kmer_scores(peptide)` → Get individual k-mer scores
-- `score_batch(peptides, show_progress=False)` → Batch scoring
-
----
-
-### `weirdo.scorers.SimilarityScorer`
-
-```python
-class SimilarityScorer(BatchScorer):
-    def __init__(
-        self,
-        k: int = 8,
-        matrix: str = 'blosum62',
-        distance_metric: str = 'min_distance',
-        max_candidates: int = 1000,
-        aggregate: str = 'mean',
-        batch_size: int = 1000
-    )
-```
-
-Similarity-based foreignness scorer using substitution matrices.
-
-**Methods:**
-
-- `fit(reference)` → Fit to reference dataset
-- `score(peptides)` → Score peptide(s)
-- `get_closest_reference(kmer, n=5)` → Find closest reference k-mers
+- `train(peptides, labels, target_categories=None, ...)` → Train model
+- `score(peptides, aggregate='mean')` → Foreignness scores in [0, 1]
+- `predict_proba(peptides, aggregate='mean')` → Category probabilities
+- `foreignness(peptides, aggregate='mean')` → Derived foreignness
+- `predict_dataframe(peptides, aggregate='mean')` → Full DataFrame output
 
 ---
 
@@ -149,7 +141,8 @@ class SwissProtReference(StreamingReference):
         k: int = 8,
         data_path: Optional[str] = None,
         lazy: bool = False,
-        use_set: bool = False
+        use_set: bool = False,
+        auto_download: bool = False
     )
 ```
 
@@ -159,7 +152,7 @@ Reference dataset from SwissProt protein database.
 
 - `load()` → Load data into memory
 - `contains(kmer)` → Check if k-mer exists
-- `get_frequency(kmer, default=0.0)` → Get k-mer frequency
+- `get_frequency(kmer, default=0.0)` → Get k-mer presence (1.0 if present)
 - `get_categories()` → List available categories
 - `get_kmer_categories(kmer)` → Get category breakdown for k-mer
 - `iter_kmers()` → Iterate over all k-mers
@@ -173,11 +166,12 @@ Reference dataset from SwissProt protein database.
 ```python
 @dataclass
 class ScorerConfig:
-    scorer: str = 'frequency'
+    scorer: str = 'mlp'
     reference: str = 'swissprot'
     k: int = 8
     scorer_params: Dict[str, Any] = field(default_factory=dict)
     reference_params: Dict[str, Any] = field(default_factory=dict)
+    training_params: Dict[str, Any] = field(default_factory=dict)
 ```
 
 **Class Methods:**
@@ -189,7 +183,7 @@ class ScorerConfig:
 
 **Methods:**
 
-- `build(auto_load=True)` → Build scorer from config
+- `build(auto_load=True, train_data=None, train_labels=None, target_categories=None, **train_overrides)` → Build scorer from config
 - `to_dict()` → Convert to dictionary
 
 ---
@@ -251,7 +245,7 @@ Abstract base class for reference datasets.
 
 - `load()` → Load data
 - `contains(kmer)` → Check k-mer existence
-- `get_frequency(kmer, default)` → Get k-mer frequency
+- `get_frequency(kmer, default)` → Get k-mer presence (1.0 if present)
 - `get_categories()` → List categories
 - `iter_kmers()` → Iterate over k-mers
 
@@ -311,7 +305,7 @@ class DataManager:
     )
 ```
 
-Manages WEIRDO reference data and indices.
+Manages WEIRDO reference data downloads.
 
 **Methods:**
 
@@ -321,13 +315,9 @@ Manages WEIRDO reference data and indices.
 - `get_data_path(name)` → Get path to dataset
 - `delete_download(name)` → Delete a dataset
 - `delete_all_downloads()` → Delete all datasets
-- `build_index(name)` → Build an index
-- `rebuild_indices()` → Rebuild all indices
-- `delete_index(name)` → Delete an index
-- `delete_all_indices()` → Delete all indices
 - `status()` → Get status dict
 - `print_status()` → Print human-readable status
-- `clear_all()` → Delete everything
+- `clear_all()` → Delete all downloads
 
 **Example:**
 
@@ -370,17 +360,15 @@ Ensure reference data is available, optionally downloading.
 
 ```bash
 # Setup
-weirdo setup                  # Download data and build indices
+weirdo setup                  # Download reference data
 
 # Data management
-weirdo data list              # List datasets and indices (alias: ls, status)
+weirdo data list              # List datasets (alias: ls, status)
 weirdo data download          # Download reference data
 weirdo data clear             # Clear data
-weirdo data index             # Build indices
 weirdo data path              # Show data directory
 
-# Scoring
-weirdo score PEPTIDE...       # Score peptides
-weirdo score -p human PEP     # Use specific preset
-weirdo score --auto-download  # Auto-download if needed
+# Model training + scoring
+weirdo models train --data train.csv --name my-model
+weirdo score --model my-model PEPTIDE...
 ```

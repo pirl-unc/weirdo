@@ -253,6 +253,10 @@ class ModelManager:
                 print(f"    Created: {model.created[:19]}")
             if 'n_train' in model.metadata:
                 print(f"    Training samples: {model.metadata['n_train']}")
+            if 'n_epochs' in model.metadata:
+                print(f"    Epochs trained: {model.metadata['n_epochs']}")
+            if 'final_train_loss' in model.metadata:
+                print(f"    Final train loss: {model.metadata['final_train_loss']:.4f}")
             if 'best_val_loss' in model.metadata:
                 print(f"    Best val loss: {model.metadata['best_val_loss']:.4f}")
             if 'k' in model.params:

@@ -4,7 +4,7 @@ Usage:
     weirdo data status          # Show data status
     weirdo data download        # Download reference data
     weirdo data clear           # Clear all data
-    weirdo score PEPTIDE        # Score a peptide
+    weirdo score --model NAME PEPTIDE...  # Score peptides
     weirdo models list          # List trained models
     weirdo models train         # Train a new model
     weirdo models info NAME     # Show model info
@@ -27,11 +27,11 @@ def create_parser():
     # -------------------------------------------------------------------------
     # Data management commands
     # -------------------------------------------------------------------------
-    data_parser = subparsers.add_parser('data', help='Manage reference data and indices')
+    data_parser = subparsers.add_parser('data', help='Manage reference data')
     data_subparsers = data_parser.add_subparsers(dest='data_command', help='Data commands')
 
     # data list (aliased as 'ls' and 'status')
-    list_parser = data_subparsers.add_parser('list', help='List datasets and indices with status')
+    list_parser = data_subparsers.add_parser('list', help='List datasets with status')
     data_subparsers.add_parser('ls', help='Alias for list')
     data_subparsers.add_parser('status', help='Alias for list')
 
@@ -55,44 +55,21 @@ def create_parser():
     )
 
     # data clear
-    clear_parser = data_subparsers.add_parser('clear', help='Clear downloaded data and/or indices')
+    clear_parser = data_subparsers.add_parser('clear', help='Clear downloaded data')
     clear_parser.add_argument(
         '--downloads',
         action='store_true',
         help='Clear only downloaded data files',
     )
     clear_parser.add_argument(
-        '--indices',
-        action='store_true',
-        help='Clear only built indices',
-    )
-    clear_parser.add_argument(
         '--all',
         action='store_true',
-        help='Clear everything (downloads and indices)',
+        help='Clear all downloaded data',
     )
     clear_parser.add_argument(
         '-y', '--yes',
         action='store_true',
         help='Skip confirmation prompt',
-    )
-
-    # data index
-    index_parser = data_subparsers.add_parser('index', help='Build or rebuild indices')
-    index_parser.add_argument(
-        'index_name',
-        nargs='?',
-        help='Index to build (frequency, set). If not specified, builds all.',
-    )
-    index_parser.add_argument(
-        '-f', '--force',
-        action='store_true',
-        help='Force rebuild even if already present',
-    )
-    index_parser.add_argument(
-        '--all',
-        action='store_true',
-        help='Rebuild all indices',
     )
 
     # data path
@@ -108,14 +85,8 @@ def create_parser():
         help='Peptide sequences to score',
     )
     score_parser.add_argument(
-        '-p', '--preset',
-        default='default',
-        help='Scoring preset (default, human, pathogen, etc.)',
-    )
-    score_parser.add_argument(
-        '--auto-download',
-        action='store_true',
-        help='Automatically download data if not present',
+        '-m', '--model',
+        help='Trained model name to use for scoring',
     )
 
     # -------------------------------------------------------------------------
@@ -139,12 +110,7 @@ def create_parser():
     # -------------------------------------------------------------------------
     # Setup command
     # -------------------------------------------------------------------------
-    setup_parser = subparsers.add_parser('setup', help='Initial setup - download data and build indices')
-    setup_parser.add_argument(
-        '--skip-index',
-        action='store_true',
-        help='Skip building indices (just download data)',
-    )
+    setup_parser = subparsers.add_parser('setup', help='Initial setup - download reference data')
 
     # -------------------------------------------------------------------------
     # Model management commands
@@ -176,7 +142,7 @@ def create_parser():
     models_train_parser.add_argument(
         '--data',
         required=True,
-        help='Training data CSV (columns: peptide, label)',
+        help='Training data CSV (columns: peptide, label or peptide + category columns)',
     )
     models_train_parser.add_argument(
         '--val-data',
@@ -184,8 +150,7 @@ def create_parser():
     )
     models_train_parser.add_argument(
         '--name',
-        required=True,
-        help='Name for saved model',
+        help='Name for saved model (default: auto-generated)',
     )
     models_train_parser.add_argument(
         '--epochs',
@@ -254,56 +219,23 @@ def cmd_data_clear(args):
     dm = get_data_manager()
 
     # Determine what to clear
-    clear_downloads = args.downloads or args.all or (not args.downloads and not args.indices)
-    clear_indices = args.indices or args.all or (not args.downloads and not args.indices)
-
-    if not clear_downloads and not clear_indices:
-        clear_downloads = clear_indices = True
+    clear_downloads = args.downloads or args.all or (not args.downloads)
 
     # Confirm
     if not args.yes:
         status = dm.status()
         size_mb = status['total_size_mb']
-        what = []
-        if clear_downloads:
-            what.append('downloads')
-        if clear_indices:
-            what.append('indices')
-        print(f"This will delete {' and '.join(what)} ({size_mb:.1f} MB)")
+        print(f"This will delete downloads ({size_mb:.1f} MB)")
         response = input("Continue? [y/N] ")
         if response.lower() not in ('y', 'yes'):
             print("Aborted.")
             return 1
 
     # Clear
-    if clear_indices:
-        count = dm.delete_all_indices()
-        print(f"Deleted {count} indices")
-
     if clear_downloads:
         count = dm.delete_all_downloads()
         print(f"Deleted {count} downloads")
 
-    return 0
-
-
-def cmd_data_index(args):
-    """Handle: weirdo data index"""
-    from .data_manager import get_data_manager, INDEX_TYPES
-    dm = get_data_manager()
-
-    if args.all:
-        dm.rebuild_indices()
-    elif args.index_name:
-        if args.index_name not in INDEX_TYPES:
-            print(f"Unknown index: {args.index_name}")
-            print(f"Available: {list(INDEX_TYPES.keys())}")
-            return 1
-        dm.build_index(args.index_name, force=args.force)
-    else:
-        # Build all indices
-        for name in INDEX_TYPES:
-            dm.build_index(name, force=args.force)
     return 0
 
 
@@ -316,39 +248,32 @@ def cmd_data_path(args):
 
 def cmd_score(args):
     """Handle: weirdo score"""
-    from .data_manager import get_data_manager
+    if not args.model:
+        print("A trained model is required to score peptides.")
+        print("Train one with: weirdo models train --data train.csv --name my-model")
+        return 1
 
-    # Check if data is available
-    dm = get_data_manager(auto_download=args.auto_download, verbose=True)
+    from .model_manager import load_model
 
-    if not dm.is_downloaded('swissprot-8mers'):
-        if args.auto_download:
-            print("Reference data not found. Downloading...")
-            dm.download('swissprot-8mers')
-        else:
-            print("Reference data not found.")
-            print("Run: weirdo data download")
-            print("Or use: weirdo score --auto-download PEPTIDE")
-            return 1
-
-    # Score peptides
-    from .api import score_peptides, create_scorer
-
-    print(f"Scoring {len(args.peptides)} peptide(s) with preset '{args.preset}'...")
+    print(f"Scoring {len(args.peptides)} peptide(s) with model '{args.model}'...")
     print()
 
     try:
-        scorer = create_scorer(args.preset, cache=True)
-        scores = scorer.score(args.peptides)
-
-        print(f"{'Peptide':<40} {'Score':>10}")
-        print("-" * 52)
-        for pep, score in zip(args.peptides, scores):
-            display_pep = pep if len(pep) <= 37 else pep[:34] + '...'
-            print(f"{display_pep:<40} {score:>10.4f}")
-        print()
-        print("Higher scores = more foreign")
-
+        scorer = load_model(args.model)
+        if getattr(scorer, 'target_categories', None):
+            df = scorer.predict_dataframe(args.peptides)
+            print(df.to_string(index=False))
+            print()
+            print("Foreignness is derived from max(pathogens) vs max(self).")
+        else:
+            scores = scorer.score(args.peptides)
+            print(f"{'Peptide':<40} {'Score':>10}")
+            print("-" * 52)
+            for pep, score in zip(args.peptides, scores):
+                display_pep = pep if len(pep) <= 37 else pep[:34] + '...'
+                print(f"{display_pep:<40} {score:>10.4f}")
+            print()
+            print("Higher scores = more foreign")
     except FileNotFoundError as e:
         print(f"Error: {e}")
         return 1
@@ -383,13 +308,6 @@ def cmd_setup(args):
     print("Step 1: Downloading reference data...")
     dm.download('swissprot-8mers')
     print()
-
-    # Build indices (optional)
-    if not args.skip_index:
-        print("Step 2: Building indices...")
-        dm.build_index('frequency')
-        dm.build_index('set')
-        print()
 
     print("Setup complete!")
     print()
@@ -439,10 +357,16 @@ def cmd_models_info(args):
             print(f"  Training samples: {info.metadata['n_train']}")
         if 'n_epochs' in info.metadata:
             print(f"  Epochs trained: {info.metadata['n_epochs']}")
+        elif 'n_iter' in info.metadata:
+            print(f"  Epochs trained: {info.metadata['n_iter']}")
         if 'final_train_loss' in info.metadata:
             print(f"  Final train loss: {info.metadata['final_train_loss']:.4f}")
+        elif 'loss' in info.metadata:
+            print(f"  Final train loss: {info.metadata['loss']:.4f}")
         if 'best_val_loss' in info.metadata:
             print(f"  Best val loss: {info.metadata['best_val_loss']:.4f}")
+        elif 'best_loss' in info.metadata:
+            print(f"  Best val loss: {info.metadata['best_loss']:.4f}")
 
     return 0
 
@@ -475,21 +399,21 @@ def cmd_models_delete(args):
 def cmd_models_train(args):
     """Handle: weirdo models train"""
     import csv
-
-    # Check for torch
-    try:
-        import torch
-    except ImportError:
-        print("Error: PyTorch is required for training ML models.")
-        print("Install with: pip install torch")
-        return 1
+    from datetime import datetime
 
     from .model_manager import get_model_manager
     mm = get_model_manager()
 
+    # Generate default name if not provided
+    if args.name:
+        model_name = args.name
+    else:
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        model_name = f"mlp-{timestamp}"
+
     # Check if model already exists
-    if mm.get_model_info(args.name) and not args.overwrite:
-        print(f"Model already exists: {args.name}")
+    if mm.get_model_info(model_name) and not args.overwrite:
+        print(f"Model already exists: {model_name}")
         print("Use --overwrite to replace.")
         return 1
 
@@ -497,12 +421,29 @@ def cmd_models_train(args):
     print(f"Loading training data from {args.data}...")
     peptides = []
     labels = []
+    target_categories = None
     with open(args.data, 'r') as f:
         reader = csv.DictReader(f)
+        if not reader.fieldnames or 'peptide' not in reader.fieldnames:
+            print("Training CSV must include a 'peptide' column.")
+            return 1
+        label_columns = [c for c in reader.fieldnames if c != 'peptide']
+        if not label_columns:
+            print("Training CSV must include at least one label column.")
+            return 1
+
         for row in reader:
             peptides.append(row['peptide'])
-            labels.append(float(row['label']))
+            if label_columns == ['label']:
+                labels.append(float(row['label']))
+            else:
+                labels.append([float(row[c]) for c in label_columns])
+        if label_columns != ['label']:
+            target_categories = label_columns
+
     print(f"  Loaded {len(peptides)} samples")
+    if target_categories:
+        print(f"  Target categories: {', '.join(target_categories)}")
 
     # Load validation data if provided
     val_peptides = None
@@ -513,29 +454,44 @@ def cmd_models_train(args):
         val_labels = []
         with open(args.val_data, 'r') as f:
             reader = csv.DictReader(f)
+            if not reader.fieldnames or 'peptide' not in reader.fieldnames:
+                print("Validation CSV must include a 'peptide' column.")
+                return 1
+            val_label_columns = [c for c in reader.fieldnames if c != 'peptide']
+            if target_categories:
+                if val_label_columns != target_categories:
+                    print("Validation label columns must match training labels.")
+                    print(f"Expected: {target_categories}")
+                    print(f"Found:    {val_label_columns}")
+                    return 1
+            else:
+                if val_label_columns != ['label']:
+                    print("Validation CSV must include a single 'label' column.")
+                    return 1
             for row in reader:
                 val_peptides.append(row['peptide'])
-                val_labels.append(float(row['label']))
+                if target_categories:
+                    val_labels.append([float(row[c]) for c in val_label_columns])
+                else:
+                    val_labels.append(float(row['label']))
         print(f"  Loaded {len(val_peptides)} validation samples")
 
     # Create model
+    from .scorers.mlp import MLPScorer
+    hidden_layers = tuple(int(x) for x in args.hidden_layers.split(','))
+
     print()
-    print(f"Training {args.model_type} model...")
+    print(f"Training {args.type} model...")
     print(f"  K-mer size: {args.k}")
-    print(f"  Embedding dim: {args.embedding_dim}")
+    print(f"  Hidden layers: {hidden_layers}")
     print(f"  Epochs: {args.epochs}")
     print(f"  Learning rate: {args.lr}")
     print()
 
-    from .scorers.mlp import MLPScorer
-    hidden_layers = tuple(int(x) for x in args.hidden_layers.split(','))
-    print(f"  Hidden layers: {hidden_layers}")
     scorer = MLPScorer(
         k=args.k,
         hidden_layer_sizes=hidden_layers,
     )
-
-    print()
 
     # Train
     scorer.train(
@@ -546,12 +502,13 @@ def cmd_models_train(args):
         epochs=args.epochs,
         learning_rate=args.lr,
         verbose=True,
+        target_categories=target_categories,
     )
 
     # Save
     print()
-    print(f"Saving model as '{args.name}'...")
-    path = mm.save(scorer, args.name, overwrite=args.overwrite)
+    print(f"Saving model as '{model_name}'...")
+    path = mm.save(scorer, model_name, overwrite=args.overwrite)
     print(f"  Saved to: {path}")
 
     return 0
@@ -574,13 +531,9 @@ def cmd_models_scorers(args):
 
     scorers = list_scorers()
     for name in scorers:
-        if name in ('frequency', 'similarity'):
-            print(f"  {name:<20} (lookup-based, no training)")
-        else:
-            print(f"  {name:<20} (ML-based, requires training)")
+        print(f"  {name:<20} (ML-based, requires training)")
 
     print()
-    print("Lookup-based scorers use fit() with a reference dataset.")
     print("ML-based scorers use train() with labeled peptide data.")
 
     return 0
@@ -609,8 +562,6 @@ def run(args_list=None):
             return cmd_data_download(args)
         elif args.data_command == 'clear':
             return cmd_data_clear(args)
-        elif args.data_command == 'index':
-            return cmd_data_index(args)
         elif args.data_command == 'path':
             return cmd_data_path(args)
 

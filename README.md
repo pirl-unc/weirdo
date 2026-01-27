@@ -1,33 +1,58 @@
 [![Tests](https://github.com/pirl-unc/weirdo/actions/workflows/tests.yml/badge.svg)](https://github.com/pirl-unc/weirdo/actions/workflows/tests.yml)
 [![Documentation](https://github.com/pirl-unc/weirdo/actions/workflows/docs.yml/badge.svg)](https://github.com/pirl-unc/weirdo/actions/workflows/docs.yml)
 [![PyPI](https://img.shields.io/pypi/v/weirdo.svg)](https://pypi.python.org/pypi/weirdo/)
-[![Python Version](https://img.shields.io/pypi/pyversions/weirdo.svg)](https://pypi.python.org/pypi/weirdo/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # WEIRDO
 
 **W**idely **E**stimated **I**mmunological **R**ecognition and **D**etection of **O**utliers
 
-A Python library for computing metrics of immunological foreignness for candidate T-cell epitopes.
+A Python library for computing peptide foreignness scores—predicting whether a peptide sequence is likely from a pathogen (bacteria, virus) or from self (human, mammalian).
+
+## Overview
+
+WEIRDO trains a multi-layer perceptron (MLP) on k-mer presence data from SwissProt to predict organism category membership. Given any peptide, it outputs:
+
+- **Category probabilities**: likelihood of appearing in human, bacteria, viruses, mammals, etc.
+- **Foreignness score**: `max(pathogens) / (max(pathogens) + max(self))`
 
 ## Quick Start
 
 ```python
-# Simple API
-from weirdo import score_peptide, score_peptides
+from weirdo.scorers import SwissProtReference, MLPScorer
 
-# Score a single peptide
-score = score_peptide('MTMDKSEL')
-print(f"Foreignness score: {score:.3f}")
+# Load reference data (SwissProt 8-mers with organism labels)
+ref = SwissProtReference().load()
 
-# Score multiple peptides
-peptides = ['MTMDKSEL', 'ACDEFGHI', 'XXXXXXXX']
-scores = score_peptides(peptides)
-for pep, score in zip(peptides, scores):
-    print(f"{pep}: {score:.3f}")
+# Define organism categories
+categories = [
+    'archaea', 'bacteria', 'fungi', 'human', 'invertebrates',
+    'mammals', 'plants', 'rodents', 'vertebrates', 'viruses'
+]
+
+# Get training data: each 8-mer labeled with organism presence
+peptides, labels = ref.get_training_data(
+    target_categories=categories,
+    multi_label=True,
+    max_samples=200000  # Optional: sample for faster training
+)
+
+# Train the MLP
+scorer = MLPScorer(k=8, hidden_layer_sizes=(256, 128, 64))
+scorer.train(peptides, labels, target_categories=categories, epochs=200)
+
+# Score new peptides (any length)
+df = scorer.predict_dataframe(['MTMDKSEL', 'SIINFEKL', 'NLVPMVATV'])
+print(df)
 ```
 
-**Higher scores = more foreign** (peptide k-mers are rare or absent in the reference proteome)
+**Output:**
+```
+    peptide  human  viruses  bacteria  mammals  ...  foreignness
+   MTMDKSEL   0.82     0.12      0.08     0.79  ...        0.127
+   SIINFEKL   0.15     0.73      0.21     0.18  ...        0.802
+  NLVPMVATV   0.31     0.68      0.15     0.35  ...        0.660
+```
 
 ## Installation
 
@@ -35,185 +60,172 @@ for pep, score in zip(peptides, scores):
 pip install weirdo
 ```
 
-For development:
-
+Download reference data (~2.5 GB compressed / ~7.5 GB uncompressed) for training:
 ```bash
-git clone https://github.com/pirl-unc/weirdo.git
-cd weirdo
-./develop.sh
-```
-
-## Setup: Downloading Reference Data
-
-WEIRDO requires reference data (~2.5 GB compressed, ~7.5 GB uncompressed) for scoring.
-
-### Option 1: CLI Setup (Recommended)
-
-```bash
-# Complete setup: download data and build indices
-weirdo setup
-
-# Or just download data
 weirdo data download
 ```
 
-### Option 2: Auto-download on First Use
+## Training Data
+
+WEIRDO uses pre-computed 8-mer data from SwissProt (~100M unique k-mers):
+
+| Category | Description |
+|----------|-------------|
+| human | Homo sapiens proteins |
+| rodents | Mouse, rat proteins |
+| mammals | Other mammals (dog, cow, primates, etc.) |
+| vertebrates | Fish, birds, reptiles, amphibians |
+| invertebrates | Insects, worms, mollusks |
+| bacteria | Bacterial proteins |
+| viruses | Viral proteins |
+| archaea | Archaeal proteins |
+| fungi | Fungal proteins |
+| plants | Plant proteins |
+
+Each 8-mer has True/False labels for each category, indicating whether it appears in proteins from that organism group.
+
+## Feature Extraction
+
+The MLP uses **663 features** extracted from each peptide:
+
+### Amino Acid Properties (48 features)
+12 physicochemical properties × 4 statistics (mean, std, min, max):
+- Hydropathy, hydrophilicity
+- Mass, volume
+- Polarity, pK side chain
+- Accessible surface area (folded/unfolded)
+- Local flexibility, refractivity
+- Solvent exposed area, % exposed residues
+
+### Structural Features (27 features)
+- **Secondary structure propensities** (12): helix, sheet, turn × 4 stats
+- **Category fractions** (9): positive/negative charged, hydrophobic, aromatic, aliphatic, polar, tiny, small, cysteine
+- **Charge features** (4): net charge, charge transitions, max cluster, R/(R+K) ratio
+- **Disorder features** (2): disorder/order promoting fractions
+
+### Composition Features (420 features)
+- **Amino acid frequencies** (20): fraction of each amino acid
+- **Dipeptide frequencies** (400): fraction of each amino acid pair
+
+### Positional Features (168 features)
+- **K-mer one-hot encoding** (k × 21): position-specific amino acid identity
+
+## API Reference
+
+### Training
 
 ```python
-from weirdo import score_peptide
+from weirdo.scorers import SwissProtReference, MLPScorer
 
-# Automatically download data if not present
-score = score_peptide('MTMDKSEL', auto_download=True)
+# Load reference
+ref = SwissProtReference().load()
+
+# Get training data
+peptides, labels = ref.get_training_data(
+    target_categories=['human', 'viruses', 'bacteria', 'mammals'],
+    multi_label=True,
+    max_samples=100000  # Optional: limit for memory
+)
+
+# Train
+scorer = MLPScorer(
+    k=8,
+    hidden_layer_sizes=(256, 128, 64),
+    activation='relu',
+    alpha=0.0001,  # L2 regularization
+)
+scorer.train(
+    peptides, labels,
+    target_categories=['human', 'viruses', 'bacteria', 'mammals'],
+    epochs=200,
+    learning_rate=0.001
+)
 ```
 
-### Data Management CLI
+### Prediction
+
+```python
+# Category probabilities (sigmoid-activated)
+probs = scorer.predict_proba(['MTMDKSEL'])
+# Shape: (1, n_categories)
+
+# Foreignness score
+foreign = scorer.foreignness(
+    ['MTMDKSEL'],
+    pathogen_categories=['bacteria', 'viruses'],
+    self_categories=['human', 'mammals', 'rodents']
+)
+# Returns: max(pathogens) / (max(pathogens) + max(self))
+
+# Full DataFrame output (handles variable-length peptides)
+df = scorer.predict_dataframe(['MTMDKSEL', 'SIINFEKL', 'NLVPMVATV'])
+```
+
+### Feature Extraction
+
+```python
+# Extract features as DataFrame
+df = scorer.features_dataframe(['MTMDKSEL', 'SIINFEKL'])
+# Shape: (2, 664) - 663 features + peptide column
+
+# Feature names
+names = scorer.get_feature_names()
+# ['hydropathy_mean', 'hydropathy_std', ..., 'dipep_YY']
+```
+
+### Model Persistence
+
+```python
+from weirdo import save_model, load_model, list_models
+
+# Save trained model
+save_model(scorer, 'my-foreignness-model')
+
+# List saved models
+for model in list_models():
+    print(f"{model.name}: {model.scorer_type}")
+
+# Load model
+scorer = load_model('my-foreignness-model')
+```
+
+### CLI
 
 ```bash
-weirdo data list       # List datasets and indices (alias: ls, status)
-weirdo data download   # Download reference data
-weirdo data clear      # Delete downloaded data
-weirdo data index      # Build/rebuild indices
-weirdo data path       # Show data directory location
-```
+# Data management
+weirdo data download        # Download SwissProt reference
+weirdo data list            # Show data status
 
-## Features
+# Model management
+weirdo models list          # List trained models
+weirdo models train --data train.csv --name my-model
+weirdo models info my-model # Show model details
 
-### Foreignness Scoring
-
-Score peptides for immunological foreignness using multiple methods:
-
-```python
-from weirdo.scorers import FrequencyScorer, SimilarityScorer, SwissProtReference
-
-# Load reference proteome (human proteins)
-ref = SwissProtReference(categories=['human']).load()
-
-# Frequency-based scoring
-freq_scorer = FrequencyScorer(k=8, aggregate='mean').fit(ref)
-scores = freq_scorer.score(['MTMDKSEL', 'XXXXXXXX'])
-
-# Similarity-based scoring (using BLOSUM62)
-sim_scorer = SimilarityScorer(k=8, matrix='blosum62').fit(ref)
-scores = sim_scorer.score(['MTMDKSEL', 'XXXXXXXX'])
-```
-
-### Presets
-
-Use built-in presets for common configurations:
-
-```python
-from weirdo import create_scorer, get_available_presets
-
-# List available presets
-print(get_available_presets())
-# ['default', 'fast', 'human', 'pathogen', 'similarity_blosum62', 'similarity_pmbec']
-
-# Create scorer with preset
-scorer = create_scorer('human')
-scores = scorer.score(['MTMDKSEL'])
-```
-
-### Amino Acid Properties
-
-Access comprehensive amino acid property data:
-
-```python
-from weirdo.amino_acid_properties import hydropathy, volume, polarity
-from weirdo.blosum import blosum62_dict
-from weirdo.pmbec import pmbec_dict
-
-# Single residue properties
-print(f"Alanine hydropathy: {hydropathy['A']}")
-
-# Substitution matrices
-print(f"A→V substitution score: {blosum62_dict['A']['V']}")
-```
-
-### Peptide Vectorization
-
-Convert peptides to numerical feature vectors:
-
-```python
-from weirdo import PeptideVectorizer
-
-vectorizer = PeptideVectorizer(max_ngram=2, normalize_row=True)
-X = vectorizer.fit_transform(['ACDEFGHIK', 'KLMNPQRST'])
+# Scoring
+weirdo score --model my-model MTMDKSEL SIINFEKL
 ```
 
 ## Architecture
 
-WEIRDO uses an extensible plugin architecture:
-
 ```
 weirdo/
-├── scorers/           # Foreignness scoring system
-│   ├── base.py        # BaseScorer, BatchScorer ABCs
-│   ├── reference.py   # BaseReference, StreamingReference ABCs
-│   ├── registry.py    # Plugin registration
-│   ├── config.py      # Configuration and presets
-│   ├── frequency.py   # FrequencyScorer
-│   ├── similarity.py  # SimilarityScorer
-│   └── swissprot.py   # SwissProtReference
-├── api.py             # High-level convenience functions
-├── amino_acid_*.py    # Amino acid data
-├── blosum.py          # BLOSUM matrices
-├── pmbec.py           # PMBEC matrix
-└── peptide_vectorizer.py
-```
-
-### Adding Custom Scorers
-
-```python
-from weirdo.scorers import register_scorer, BaseScorer
-
-@register_scorer('my_scorer', description='My custom scorer')
-class MyScorer(BaseScorer):
-    def fit(self, reference):
-        self._reference = reference
-        self._is_fitted = True
-        return self
-
-    def score(self, peptides):
-        self._check_is_fitted()
-        # Custom scoring logic
-        pass
-```
-
-## Reference Data
-
-WEIRDO uses pre-computed k-mer data from SwissProt:
-
-- **10 organism categories**: human, mammals, bacteria, viruses, archaea, fungi, invertebrates, plants, rodents, vertebrates
-- **~100M unique 8-mers** across all categories
-- **Category filtering** for targeted analysis
-
-## Development
-
-```bash
-# Install development dependencies
-./develop.sh
-
-# Run linting
-./lint.sh
-
-# Run tests
-./test.sh
-
-# Build documentation
-mkdocs build
-
-# Serve documentation locally
-mkdocs serve
+├── scorers/
+│   ├── mlp.py          # MLPScorer with feature extraction
+│   ├── swissprot.py    # SwissProtReference (training data)
+│   ├── config.py       # Presets and configuration
+│   ├── registry.py     # Scorer registry
+│   └── trainable.py    # TrainableScorer base class
+├── model_manager.py    # Save/load trained models
+├── amino_acid_properties.py  # 12 AA property dictionaries
+└── api.py              # High-level functions
 ```
 
 ## Citation
 
-If you use WEIRDO in your research, please cite:
-
-```
+```bibtex
 @software{weirdo,
   title = {WEIRDO: Widely Estimated Immunological Recognition and Detection of Outliers},
-  author = {OpenVax},
+  author = {PIRL-UNC},
   url = {https://github.com/pirl-unc/weirdo}
 }
 ```
@@ -221,9 +233,3 @@ If you use WEIRDO in your research, please cite:
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) for details.
-
-## Related Projects
-
-- [pepdata](https://github.com/openvax/pepdata) - Amino acid property data
-- [mhctools](https://github.com/openvax/mhctools) - MHC binding prediction
-- [vaxrank](https://github.com/openvax/vaxrank) - Personalized cancer vaccine design

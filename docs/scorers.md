@@ -1,196 +1,222 @@
 # Foreignness Scorers
 
-WEIRDO provides an extensible architecture for foreignness scoring with multiple
-scorer implementations and reference datasets.
+WEIRDO provides multiple methods for scoring peptide foreignness, from simple k-mer lookup to trained neural networks.
 
-## Architecture Overview
+## MLPScorer (Recommended)
 
-The scoring system uses three main components:
+A multi-layer perceptron trained on SwissProt k-mer data to predict organism category membership.
 
-1. **References**: Load and query k-mer data from protein databases
-2. **Scorers**: Compute foreignness scores using reference data
-3. **Registry**: Plugin system for adding new implementations
+### Training Data
 
-```
-Reference (SwissProt) → Scorer (Frequency/Similarity) → Scores
-```
+The training data comes from SwissProt, containing ~100M unique 8-mers with binary labels for 10 organism categories:
 
-## FrequencyScorer
-
-Scores peptides based on k-mer frequency in the reference dataset.
-
-### How it works
-
-1. Decompose peptide into overlapping k-mers
-2. Look up each k-mer's frequency in the reference
-3. Compute `-log10(frequency + pseudocount)` for each k-mer
-4. Aggregate k-mer scores using specified method
+| Category | Description |
+|----------|-------------|
+| human | Homo sapiens |
+| rodents | Mouse, rat |
+| mammals | Other mammals (dog, cow, primates, etc.) |
+| vertebrates | Fish, birds, reptiles, amphibians |
+| invertebrates | Insects, worms, mollusks |
+| bacteria | Bacterial proteins |
+| viruses | Viral proteins |
+| archaea | Archaeal proteins |
+| fungi | Fungal proteins |
+| plants | Plant proteins |
 
 ```python
-from weirdo.scorers import FrequencyScorer, SwissProtReference
+from weirdo.scorers import SwissProtReference
 
-ref = SwissProtReference(categories=['human']).load()
-scorer = FrequencyScorer(
-    k=8,
-    pseudocount=1e-10,
-    aggregate='mean'
-).fit(ref)
+ref = SwissProtReference().load()
 
-scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
+# Get multi-label training data
+peptides, labels = ref.get_training_data(
+    target_categories=['human', 'viruses', 'bacteria', 'mammals'],
+    multi_label=True,
+    max_samples=100000  # Optional memory limit
+)
+# labels.shape = (100000, 4)
 ```
 
-### Parameters
+### Feature Extraction
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `k` | int | 8 | K-mer size |
-| `pseudocount` | float | 1e-10 | Added to frequencies to avoid log(0) |
-| `aggregate` | str | 'mean' | Aggregation method ('mean', 'max', 'min', 'sum') |
+The MLP extracts **663 features** from each peptide:
 
-### Inspecting K-mer Scores
+#### Amino Acid Properties (48 features)
+
+12 physicochemical properties, each summarized with 4 statistics (mean, std, min, max):
+
+| Property | Description |
+|----------|-------------|
+| hydropathy | Kyte-Doolittle scale |
+| hydrophilicity | Hopp-Woods scale |
+| mass | Molecular weight |
+| volume | Residue volume |
+| polarity | Grantham polarity |
+| pK_side_chain | Side chain pKa |
+| accessible_surface_area | Unfolded ASA |
+| accessible_surface_area_folded | Folded ASA |
+| local_flexibility | B-factor correlation |
+| refractivity | Molar refractivity |
+| solvent_exposed_area | Fraction exposed |
+| prct_exposed_residues | % typically exposed |
+
+#### Structural Features (27 features)
+
+| Feature Group | Count | Features |
+|---------------|-------|----------|
+| Secondary structure | 12 | helix/sheet/turn propensity × 4 stats |
+| Category fractions | 9 | positive_charged, negative_charged, hydrophobic, aromatic, aliphatic, polar_uncharged, tiny, small, cysteine |
+| Charge features | 4 | net_charge, charge_transitions, max_cluster, arginine_ratio |
+| Disorder features | 2 | disorder_promoting, order_promoting fractions |
+
+**Viral-discriminating features:**
+- `frac_cysteine`: Viruses often have more cysteines (disulfide bonds)
+- `arginine_ratio` (R/(R+K)): Viruses often have depleted arginine
+- `frac_disorder_promoting`: Viral proteins often more disordered
+
+#### Composition Features (420 features)
+
+| Feature | Count | Description |
+|---------|-------|-------------|
+| AA frequencies | 20 | Fraction of each amino acid |
+| Dipeptide frequencies | 400 | Fraction of each AA pair (20×20) |
+
+#### Positional Features (168 features)
+
+| Feature | Count | Description |
+|---------|-------|-------------|
+| K-mer one-hot | k×21 | Position-specific AA encoding (168 for k=8) |
+
+### Training
 
 ```python
-# Get individual k-mer contributions
-kmer_scores = scorer.get_kmer_scores('MTMDKSELVQKAKLAE')
-for kmer, score in kmer_scores:
-    print(f"  {kmer}: {score:.3f}")
-```
+from weirdo.scorers import SwissProtReference, MLPScorer
 
-## MLPScorer
+ref = SwissProtReference().load()
 
-Trainable MLP (multi-layer perceptron) for learning foreignness from labeled data.
-Uses one-hot encoded amino acid features and scikit-learn's MLPRegressor.
+categories = [
+    'archaea', 'bacteria', 'fungi', 'human', 'invertebrates',
+    'mammals', 'plants', 'rodents', 'vertebrates', 'viruses'
+]
 
-### How it works
+peptides, labels = ref.get_training_data(
+    target_categories=categories,
+    multi_label=True
+)
 
-1. Convert peptides to one-hot encoded features (k positions × 21 amino acids)
-2. Train an MLP regressor on labeled peptide data
-3. Predict foreignness scores for new peptides
-
-```python
-from weirdo.scorers import MLPScorer
-
-# Create and train
 scorer = MLPScorer(
     k=8,
     hidden_layer_sizes=(256, 128, 64),
     activation='relu',
+    alpha=0.0001,
+    early_stopping=True,
 )
-scorer.train(peptides, labels, epochs=200)
 
-# Score new peptides
-scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
-
-# Save and load
-scorer.save('my_model')
-loaded = MLPScorer.load('my_model')
-```
-
-### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `k` | int | 8 | K-mer size |
-| `hidden_layer_sizes` | tuple | (256, 128, 64) | Sizes of hidden layers |
-| `activation` | str | 'relu' | Activation function ('relu', 'tanh', 'logistic') |
-| `alpha` | float | 0.0001 | L2 regularization strength |
-| `early_stopping` | bool | True | Use early stopping with validation split |
-
-### Training Parameters
-
-```python
 scorer.train(
-    peptides=peptides,       # Training sequences
-    labels=labels,           # Target foreignness scores
-    epochs=200,              # Maximum iterations
-    learning_rate=0.001,     # Initial learning rate
-    verbose=True,            # Print progress
+    peptides, labels,
+    target_categories=categories,
+    epochs=200,
+    learning_rate=0.001,
+    verbose=True
 )
-```
-
-### Model Management
-
-```python
-from weirdo import list_models, load_model, save_model
-
-# Save a trained model
-save_model(scorer, 'my-foreignness-model')
-
-# List available models
-for model in list_models():
-    print(f"{model.name}: {model.scorer_type}")
-
-# Load a model
-scorer = load_model('my-foreignness-model')
-```
-
-### CLI Training
-
-```bash
-# Train from CSV (columns: peptide, label)
-weirdo models train --data train.csv --name my-model --hidden-layers 256,128
-
-# List trained models
-weirdo models list
-
-# Show model info
-weirdo models info my-model
-```
-
-## SimilarityScorer
-
-Scores peptides based on minimum distance to reference k-mers using
-substitution matrices (BLOSUM, PMBEC).
-
-### How it works
-
-1. Decompose peptide into overlapping k-mers
-2. For each k-mer, find the most similar reference k-mer
-3. Compute distance based on substitution matrix
-4. Aggregate distances across k-mers
-
-```python
-from weirdo.scorers import SimilarityScorer, SwissProtReference
-
-ref = SwissProtReference(categories=['human']).load()
-scorer = SimilarityScorer(
-    k=8,
-    matrix='blosum62',
-    max_candidates=1000,
-    distance_metric='min_distance'
-).fit(ref)
-
-scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
 ```
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `k` | int | 8 | K-mer size |
-| `matrix` | str | 'blosum62' | Substitution matrix ('blosum30', 'blosum50', 'blosum62', 'pmbec') |
-| `max_candidates` | int | 1000 | Maximum reference k-mers to compare |
-| `distance_metric` | str | 'min_distance' | Distance computation method |
-| `aggregate` | str | 'mean' | Aggregation method |
+| `k` | int | 8 | K-mer size for positional features |
+| `hidden_layer_sizes` | tuple | (256, 128, 64) | Hidden layer dimensions |
+| `activation` | str | 'relu' | Activation: 'relu', 'tanh', 'logistic' |
+| `alpha` | float | 0.0001 | L2 regularization strength |
+| `early_stopping` | bool | True | Stop when validation loss plateaus |
+| `use_dipeptides` | bool | True | Include 400 dipeptide features |
 
-### Finding Closest Matches
+### Prediction Methods
+
+#### `predict_proba(peptides, aggregate='mean')` - Category Probabilities
+
+Returns sigmoid-activated probabilities for each category:
 
 ```python
-# Find closest reference k-mers
-matches = scorer.get_closest_reference('MTMDKSEL', n=5)
-for ref_kmer, distance in matches:
-    print(f"  {ref_kmer}: distance={distance:.3f}")
+probs = scorer.predict_proba(['MTMDKSEL', 'SIINFEKL'], aggregate='mean')
+# Shape: (2, n_categories)
+# Values in [0, 1]
 ```
+
+#### `foreignness(peptides)` - Foreignness Score
+
+Computes: `max(pathogens) / (max(pathogens) + max(self))`
+
+```python
+scores = scorer.foreignness(
+    ['MTMDKSEL', 'SIINFEKL'],
+    pathogen_categories=['bacteria', 'viruses'],
+    self_categories=['human', 'mammals', 'rodents']
+)
+# Values in [0, 1], higher = more foreign
+```
+
+#### `predict_dataframe(peptides)` - Full Results
+
+Returns DataFrame with all category probabilities and foreignness:
+
+```python
+df = scorer.predict_dataframe([
+    'MTMDKSEL',           # 8-mer
+    'MTMDKSELVQKAKLAE',   # Variable length (aggregates k-mers)
+    'SIINFEKL',
+])
+```
+
+Output:
+```
+         peptide  human  viruses  bacteria  mammals  ...  foreignness
+        MTMDKSEL   0.82     0.12      0.08     0.79  ...        0.127
+MTMDKSELVQKAKLAE   0.78     0.15      0.10     0.75  ...        0.161
+        SIINFEKL   0.15     0.73      0.21     0.18  ...        0.802
+```
+
+Options:
+- `aggregate='mean'|'max'|'min'`: How to combine k-mer scores for long peptides
+- `pathogen_categories`: Categories for foreignness numerator
+- `self_categories`: Categories for foreignness denominator
+
+#### `features_dataframe(peptides)` - Feature Extraction
+
+Returns DataFrame with all 663 features:
+
+```python
+df = scorer.features_dataframe(['MTMDKSEL', 'SIINFEKL'])
+# Shape: (2, 664) - 663 features + peptide column
+
+# Get feature names
+names = scorer.get_feature_names()
+```
+
+### Model Persistence
+
+```python
+from weirdo import save_model, load_model, list_models
+
+# Save
+save_model(scorer, 'my-model')
+
+# List
+for m in list_models():
+    print(f"{m.name}: {m.scorer_type}")
+
+# Load
+scorer = load_model('my-model')
+
+# Models stored in ~/.weirdo/models/
+```
+
+---
 
 ## SwissProtReference
 
-Reference dataset from the SwissProt protein database, containing pre-computed
-k-mer presence across organism categories.
-
-### Categories
-
-- archaea, bacteria, fungi, human, invertebrates
-- mammals, plants, rodents, vertebrates, viruses
+Reference dataset providing k-mer presence across organism categories.
 
 ```python
 from weirdo.scorers import SwissProtReference
@@ -199,115 +225,57 @@ from weirdo.scorers import SwissProtReference
 ref = SwissProtReference().load()
 
 # Load specific categories
-ref = SwissProtReference(categories=['human', 'mammals']).load()
+ref = SwissProtReference(categories=['human', 'viruses']).load()
 
-# Memory-efficient mode (presence only, no category info)
-ref = SwissProtReference(use_set=True).load()
-
-# Lazy mode (stream from disk, low memory)
-ref = SwissProtReference(lazy=True).load()
+# Memory-efficient modes
+ref = SwissProtReference(use_set=True).load()   # Presence only
+ref = SwissProtReference(lazy=True).load()      # Stream from disk
 ```
 
-### Querying the Reference
+### Querying
 
 ```python
 # Check if k-mer exists
 if 'MTMDKSEL' in ref:
-    print("K-mer found!")
+    print("Found!")
 
 # Get category breakdown
 cats = ref.get_kmer_categories('MTMDKSEL')
-print(f"Human: {cats['human']}, Bacteria: {cats['bacteria']}")
+# {'human': True, 'bacteria': False, 'viruses': False, ...}
 
-# Iterate over all k-mers
-for kmer in ref.iter_kmers():
-    process(kmer)
+# Iterate over k-mers
+for kmer, categories in ref.iter_kmers_with_categories():
+    process(kmer, categories)
 ```
 
-## Configuration System
-
-Use `ScorerConfig` for reproducible configurations:
+### Training Data Generation
 
 ```python
-from weirdo.scorers import ScorerConfig
+# Single-label (foreignness to human)
+peptides, labels = ref.get_training_data(target_categories=['human'])
+# labels: 0 if in human, 1 if not
 
-# From preset
-config = ScorerConfig.from_preset('default')
-
-# From dictionary
-config = ScorerConfig.from_dict({
-    'scorer': 'frequency',
-    'reference': 'swissprot',
-    'k': 8,
-    'scorer_params': {'aggregate': 'max'},
-    'reference_params': {'categories': ['human']},
-})
-
-# From YAML file
-config = ScorerConfig.from_yaml('my_config.yaml')
-
-# Build scorer
-scorer = config.build()
+# Multi-label (all categories)
+peptides, labels = ref.get_training_data(
+    target_categories=['human', 'viruses', 'bacteria', 'mammals'],
+    multi_label=True
+)
+# labels.shape: (n_kmers, 4)
 ```
 
-## Adding Custom Scorers
+---
 
-Register new scorers using the decorator:
+## CLI Commands
 
-```python
-from weirdo.scorers import register_scorer, BaseScorer
-import numpy as np
+```bash
+# Data management
+weirdo data download    # Download SwissProt reference
+weirdo data list        # Show data status
+weirdo data path        # Show data directory
 
-@register_scorer('my_scorer', description='My custom scorer')
-class MyScorer(BaseScorer):
-    def __init__(self, k=8, my_param=1.0, **kwargs):
-        super().__init__(**kwargs)
-        self._params.update({'k': k, 'my_param': my_param})
-
-    def fit(self, reference):
-        self._reference = reference
-        self._is_fitted = True
-        return self
-
-    def score(self, peptides):
-        self._check_is_fitted()
-        peptides = self._ensure_list(peptides)
-        # Custom scoring logic
-        return np.array([self._score_one(p) for p in peptides])
-
-    def _score_one(self, peptide):
-        # Your implementation here
-        pass
-
-# Now available via registry
-from weirdo.scorers import create_scorer
-scorer = create_scorer('my_scorer', k=8, my_param=2.0)
-```
-
-## Performance Tips
-
-### 1. Use category filters to reduce reference size
-
-```python
-ref = SwissProtReference(categories=['human']).load()  # Faster
-```
-
-### 2. Use set mode when you don't need frequency information
-
-```python
-ref = SwissProtReference(use_set=True).load()  # Less memory
-```
-
-### 3. Use batch scoring for large datasets
-
-```python
-scorer = FrequencyScorer(batch_size=10000).fit(ref)
-scores = scorer.score_batch(large_peptide_list, show_progress=True)
-```
-
-### 4. Cache scorers for repeated use
-
-```python
-from weirdo import create_scorer
-scorer = create_scorer('human', cache=True)  # Cached by default
+# Model management
+weirdo models list      # List trained models
+weirdo models train --data train.csv --name my-model
+weirdo models info my-model
+weirdo models delete my-model
 ```

@@ -9,8 +9,7 @@ from weirdo.scorers import (
     BatchScorer,
     BaseReference,
     StreamingReference,
-    FrequencyScorer,
-    SimilarityScorer,
+    MLPScorer,
     ScorerConfig,
     registry,
     register_scorer,
@@ -151,8 +150,7 @@ class TestRegistry:
     def test_builtin_scorers_registered(self):
         """Test that built-in scorers are registered."""
         scorers = list_scorers()
-        assert 'frequency' in scorers
-        assert 'similarity' in scorers
+        assert 'mlp' in scorers
 
     def test_builtin_references_registered(self):
         """Test that built-in references are registered."""
@@ -161,8 +159,8 @@ class TestRegistry:
 
     def test_create_scorer(self):
         """Test creating scorer by name."""
-        scorer = registry.create_scorer('frequency', k=8)
-        assert isinstance(scorer, FrequencyScorer)
+        scorer = registry.create_scorer('mlp', k=8)
+        assert isinstance(scorer, MLPScorer)
         assert scorer.k == 8
 
     def test_unknown_scorer_error(self):
@@ -197,39 +195,37 @@ class TestScorerConfig:
         """Test that presets are available."""
         presets = list_presets()
         assert 'default' in presets
-        assert 'pathogen' in presets
-        assert 'human' in presets
-        assert 'similarity_blosum62' in presets
+        assert 'fast' in presets
 
     def test_get_preset(self):
         """Test getting a preset config."""
         config = get_preset('default')
-        assert config.scorer == 'frequency'
+        assert config.scorer == 'mlp'
         assert config.reference == 'swissprot'
         assert config.k == 8
 
     def test_from_dict(self):
         """Test creating config from dict."""
         data = {
-            'scorer': 'frequency',
+            'scorer': 'mlp',
             'reference': 'swissprot',
             'k': 10,
-            'scorer_params': {'aggregate': 'max'},
+            'scorer_params': {'hidden_layer_sizes': (64, 32)},
         }
         config = ScorerConfig.from_dict(data)
         assert config.k == 10
-        assert config.scorer_params['aggregate'] == 'max'
+        assert config.scorer_params['hidden_layer_sizes'] == (64, 32)
 
     def test_to_dict(self):
         """Test converting config to dict."""
         config = ScorerConfig(
-            scorer='frequency',
+            scorer='mlp',
             reference='swissprot',
             k=12
         )
         data = config.to_dict()
         assert data['k'] == 12
-        assert data['scorer'] == 'frequency'
+        assert data['scorer'] == 'mlp'
 
     def test_preset_returns_copy(self):
         """Test that get_preset returns a copy."""
@@ -237,146 +233,6 @@ class TestScorerConfig:
         config2 = get_preset('default')
         config1.k = 99
         assert config2.k == 8  # Should not be affected
-
-
-# ====================
-# FrequencyScorer Tests
-# ====================
-
-class TestFrequencyScorer:
-    """Tests for FrequencyScorer."""
-
-    def test_basic_scoring(self):
-        """Test basic frequency scoring."""
-        # Create mock reference with some k-mers
-        ref = MockReference(kmers={
-            'AAAAAAAA': 1.0,
-            'BBBBBBBB': 0.5,
-        }, k=8).load()
-
-        scorer = FrequencyScorer(k=8, pseudocount=1e-10, aggregate='mean')
-        scorer.fit(ref)
-
-        # Score peptides
-        scores = scorer.score(['AAAAAAAA', 'ZZZZZZZZ'])
-
-        # Known k-mer should have lower score (less foreign)
-        assert scores[0] < scores[1]
-
-    def test_aggregation_methods(self):
-        """Test different aggregation methods."""
-        ref = MockReference(kmers={
-            'AAAAAAAA': 1.0,
-            'AAAAAAAB': 0.0,  # Not present
-        }, k=8).load()
-
-        # Test mean
-        scorer_mean = FrequencyScorer(k=8, aggregate='mean').fit(ref)
-        scores_mean = scorer_mean.score(['AAAAAAAAAB'])
-
-        # Test max (should give higher score)
-        scorer_max = FrequencyScorer(k=8, aggregate='max').fit(ref)
-        scores_max = scorer_max.score(['AAAAAAAAAB'])
-
-        # Test min (should give lower score)
-        scorer_min = FrequencyScorer(k=8, aggregate='min').fit(ref)
-        scores_min = scorer_min.score(['AAAAAAAAAB'])
-
-        # Verify ordering
-        assert scores_min[0] < scores_mean[0] < scores_max[0]
-
-    def test_short_peptide(self):
-        """Test handling of peptides shorter than k."""
-        ref = MockReference(kmers={'AAAAAAAA': 1.0}, k=8).load()
-        scorer = FrequencyScorer(k=8).fit(ref)
-
-        scores = scorer.score(['SHORT'])
-        assert scores[0] == float('inf')
-
-    def test_get_kmer_scores(self):
-        """Test getting individual k-mer scores."""
-        ref = MockReference(kmers={
-            'AAAAAAAA': 1.0,
-            'AAAAAAAB': 0.0,
-        }, k=8).load()
-
-        scorer = FrequencyScorer(k=8).fit(ref)
-        kmer_scores = scorer.get_kmer_scores('AAAAAAAAAB')
-
-        assert len(kmer_scores) == 3  # 10-mer has 3 8-mers
-        # K-mers from AAAAAAAAAB: AAAAAAAA (0-7), AAAAAAAA (1-8), AAAAAAAB (2-9)
-        assert kmer_scores[0][0] == 'AAAAAAAA'
-        assert kmer_scores[1][0] == 'AAAAAAAA'
-        assert kmer_scores[2][0] == 'AAAAAAAB'
-
-    def test_not_fitted_error(self):
-        """Test error when scoring without fitting."""
-        scorer = FrequencyScorer(k=8)
-        with pytest.raises(RuntimeError, match="not fitted"):
-            scorer.score(['MTMDKSEL'])
-
-    def test_reference_not_loaded_error(self):
-        """Test error when reference is not loaded."""
-        ref = MockReference(kmers={'AAAAAAAA': 1.0}, k=8)  # Not loaded
-        scorer = FrequencyScorer(k=8)
-        with pytest.raises(RuntimeError, match="not loaded"):
-            scorer.fit(ref)
-
-
-# ====================
-# SimilarityScorer Tests
-# ====================
-
-class TestSimilarityScorer:
-    """Tests for SimilarityScorer."""
-
-    def test_basic_scoring(self):
-        """Test basic similarity scoring."""
-        ref = MockReference(kmers={
-            'AAAAAAAA': 1.0,
-            'MMMMMMMM': 1.0,
-        }, k=8).load()
-
-        scorer = SimilarityScorer(k=8, matrix='blosum62')
-        scorer.fit(ref)
-
-        # Score peptides
-        scores = scorer.score(['AAAAAAAA', 'ZZZZZZZZ'])
-
-        # Identical k-mer should have lower score (less foreign)
-        assert scores[0] < scores[1]
-
-    def test_matrix_options(self):
-        """Test different substitution matrices."""
-        ref = MockReference(kmers={'AAAAAAAA': 1.0}, k=8).load()
-
-        for matrix in ['blosum30', 'blosum50', 'blosum62', 'pmbec']:
-            scorer = SimilarityScorer(k=8, matrix=matrix)
-            scorer.fit(ref)
-            scores = scorer.score(['AAAAAAAA'])
-            assert np.isfinite(scores[0])
-
-    def test_invalid_matrix(self):
-        """Test error for invalid matrix name."""
-        with pytest.raises(ValueError, match="Unknown matrix"):
-            SimilarityScorer(k=8, matrix='invalid')
-
-    def test_get_closest_reference(self):
-        """Test finding closest reference k-mers."""
-        ref = MockReference(kmers={
-            'AAAAAAAA': 1.0,
-            'AAAAMAAA': 1.0,
-            'MMMMMMMM': 1.0,
-        }, k=8).load()
-
-        scorer = SimilarityScorer(k=8, matrix='blosum62')
-        scorer.fit(ref)
-
-        matches = scorer.get_closest_reference('AAAAAAAA', n=2)
-        assert len(matches) == 2
-        # Exact match should be first with distance 0
-        assert matches[0][0] == 'AAAAAAAA'
-        assert matches[0][1] == 0.0
 
 
 # ====================
@@ -388,38 +244,24 @@ class TestIntegration:
 
     def test_full_workflow(self):
         """Test complete scoring workflow."""
-        # Create reference
-        ref = MockReference(kmers={
-            'MTMDKSEL': 1.0,
-            'ACDEFGHI': 0.8,
-            'KLMNPQRS': 0.5,
-        }, k=8).load()
+        # Create simple training data
+        peptides = ['MTMDKSEL', 'ACDEFGHI', 'XXXXXXXX', 'YYYYYYYY'] * 10
+        labels = [0.0, 0.0, 1.0, 1.0] * 10
 
-        # Create and fit scorer
-        scorer = FrequencyScorer(k=8, aggregate='mean')
-        scorer.fit(ref)
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(32,), random_state=1)
+        scorer.train(peptides=peptides, labels=labels, epochs=50, verbose=False)
 
-        # Score peptides
-        peptides = ['MTMDKSEL', 'XXXXXXXX']
-        scores = scorer.score(peptides)
+        scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
 
-        # Verify results
         assert len(scores) == 2
         assert scores[0] < scores[1]  # Known vs unknown
 
-    def test_fit_score_convenience(self):
-        """Test fit_score convenience method."""
-        ref = MockReference(kmers={'AAAAAAAA': 1.0}, k=8).load()
-        scorer = FrequencyScorer(k=8)
-
-        scores = scorer.fit_score(ref, ['AAAAAAAA', 'BBBBBBBB'])
-        assert len(scores) == 2
-
     def test_batch_scoring(self):
         """Test batch scoring for large datasets."""
-        ref = MockReference(kmers={'AAAAAAAA': 1.0}, k=8).load()
-        scorer = FrequencyScorer(k=8, batch_size=10)
-        scorer.fit(ref)
+        peptides = ['MTMDKSEL', 'XXXXXXXX'] * 20
+        labels = [0.0, 1.0] * 20
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), batch_size=10, random_state=1)
+        scorer.train(peptides=peptides, labels=labels, epochs=30, verbose=False)
 
         # Create many peptides
         peptides = ['AAAAAAAAAA' + str(i) for i in range(100)]

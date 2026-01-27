@@ -5,25 +5,83 @@ import tempfile
 import pytest
 import numpy as np
 
-from weirdo.scorers.mlp import MLPScorer, _kmer_to_onehot, _peptide_to_features
+from weirdo.scorers.mlp import (
+    MLPScorer,
+    extract_features,
+    _compute_property_features,
+    _compute_composition_features,
+    _compute_dipeptide_features,
+    _compute_kmer_onehot,
+    _get_aa_properties,
+    AMINO_ACIDS,
+)
 
 
 class TestFeatureExtraction:
     """Tests for feature extraction functions."""
 
-    def test_kmer_to_onehot(self):
-        """Test one-hot encoding of k-mers."""
-        onehot = _kmer_to_onehot('AA')
-        assert len(onehot) == 2 * 21  # 2 positions * 21 amino acids
-        assert onehot[0] == 1.0  # A at position 0
-        assert onehot[21] == 1.0  # A at position 1
-        assert sum(onehot) == 2.0  # Exactly 2 ones
+    def test_compute_composition_features(self):
+        """Test amino acid composition feature extraction."""
+        features = _compute_composition_features('AAAA')
+        assert len(features) == 20  # 20 amino acids
+        assert features[0] == 1.0  # 100% A
+        assert sum(features) == pytest.approx(1.0)
 
-    def test_peptide_to_features(self):
-        """Test peptide feature extraction."""
-        features = _peptide_to_features('MTMDKSEL', k=8)
-        assert len(features) == 8 * 21  # k * num_amino_acids
+    def test_compute_dipeptide_features(self):
+        """Test dipeptide composition feature extraction."""
+        features = _compute_dipeptide_features('AAA')
+        assert len(features) == 400  # 20 * 20
+        # AA dipeptide should have frequency 1.0 (2 AAs out of 2 dipeptides)
+        assert features[0] == 1.0  # AA is at index 0*20 + 0 = 0
         assert np.isfinite(features).all()
+
+    def test_compute_kmer_onehot(self):
+        """Test k-mer one-hot encoding."""
+        features = _compute_kmer_onehot('AA', k=2)
+        assert len(features) == 2 * 21  # k * 21 amino acids
+        assert np.isfinite(features).all()
+
+    def test_compute_property_features(self):
+        """Test amino acid property feature extraction."""
+        properties = _get_aa_properties()
+        features = _compute_property_features('MTMDKSEL', properties)
+        # 12 properties * 4 stats (mean, std, min, max) = 48 features
+        assert len(features) == 12 * 4
+        assert np.isfinite(features).all()
+
+    def test_extract_features(self):
+        """Test full feature extraction."""
+        features = extract_features('MTMDKSEL', k=8, use_dipeptides=True)
+        # 48 (properties) + 27 (structural) + 20 (composition) + 168 (8*21 kmer) + 400 (dipeptides) = 663
+        expected_length = 48 + 27 + 20 + 8 * 21 + 400
+        assert len(features) == expected_length
+        assert np.isfinite(features).all()
+
+    def test_extract_features_no_dipeptides(self):
+        """Test feature extraction without dipeptides."""
+        features = extract_features('MTMDKSEL', k=8, use_dipeptides=False)
+        # 48 (properties) + 27 (structural) + 20 (composition) + 168 (8*21 kmer) = 263
+        expected_length = 48 + 27 + 20 + 8 * 21
+        assert len(features) == expected_length
+        assert np.isfinite(features).all()
+
+    def test_get_feature_names(self):
+        """Test getting feature names from scorer."""
+        scorer = MLPScorer(k=8, use_dipeptides=True)
+        names = scorer.get_feature_names()
+
+        # Should have names for all features
+        expected_count = 48 + 27 + 20 + 8 * 21 + 400
+        assert len(names) == expected_count
+
+        # Check some specific feature names
+        assert 'hydropathy_mean' in names
+        assert 'helix_propensity_mean' in names
+        assert 'frac_cysteine' in names
+        assert 'arginine_ratio' in names
+        assert 'aa_freq_A' in names
+        assert 'kmer_pos0_A' in names
+        assert 'dipep_AA' in names
 
 
 class TestMLPScorer:
@@ -47,7 +105,7 @@ class TestMLPScorer:
             'XXXXXXXX', 'YYYYYYYY', 'WWWWWWWW',
         ] * 10  # Need enough samples
         # Low scores for known, high for unknown
-        labels = [0.0, 0.0, 0.0, 10.0, 10.0, 10.0] * 10
+        labels = [0.0, 0.0, 0.0, 1.0, 1.0, 1.0] * 10
 
         scorer = MLPScorer(
             k=8,
@@ -68,7 +126,7 @@ class TestMLPScorer:
     def test_score_peptides(self):
         """Test scoring peptides with trained model."""
         peptides = ['MTMDKSEL', 'ACDEFGHI'] * 20
-        labels = [0.0, 5.0] * 20
+        labels = [0.0, 1.0] * 20
 
         scorer = MLPScorer(k=8, hidden_layer_sizes=(32,), random_state=42)
         scorer.train(peptides=peptides, labels=labels, epochs=100, verbose=False)
@@ -78,10 +136,34 @@ class TestMLPScorer:
         assert len(scores) == 2
         assert all(np.isfinite(scores))
 
+    def test_model_learns_difference(self):
+        """Test that model learns to distinguish self from foreign peptides."""
+        # Create peptides with distinct properties
+        self_peptides = ['ACDEFGHI', 'KLMNPQRS', 'TVWYACDE'] * 30
+        foreign_peptides = ['XXXXXXXX', 'WWWWWWWW', 'YYYYYYYY'] * 30
+
+        peptides = self_peptides + foreign_peptides
+        labels = [0.0] * len(self_peptides) + [1.0] * len(foreign_peptides)
+
+        scorer = MLPScorer(
+            k=8,
+            hidden_layer_sizes=(64, 32),
+            random_state=42,
+            use_dipeptides=True,
+        )
+        scorer.train(peptides=peptides, labels=labels, epochs=200, verbose=False)
+
+        # Test on training examples - model should separate them
+        self_score = scorer.score(['ACDEFGHI'])[0]
+        foreign_score = scorer.score(['XXXXXXXX'])[0]
+
+        # Foreign peptides should have higher scores
+        assert foreign_score > self_score
+
     def test_save_load_model(self):
         """Test saving and loading a model."""
         peptides = ['MTMDKSEL', 'ACDEFGHI'] * 10
-        labels = [0.0, 5.0] * 10
+        labels = [0.0, 1.0] * 10
 
         scorer = MLPScorer(k=8, hidden_layer_sizes=(32,), random_state=42)
         scorer.train(peptides=peptides, labels=labels, epochs=50, verbose=False)

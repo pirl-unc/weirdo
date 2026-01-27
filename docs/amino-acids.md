@@ -160,7 +160,7 @@ from weirdo.reduced_alphabet import alphabets
 
 # Available reduced alphabets
 print(alphabets.keys())
-# ['gbmr4', 'sdm12', 'hp2', 'murphy10', 'alex6', 'murphy15', 'murphy8', 'hp_vs_aromatic']
+# ['gbmr4', 'sdm12', 'hsdm17', 'hp2', 'murphy8', 'murphy10', 'murphy15', 'alex6', 'aromatic2', 'hp_vs_aromatic']
 
 # Map amino acid to reduced alphabet
 hp2 = alphabets['hp2']
@@ -182,6 +182,9 @@ reduced = ''.join(hp2[aa] for aa in sequence)
 | `murphy10` | 10 | Murphy 10-group clustering |
 | `sdm12` | 12 | SDM 12-group clustering |
 | `murphy15` | 15 | Murphy 15-group clustering |
+| `hsdm17` | 17 | HSDM 17-group clustering |
+| `aromatic2` | 2 | Aromatic vs non-aromatic |
+| `hp_vs_aromatic` | 4 | Hydrophobic vs aromatic vs polar |
 
 ## Peptide Vectorizer
 

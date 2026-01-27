@@ -46,8 +46,6 @@ from .scorers import (
     BaseReference,
     StreamingReference,
     TrainableScorer,
-    FrequencyScorer,
-    SimilarityScorer,
     SwissProtReference,
     ScorerConfig,
     register_scorer,
@@ -57,7 +55,7 @@ from .scorers import (
 # ML scorer
 from .scorers import MLPScorer
 
-__version__ = "1.1.0"
+__version__ = "2.0.1"
 
 __all__ = [
     # Amino acid data
@@ -93,8 +91,6 @@ __all__ = [
     "BaseReference",
     "StreamingReference",
     "TrainableScorer",
-    "FrequencyScorer",
-    "SimilarityScorer",
     "SwissProtReference",
     "ScorerConfig",
     "register_scorer",

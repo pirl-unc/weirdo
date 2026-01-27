@@ -20,28 +20,19 @@ cd weirdo
 
 ## Downloading Reference Data
 
-WEIRDO requires reference data (~7.5 GB) for scoring. You can download it using the CLI or Python API.
+WEIRDO requires reference data (~2.5 GB compressed / ~7.5 GB uncompressed) for training. You can download it using the CLI or Python API.
 
 ### Option 1: CLI Setup (Recommended)
 
 ```bash
-# Download data and build indices
+# Download data
 weirdo setup
 
 # Or just download data
 weirdo data download
 ```
 
-### Option 2: Auto-download on First Use
-
-```python
-from weirdo import score_peptide
-
-# Automatically download data if not present
-score = score_peptide('MTMDKSEL', auto_download=True)
-```
-
-### Option 3: Python API
+### Option 2: Python API
 
 ```python
 from weirdo import get_data_manager
@@ -54,106 +45,110 @@ dm.print_status()               # Show what's downloaded
 ### Managing Data
 
 ```bash
-weirdo data list         # List datasets and indices (or: ls, status)
+weirdo data list         # List datasets (or: ls, status)
 weirdo data clear --all  # Clear all data
 weirdo data path         # Show data directory
 ```
 
 ## Basic Usage
 
-The simplest way to score peptides is using the high-level API:
+Train a model and score peptides:
 
 ```python
-from weirdo import score_peptide, score_peptides
+from weirdo.scorers import SwissProtReference, MLPScorer
 
-# Score a single peptide
-score = score_peptide('MTMDKSEL')
-print(f"Foreignness score: {score:.3f}")
+categories = [
+    'archaea', 'bacteria', 'fungi', 'human', 'invertebrates',
+    'mammals', 'plants', 'rodents', 'vertebrates', 'viruses'
+]
 
-# Score multiple peptides
-peptides = ['MTMDKSEL', 'ACDEFGHI', 'XXXXXXXX']
-scores = score_peptides(peptides)
-for pep, score in zip(peptides, scores):
-    print(f"{pep}: {score:.3f}")
+ref = SwissProtReference().load()
+peptides, labels = ref.get_training_data(
+    target_categories=categories,
+    multi_label=True,
+    max_samples=100000,  # Sample for faster training
+    shuffle=True,
+    seed=42,
+)
+
+scorer = MLPScorer(k=8, hidden_layer_sizes=(256, 128, 64))
+scorer.train(peptides, labels, target_categories=categories, epochs=100)
+
+# Foreignness scores in [0, 1]
+scores = scorer.score(['MTMDKSEL', 'SIINFEKL'])
+
+# Per-category probabilities + foreignness
+df = scorer.predict_dataframe(['MTMDKSEL', 'SIINFEKL'])
+```
+
+Save and reload models:
+
+```python
+from weirdo import save_model, load_model, score_peptide
+
+save_model(scorer, 'my-model')
+loaded = load_model('my-model')
+score = score_peptide('MTMDKSEL', model=loaded)
+```
+
+CLI scoring:
+
+```bash
+weirdo score --model my-model MTMDKSEL SIINFEKL
 ```
 
 ## Understanding Scores
 
-Higher scores indicate more "foreign" peptides:
+Foreignness scores are in [0, 1]:
 
 | Score Range | Interpretation |
 |-------------|----------------|
-| ~0 | K-mers commonly found in reference proteome |
-| ~5 | Mix of known and unknown k-mers |
-| ~10 | K-mers rare or absent from reference |
+| 0.0 | Strongly self-like |
+| 0.5 | Ambiguous / mixed |
+| 1.0 | Strongly pathogen-like |
 
 ## Using Presets
 
-WEIRDO provides several preset configurations:
+Presets define model architecture defaults:
 
 ```python
 from weirdo import get_available_presets, create_scorer
 
-# List available presets
 print(get_available_presets())
-# ['default', 'fast', 'human', 'pathogen', 'similarity_blosum62', 'similarity_pmbec']
+# ['default', 'fast']
 
-# Create scorer with specific preset
-scorer = create_scorer('human')  # Uses human-only reference
-scores = scorer.score(['MTMDKSEL'])
+scorer = create_scorer('fast')
+scorer.train(peptides, labels, target_categories=categories, epochs=50)
 ```
-
-### Available Presets
-
-| Preset | Description |
-|--------|-------------|
-| `default` | Frequency-based scoring against all SwissProt categories |
-| `human` | Frequency-based scoring against human proteins only |
-| `pathogen` | Frequency-based scoring against bacteria and viruses |
-| `similarity_blosum62` | Similarity-based scoring using BLOSUM62 matrix |
-| `similarity_pmbec` | Similarity-based scoring using PMBEC matrix |
-| `fast` | Memory-efficient mode (presence only, no frequencies) |
 
 ## Custom Configuration
 
-For more control, use the scorer classes directly:
+For more control, configure the scorer directly:
 
 ```python
-from weirdo.scorers import FrequencyScorer, SwissProtReference
+from weirdo.scorers import MLPScorer
 
-# Load reference with specific categories
-ref = SwissProtReference(
-    categories=['human', 'mammals'],
-    use_set=False  # Keep frequency information
-).load()
-
-# Configure scorer
-scorer = FrequencyScorer(
-    k=8,              # K-mer size
-    pseudocount=1e-10,  # For log computation
-    aggregate='mean'    # How to combine k-mer scores
-).fit(ref)
-
-# Score peptides
-scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
+scorer = MLPScorer(
+    k=8,
+    hidden_layer_sizes=(128, 64),
+    use_dipeptides=False,
+)
+scorer.train(peptides, labels, target_categories=categories, epochs=50)
 ```
 
 ## Aggregation Methods
 
-The `aggregate` parameter controls how k-mer scores are combined:
+When scoring long peptides, k-mer probabilities are aggregated:
 
 | Method | Description |
 |--------|-------------|
-| `mean` | Average score across all k-mers (default) |
-| `max` | Maximum (most foreign) k-mer score |
-| `min` | Minimum (least foreign) k-mer score |
-| `sum` | Sum of all k-mer scores |
+| `mean` | Average across k-mers (default) |
+| `max` | Maximum (most pathogen-like) |
+| `min` | Minimum (most self-like) |
 
 ```python
-# Compare aggregation methods
 for agg in ['mean', 'max', 'min']:
-    scorer = FrequencyScorer(aggregate=agg).fit(ref)
-    score = scorer.score(['MTMDKSELVQKAKLAE'])[0]
+    score = scorer.score(['MTMDKSELVQKAKLAE'], aggregate=agg)[0]
     print(f"{agg}: {score:.3f}")
 ```
 

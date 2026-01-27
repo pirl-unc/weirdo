@@ -63,8 +63,8 @@ class TrainableScorer(BatchScorer):
         labels: Sequence[float],
         val_peptides: Optional[Sequence[str]] = None,
         val_labels: Optional[Sequence[float]] = None,
-        epochs: int = 100,
-        learning_rate: float = 1e-3,
+        epochs: Optional[int] = None,
+        learning_rate: Optional[float] = None,
         verbose: bool = True,
     ) -> 'TrainableScorer':
         """Train the model on labeled data.
@@ -73,16 +73,16 @@ class TrainableScorer(BatchScorer):
         ----------
         peptides : sequence of str
             Training peptide sequences.
-        labels : sequence of float
-            Target foreignness scores (higher = more foreign).
+        labels : sequence of float or 2D array
+            Target labels. For multi-label classification, use a 2D array.
         val_peptides : sequence of str, optional
             Validation peptides for early stopping.
         val_labels : sequence of float, optional
             Validation labels.
-        epochs : int, default=100
-            Number of training epochs.
-        learning_rate : float, default=1e-3
-            Learning rate for optimizer.
+        epochs : int, optional
+            Number of training epochs. Defaults to model's max_iter.
+        learning_rate : float, optional
+            Learning rate for optimizer. Defaults to model's learning_rate_init.
         verbose : bool, default=True
             Print training progress.
 

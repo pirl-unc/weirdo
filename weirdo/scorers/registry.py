@@ -55,8 +55,8 @@ class ScorerRegistry:
 
         Example
         -------
-        >>> @registry.register_scorer('frequency', description='Frequency-based scoring')
-        ... class FrequencyScorer(BaseScorer):
+        >>> @registry.register_scorer('mlp', description='MLP-based scoring')
+        ... class MLPScorer(BaseScorer):
         ...     pass
         """
         aliases = aliases or []

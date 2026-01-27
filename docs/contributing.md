@@ -63,12 +63,14 @@ Example test:
 
 ```python
 import pytest
-from weirdo.scorers import FrequencyScorer
+from weirdo.scorers import MLPScorer
 
-def test_frequency_scorer_basic():
-    """Test basic frequency scoring."""
-    ref = MockReference(kmers={'AAAAAAAA': 1.0}).load()
-    scorer = FrequencyScorer(k=8).fit(ref)
+def test_mlp_scorer_basic():
+    """Test basic MLP scoring."""
+    peptides = ['AAAAAAAA', 'XXXXXXXX'] * 10
+    labels = [0.0, 1.0] * 10
+    scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), random_state=1)
+    scorer.train(peptides, labels, epochs=20, verbose=False)
     scores = scorer.score(['AAAAAAAA', 'XXXXXXXX'])
     assert scores[0] < scores[1]
 ```

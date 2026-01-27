@@ -49,8 +49,8 @@ ALL_CATEGORIES = [
 class SwissProtReference(StreamingReference):
     """Reference dataset from SwissProt protein database.
 
-    Loads pre-computed k-mer frequencies from a CSV file containing
-    k-mer presence across organism categories.
+    Loads pre-computed k-mer presence from a CSV file containing
+    organism category membership for each k-mer.
 
     Parameters
     ----------
@@ -409,3 +409,102 @@ class SwissProtReference(StreamingReference):
         if self._use_set:
             return len(self._kmer_set)
         return len(self._kmers)
+
+    def get_training_data(
+        self,
+        target_categories: Optional[List[str]] = None,
+        max_samples: Optional[int] = None,
+        multi_label: bool = False,
+        shuffle: bool = False,
+        seed: Optional[int] = None,
+    ) -> Tuple[List[str], 'np.ndarray']:
+        """Generate training data for MLP scorer.
+
+        Parameters
+        ----------
+        target_categories : list of str, optional
+            Categories to use as targets. Default: ['human', 'viruses', 'bacteria'].
+        max_samples : int, optional
+            Maximum number of samples to return (for memory efficiency).
+        multi_label : bool, default=False
+            If True, return multi-label array (one column per category).
+            If False, return single foreignness score (1 if not in first target category).
+        shuffle : bool, default=False
+            If True and max_samples is set, randomly sample k-mers using
+            reservoir sampling instead of taking the first N.
+        seed : int, optional
+            Random seed for reproducible sampling.
+
+        Returns
+        -------
+        peptides : list of str
+            K-mer sequences.
+        labels : np.ndarray
+            If multi_label=True: shape (n_samples, n_categories) with binary labels.
+            If multi_label=False: shape (n_samples,) with foreignness scores.
+
+        Example
+        -------
+        >>> ref = SwissProtReference().load()
+        >>> peptides, labels = ref.get_training_data(
+        ...     target_categories=['human', 'viruses', 'bacteria'],
+        ...     multi_label=True,
+        ...     max_samples=100000
+        ... )
+        >>> print(labels.shape)  # (100000, 3)
+        """
+        import numpy as np
+
+        if target_categories is None:
+            target_categories = ['human', 'viruses', 'bacteria']
+
+        # Validate categories
+        for cat in target_categories:
+            if cat not in ALL_CATEGORIES:
+                raise ValueError(
+                    f"Unknown category: {cat}. "
+                    f"Available: {ALL_CATEGORIES}"
+                )
+
+        self._check_is_loaded()
+
+        if self._use_set:
+            raise RuntimeError(
+                "Training data requires category info. Set use_set=False."
+            )
+
+        if shuffle or seed is not None:
+            import random
+            if seed is not None:
+                random.seed(seed)
+
+        peptides: List[str] = []
+        labels_list: List[List[float]] = []
+
+        def make_row(cats: Dict[str, bool]) -> List[float]:
+            if multi_label:
+                return [1.0 if cats.get(cat, False) else 0.0 for cat in target_categories]
+            in_self = cats.get(target_categories[0], False)
+            return [0.0 if in_self else 1.0]
+
+        for idx, (kmer, cats) in enumerate(self.iter_kmers_with_categories()):
+            if max_samples and shuffle:
+                if len(peptides) < max_samples:
+                    peptides.append(kmer)
+                    labels_list.append(make_row(cats))
+                else:
+                    j = random.randint(0, idx)
+                    if j < max_samples:
+                        peptides[j] = kmer
+                        labels_list[j] = make_row(cats)
+            else:
+                peptides.append(kmer)
+                labels_list.append(make_row(cats))
+                if max_samples and len(peptides) >= max_samples:
+                    break
+
+        labels = np.array(labels_list, dtype=np.float32)
+        if not multi_label:
+            labels = labels.ravel()
+
+        return peptides, labels

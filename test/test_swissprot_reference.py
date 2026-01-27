@@ -6,8 +6,7 @@ import numpy as np
 
 from weirdo.scorers import (
     SwissProtReference,
-    FrequencyScorer,
-    SimilarityScorer,
+    MLPScorer,
 )
 
 # Path to test fixture
@@ -171,67 +170,63 @@ class TestSwissProtReference:
 class TestSwissProtWithScorers:
     """Integration tests for SwissProtReference with scorers."""
 
-    def test_frequency_scorer_with_swissprot(self):
-        """Test FrequencyScorer with SwissProt data."""
+    def test_mlp_scorer_with_swissprot(self):
+        """Test MLPScorer with SwissProt data."""
         ref = SwissProtReference(data_path=FIXTURE_PATH).load()
-        scorer = FrequencyScorer(k=8, aggregate='mean').fit(ref)
+        categories = ['human', 'viruses', 'bacteria']
+        peptides, labels = ref.get_training_data(
+            target_categories=categories,
+            multi_label=True,
+            max_samples=200,
+            shuffle=True,
+            seed=1,
+        )
 
-        # Score known vs unknown peptides
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(32,), random_state=1)
+        scorer.train(peptides=peptides, labels=labels, target_categories=categories, epochs=50, verbose=False)
+
         scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
-
-        # Known k-mer should have lower score (less foreign)
-        assert scores[0] < scores[1]
+        assert len(scores) == 2
         assert np.isfinite(scores[0])
 
-    def test_frequency_scorer_with_category_filter(self):
-        """Test FrequencyScorer with category-filtered reference."""
-        ref = SwissProtReference(
-            data_path=FIXTURE_PATH,
-            categories=['human']
-        ).load()
-        scorer = FrequencyScorer(k=8).fit(ref)
-
-        scores = scorer.score(['MTMDKSEL'])
-        assert np.isfinite(scores[0])
-
-    def test_similarity_scorer_with_swissprot(self):
-        """Test SimilarityScorer with SwissProt data."""
+    def test_mlp_scores_variable_length(self):
+        """Test scoring peptides longer than k with aggregation."""
         ref = SwissProtReference(data_path=FIXTURE_PATH).load()
-        scorer = SimilarityScorer(
-            k=8,
-            matrix='blosum62',
-            max_candidates=100
-        ).fit(ref)
+        categories = ['human', 'viruses', 'bacteria']
+        peptides, labels = ref.get_training_data(
+            target_categories=categories,
+            multi_label=True,
+            max_samples=200,
+            shuffle=True,
+            seed=2,
+        )
 
-        # Score peptides
-        scores = scorer.score(['MTMDKSEL', 'XXXXXXXX'])
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(32,), random_state=2)
+        scorer.train(peptides=peptides, labels=labels, target_categories=categories, epochs=30, verbose=False)
 
-        # Known k-mer should have lower distance (less foreign)
-        assert scores[0] < scores[1]
-
-    def test_scorer_with_longer_peptide(self):
-        """Test scoring peptides longer than k."""
-        ref = SwissProtReference(data_path=FIXTURE_PATH).load()
-        scorer = FrequencyScorer(k=8).fit(ref)
-
-        # Use first few k-mers concatenated
         peptide = 'MTMDKSELTMDKSELVMDKSELVD'  # 24-mer
-        scores = scorer.score([peptide])
+        score = scorer.score([peptide])[0]
+        assert np.isfinite(score)
 
-        assert len(scores) == 1
-        assert np.isfinite(scores[0])
-
-    def test_batch_scoring(self):
-        """Test batch scoring with SwissProt data."""
+    def test_predict_dataframe_columns(self):
+        """Test predict_dataframe output columns."""
         ref = SwissProtReference(data_path=FIXTURE_PATH).load()
-        scorer = FrequencyScorer(k=8, batch_size=10).fit(ref)
+        categories = ['human', 'viruses', 'bacteria']
+        peptides, labels = ref.get_training_data(
+            target_categories=categories,
+            multi_label=True,
+            max_samples=100,
+            shuffle=True,
+            seed=3,
+        )
 
-        # Create batch of peptides
-        peptides = [f'MTMDKSEL{i:02d}' for i in range(50)]
-        scores = scorer.score_batch(peptides)
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), random_state=3)
+        scorer.train(peptides=peptides, labels=labels, target_categories=categories, epochs=20, verbose=False)
 
-        assert len(scores) == 50
-        assert all(np.isfinite(s) for s in scores)
+        df = scorer.predict_dataframe(['MTMDKSEL'])
+        assert 'foreignness' in df.columns
+        for cat in categories:
+            assert cat in df.columns
 
 
 class TestSwissProtPerformance:

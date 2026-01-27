@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 2026-01-27
+
+### Fixed
+
+- Documentation consistency and reference wording for the MLP-only workflow
+
+## [2.0.0] - 2026-01-27
+
+### Added
+
+- Murphy 8 and Murphy 15 reduced alphabets (`murphy8`, `murphy15`)
+- Consistent training metadata keys for model inspection (`n_epochs`, `final_train_loss`, `best_val_loss`)
+
+### Changed
+
+- Default preset now targets the parametric MLP scorer
+- MLP scoring now aggregates k-mer probabilities for variable-length peptides
+- `create_scorer` returns trainable scorers untrained unless training data is provided
+- `score_peptide` / `score_peptides` now require a trained model (or a non-trainable preset)
+- CLI scoring now requires a trained model and prints per-category probabilities when available
+- Data manager focuses on downloads only (indices removed)
+
+### Removed
+
+- FrequencyScorer from the public API and documentation
+- Data index build commands from the CLI
+
 ## [1.1.0] - 2026-01-19
 
 ### Added

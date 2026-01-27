@@ -5,18 +5,19 @@ needing to understand the full scorer architecture.
 
 Example
 -------
->>> from weirdo import score_peptide
->>> score = score_peptide('MTMDKSEL')  # Uses default preset
+>>> from weirdo import score_peptide, load_model
+>>> scorer = load_model('my-mlp')
+>>> score = score_peptide('MTMDKSEL', model=scorer)
 
 >>> from weirdo import score_peptides
->>> scores = score_peptides(['MTMDKSEL', 'ACDEFGHI'])
+>>> scores = score_peptides(['MTMDKSEL', 'ACDEFGHI'], model=scorer)
 """
 
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 
-from .scorers import ScorerConfig, BaseScorer
+from .scorers import ScorerConfig, BaseScorer, TrainableScorer
 
 
 # Cache for scorer instances by preset
@@ -27,6 +28,9 @@ def create_scorer(
     preset: str = 'default',
     cache: bool = True,
     auto_download: bool = False,
+    train_data: Optional[Sequence[str]] = None,
+    train_labels: Optional[Any] = None,
+    target_categories: Optional[List[str]] = None,
     **overrides
 ) -> BaseScorer:
     """Create a scorer from a preset configuration.
@@ -34,26 +38,31 @@ def create_scorer(
     Parameters
     ----------
     preset : str, default='default'
-        Preset name (e.g., 'default', 'pathogen', 'human', 'similarity_blosum62').
+        Preset name (e.g., 'default', 'fast').
     cache : bool, default=True
         If True, cache the scorer instance for reuse.
         Set to False if you need multiple independent instances.
     auto_download : bool, default=False
         If True, automatically download reference data if not present.
+    train_data : sequence of str, optional
+        Training peptides for trainable scorers.
+    train_labels : array-like, optional
+        Training labels for trainable scorers.
+    target_categories : list of str, optional
+        Category names for multi-label training.
     **overrides : dict
-        Override specific config parameters (e.g., k=10, aggregate='max').
+        Override specific config parameters (e.g., k=10, hidden_layer_sizes=(128, 64)).
 
     Returns
     -------
     scorer : BaseScorer
-        Configured and fitted scorer ready for scoring.
+        Configured scorer. Trainable scorers are returned untrained unless
+        train_data and train_labels are provided.
 
     Example
     -------
-    >>> scorer = create_scorer('human')
-    >>> scores = scorer.score(['MTMDKSEL'])
-
-    >>> scorer = create_scorer('default', k=10, aggregate='max')
+    >>> scorer = create_scorer('default', use_dipeptides=False)
+    >>> scorer.train(peptides, labels, target_categories=['human', 'viruses'])
 
     >>> # Auto-download data on first use
     >>> scorer = create_scorer('default', auto_download=True)
@@ -61,7 +70,7 @@ def create_scorer(
     # Build cache key from preset and overrides
     cache_key = f"{preset}:{sorted(overrides.items())}:auto={auto_download}"
 
-    if cache and cache_key in _scorer_cache:
+    if cache and cache_key in _scorer_cache and train_data is None and train_labels is None:
         return _scorer_cache[cache_key]
 
     # Get preset config
@@ -70,7 +79,17 @@ def create_scorer(
     # Apply overrides
     if overrides:
         # Check which params go to scorer vs reference
-        scorer_params = {'k', 'aggregate', 'pseudocount', 'matrix', 'distance_metric', 'max_candidates'}
+        scorer_params = {
+            'hidden_layer_sizes',
+            'activation',
+            'alpha',
+            'learning_rate_init',
+            'max_iter',
+            'early_stopping',
+            'use_dipeptides',
+            'batch_size',
+            'random_state',
+        }
         reference_params = {'categories', 'lazy', 'use_set', 'data_path'}
 
         for key, value in overrides.items():
@@ -92,10 +111,14 @@ def create_scorer(
     if auto_download:
         config.reference_params['auto_download'] = True
 
-    # Build scorer
-    scorer = config.build()
+    # Build scorer (trainable scorers are returned untrained unless training data provided)
+    scorer = config.build(
+        train_data=list(train_data) if train_data is not None else None,
+        train_labels=train_labels,
+        target_categories=target_categories,
+    )
 
-    if cache:
+    if cache and train_data is None and train_labels is None:
         _scorer_cache[cache_key] = scorer
 
     return scorer
@@ -103,20 +126,26 @@ def create_scorer(
 
 def score_peptide(
     peptide: str,
-    preset: str = 'default',
-    auto_download: bool = False,
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    preset: Optional[str] = None,
+    aggregate: str = 'mean',
     **kwargs
 ) -> float:
-    """Score a single peptide for foreignness.
+    """Score a single peptide.
 
     Parameters
     ----------
     peptide : str
         Peptide sequence to score.
-    preset : str, default='default'
-        Scoring preset to use.
-    auto_download : bool, default=False
-        If True, automatically download reference data if not present.
+    model : str or BaseScorer, optional
+        Model name (from ModelManager) or an instantiated scorer.
+    model_dir : str, optional
+        Custom model directory when loading by name.
+    preset : str, optional
+        Scoring preset for non-trainable scorers.
+    aggregate : str, default='mean'
+        How to aggregate k-mer probabilities for long peptides.
     **kwargs : dict
         Additional arguments passed to create_scorer().
 
@@ -127,33 +156,50 @@ def score_peptide(
 
     Example
     -------
-    >>> score = score_peptide('MTMDKSEL')
-    >>> print(f"Foreignness: {score:.2f}")
-
-    >>> # Auto-download data on first use
-    >>> score = score_peptide('MTMDKSEL', auto_download=True)
+    >>> scorer = load_model('my-mlp')
+    >>> score = score_peptide('MTMDKSEL', model=scorer)
     """
-    scorer = create_scorer(preset, auto_download=auto_download, **kwargs)
-    scores = scorer.score([peptide])
+    if model is None:
+        if preset is None:
+            raise ValueError("Provide a trained model or a preset for non-trainable scorers.")
+        scorer = create_scorer(preset, **kwargs)
+    elif isinstance(model, str):
+        scorer = load_model(model, model_dir)
+    else:
+        scorer = model
+
+    if isinstance(scorer, TrainableScorer) and not scorer.is_trained:
+        raise RuntimeError("Scorer is not trained. Train or load a trained model before scoring.")
+
+    try:
+        scores = scorer.score([peptide], aggregate=aggregate)
+    except TypeError:
+        scores = scorer.score([peptide])
     return float(scores[0])
 
 
 def score_peptides(
     peptides: Sequence[str],
-    preset: str = 'default',
-    auto_download: bool = False,
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    preset: Optional[str] = None,
+    aggregate: str = 'mean',
     **kwargs
 ) -> np.ndarray:
-    """Score multiple peptides for foreignness.
+    """Score multiple peptides.
 
     Parameters
     ----------
     peptides : sequence of str
         Peptide sequences to score.
-    preset : str, default='default'
-        Scoring preset to use.
-    auto_download : bool, default=False
-        If True, automatically download reference data if not present.
+    model : str or BaseScorer, optional
+        Model name (from ModelManager) or an instantiated scorer.
+    model_dir : str, optional
+        Custom model directory when loading by name.
+    preset : str, optional
+        Scoring preset for non-trainable scorers.
+    aggregate : str, default='mean'
+        How to aggregate k-mer probabilities for long peptides.
     **kwargs : dict
         Additional arguments passed to create_scorer().
 
@@ -164,15 +210,25 @@ def score_peptides(
 
     Example
     -------
-    >>> scores = score_peptides(['MTMDKSEL', 'ACDEFGHI', 'XXXXXXXX'])
-    >>> for pep, score in zip(peptides, scores):
-    ...     print(f"{pep}: {score:.2f}")
-
-    >>> # Auto-download data on first use
-    >>> scores = score_peptides(['MTMDKSEL'], auto_download=True)
+    >>> scorer = load_model('my-mlp')
+    >>> scores = score_peptides(['MTMDKSEL'], model=scorer)
     """
-    scorer = create_scorer(preset, auto_download=auto_download, **kwargs)
-    return scorer.score(peptides)
+    if model is None:
+        if preset is None:
+            raise ValueError("Provide a trained model or a preset for non-trainable scorers.")
+        scorer = create_scorer(preset, **kwargs)
+    elif isinstance(model, str):
+        scorer = load_model(model, model_dir)
+    else:
+        scorer = model
+
+    if isinstance(scorer, TrainableScorer) and not scorer.is_trained:
+        raise RuntimeError("Scorer is not trained. Train or load a trained model before scoring.")
+
+    try:
+        return scorer.score(peptides, aggregate=aggregate)
+    except TypeError:
+        return scorer.score(peptides)
 
 
 def clear_cache() -> None:
@@ -310,7 +366,7 @@ def get_available_scorers() -> List[str]:
     Example
     -------
     >>> print(get_available_scorers())
-    ['frequency', 'similarity', 'mlp', 'modern-mlp']
+    ['mlp']
     """
     from .scorers import list_scorers
     return list_scorers()

@@ -1,6 +1,6 @@
-"""Data management for WEIRDO reference data and indices.
+"""Data management for WEIRDO reference data.
 
-Handles downloading, caching, and indexing of reference data files.
+Handles downloading and caching of reference data files.
 Data is stored in ~/.weirdo/ by default.
 
 Example
@@ -12,16 +12,14 @@ Example
 >>> dm.clear_all()  # Remove all data
 """
 
-import hashlib
 import json
 import os
 import shutil
 import sys
 import tempfile
-import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from urllib.request import urlretrieve
 from urllib.error import URLError
 
@@ -42,17 +40,6 @@ DATASETS = {
     },
 }
 
-# Index types that can be generated
-INDEX_TYPES = {
-    'frequency': {
-        'description': 'Pre-computed frequency lookup for fast scoring',
-        'source': 'swissprot-8mers',
-    },
-    'set': {
-        'description': 'K-mer presence set (memory efficient)',
-        'source': 'swissprot-8mers',
-    },
-}
 
 
 def _progress_hook(block_num: int, block_size: int, total_size: int) -> None:
@@ -72,7 +59,7 @@ def _progress_hook(block_num: int, block_size: int, total_size: int) -> None:
 
 
 class DataManager:
-    """Manages WEIRDO reference data and indices.
+    """Manages WEIRDO reference data.
 
     Parameters
     ----------
@@ -102,7 +89,6 @@ class DataManager:
 
         # Subdirectories
         self.downloads_dir = self.data_dir / 'downloads'
-        self.indices_dir = self.data_dir / 'indices'
         self.metadata_file = self.data_dir / 'metadata.json'
 
         # Ensure directories exist
@@ -115,14 +101,16 @@ class DataManager:
         """Create data directories if they don't exist."""
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.downloads_dir.mkdir(exist_ok=True)
-        self.indices_dir.mkdir(exist_ok=True)
 
     def _load_metadata(self) -> Dict[str, Any]:
         """Load metadata from disk."""
         if self.metadata_file.exists():
             with open(self.metadata_file, 'r') as f:
-                return json.load(f)
-        return {'downloads': {}, 'indices': {}}
+                data = json.load(f)
+            if 'downloads' not in data:
+                data['downloads'] = {}
+            return data
+        return {'downloads': {}}
 
     def _save_metadata(self) -> None:
         """Save metadata to disk."""
@@ -147,16 +135,6 @@ class DataManager:
             Names of available datasets.
         """
         return list(DATASETS.keys())
-
-    def list_available_indices(self) -> List[str]:
-        """List available index types that can be generated.
-
-        Returns
-        -------
-        indices : list of str
-            Names of available index types.
-        """
-        return list(INDEX_TYPES.keys())
 
     def get_dataset_info(self, name: str) -> Dict[str, Any]:
         """Get information about a dataset.
@@ -347,14 +325,6 @@ class DataManager:
             del self._metadata['downloads'][name]
             self._save_metadata()
 
-        # Also delete any indices that depend on this dataset
-        indices_to_delete = [
-            idx_name for idx_name, idx_info in INDEX_TYPES.items()
-            if idx_info.get('source') == name
-        ]
-        for idx_name in indices_to_delete:
-            self.delete_index(idx_name)
-
         return deleted
 
     def delete_all_downloads(self) -> int:
@@ -372,221 +342,11 @@ class DataManager:
         return count
 
     # -------------------------------------------------------------------------
-    # Index management
-    # -------------------------------------------------------------------------
-
-    def is_indexed(self, name: str) -> bool:
-        """Check if an index exists.
-
-        Parameters
-        ----------
-        name : str
-            Index name.
-
-        Returns
-        -------
-        indexed : bool
-            True if index exists.
-        """
-        if name not in INDEX_TYPES:
-            raise ValueError(f"Unknown index: {name}")
-
-        index_path = self.indices_dir / f"{name}.idx"
-        return index_path.exists() and name in self._metadata.get('indices', {})
-
-    def get_index_path(self, name: str) -> Path:
-        """Get path to an index file.
-
-        Parameters
-        ----------
-        name : str
-            Index name.
-
-        Returns
-        -------
-        path : Path
-            Path to index file.
-        """
-        if name not in INDEX_TYPES:
-            raise ValueError(f"Unknown index: {name}")
-        return self.indices_dir / f"{name}.idx"
-
-    def build_index(self, name: str, force: bool = False) -> Path:
-        """Build an index from downloaded data.
-
-        Parameters
-        ----------
-        name : str
-            Index name.
-        force : bool, default=False
-            Rebuild even if already exists.
-
-        Returns
-        -------
-        path : Path
-            Path to index file.
-        """
-        if name not in INDEX_TYPES:
-            raise ValueError(f"Unknown index: {name}. Available: {list(INDEX_TYPES.keys())}")
-
-        index_path = self.indices_dir / f"{name}.idx"
-
-        if index_path.exists() and not force:
-            self._log(f"Index '{name}' already exists at {index_path}")
-            return index_path
-
-        info = INDEX_TYPES[name]
-        source = info['source']
-
-        # Ensure source data is downloaded
-        source_path = self.get_data_path(source)
-
-        self._log(f"Building index '{name}'...")
-        self._log(f"  Source: {source_path}")
-
-        start_time = time.time()
-
-        if name == 'frequency':
-            self._build_frequency_index(source_path, index_path)
-        elif name == 'set':
-            self._build_set_index(source_path, index_path)
-        else:
-            raise NotImplementedError(f"Index type '{name}' not implemented")
-
-        elapsed = time.time() - start_time
-
-        # Update metadata
-        self._metadata.setdefault('indices', {})[name] = {
-            'path': str(index_path),
-            'built_at': datetime.now().isoformat(),
-            'source': source,
-            'size_bytes': index_path.stat().st_size,
-            'build_time_seconds': elapsed,
-        }
-        self._save_metadata()
-
-        self._log(f"  Built in {elapsed:.1f}s: {index_path}")
-        return index_path
-
-    def _build_frequency_index(self, source_path: Path, index_path: Path) -> None:
-        """Build frequency lookup index."""
-        import pickle
-
-        frequencies = {}
-        total_count = 0
-
-        with open(source_path, 'r') as f:
-            # Skip header
-            header = f.readline().strip().split(',')
-
-            for line in f:
-                parts = line.strip().split(',')
-                if len(parts) >= 2:
-                    kmer = parts[1]  # seq column
-                    # Count number of True values (categories present)
-                    count = sum(1 for p in parts[2:-1] if p == 'True')
-                    frequencies[kmer] = count
-                    total_count += 1
-
-                if total_count % 10000000 == 0:
-                    self._log(f"    Processed {total_count:,} k-mers...")
-
-        # Normalize to frequencies
-        max_count = max(frequencies.values()) if frequencies else 1
-        frequencies = {k: v / max_count for k, v in frequencies.items()}
-
-        with open(index_path, 'wb') as f:
-            pickle.dump(frequencies, f)
-
-    def _build_set_index(self, source_path: Path, index_path: Path) -> None:
-        """Build k-mer presence set index."""
-        import pickle
-
-        kmers = set()
-        total_count = 0
-
-        with open(source_path, 'r') as f:
-            # Skip header
-            f.readline()
-
-            for line in f:
-                parts = line.strip().split(',')
-                if len(parts) >= 2:
-                    kmer = parts[1]  # seq column
-                    kmers.add(kmer)
-                    total_count += 1
-
-                if total_count % 10000000 == 0:
-                    self._log(f"    Processed {total_count:,} k-mers...")
-
-        with open(index_path, 'wb') as f:
-            pickle.dump(kmers, f)
-
-    def delete_index(self, name: str) -> bool:
-        """Delete an index.
-
-        Parameters
-        ----------
-        name : str
-            Index name.
-
-        Returns
-        -------
-        deleted : bool
-            True if index was deleted.
-        """
-        if name not in INDEX_TYPES:
-            raise ValueError(f"Unknown index: {name}")
-
-        index_path = self.indices_dir / f"{name}.idx"
-        deleted = False
-
-        if index_path.exists():
-            index_path.unlink()
-            deleted = True
-            self._log(f"Deleted index: {index_path}")
-
-        if name in self._metadata.get('indices', {}):
-            del self._metadata['indices'][name]
-            self._save_metadata()
-
-        return deleted
-
-    def delete_all_indices(self) -> int:
-        """Delete all indices.
-
-        Returns
-        -------
-        count : int
-            Number of indices deleted.
-        """
-        count = 0
-        for name in list(INDEX_TYPES.keys()):
-            if self.delete_index(name):
-                count += 1
-        return count
-
-    def rebuild_indices(self) -> List[Path]:
-        """Rebuild all indices from downloaded data.
-
-        Returns
-        -------
-        paths : list of Path
-            Paths to rebuilt indices.
-        """
-        paths = []
-        for name in INDEX_TYPES:
-            source = INDEX_TYPES[name]['source']
-            if self.is_downloaded(source):
-                paths.append(self.build_index(name, force=True))
-        return paths
-
-    # -------------------------------------------------------------------------
     # Status and cleanup
     # -------------------------------------------------------------------------
 
     def status(self) -> Dict[str, Any]:
-        """Get status of all data and indices.
+        """Get status of all downloaded data.
 
         Returns
         -------
@@ -596,7 +356,6 @@ class DataManager:
         status = {
             'data_dir': str(self.data_dir),
             'downloads': {},
-            'indices': {},
             'total_size_bytes': 0,
         }
 
@@ -613,20 +372,6 @@ class DataManager:
                 status['total_size_bytes'] += size
             else:
                 status['downloads'][name] = {'downloaded': False}
-
-        for name in INDEX_TYPES:
-            index_path = self.indices_dir / f"{name}.idx"
-            if index_path.exists():
-                size = index_path.stat().st_size
-                status['indices'][name] = {
-                    'path': str(index_path),
-                    'size_bytes': size,
-                    'size_mb': size / (1024 * 1024),
-                    'metadata': self._metadata.get('indices', {}).get(name, {}),
-                }
-                status['total_size_bytes'] += size
-            else:
-                status['indices'][name] = {'built': False}
 
         status['total_size_mb'] = status['total_size_bytes'] / (1024 * 1024)
         return status
@@ -653,33 +398,17 @@ class DataManager:
                 print(f"      {ds_info.get('description', '')}")
                 print(f"      Status: Not downloaded (~{ds_info.get('size_mb', '?')} MB compressed)")
 
-        print("\nIndices:")
-        print("-" * 70)
-        for name, info in status['indices'].items():
-            idx_info = INDEX_TYPES.get(name, {})
-            if info.get('built', True) and 'size_mb' in info:
-                meta = info.get('metadata', {})
-                built_at = meta.get('built_at', 'unknown')[:10]  # Just date
-                print(f"  [x] {name}")
-                print(f"      {idx_info.get('description', '')}")
-                print(f"      Status: Built ({info['size_mb']:.0f} MB, {built_at})")
-            else:
-                print(f"  [ ] {name}")
-                print(f"      {idx_info.get('description', '')}")
-                print(f"      Status: Not built (requires: {idx_info.get('source', '?')})")
         print()
 
-    def clear_all(self) -> Tuple[int, int]:
-        """Delete all downloaded data and indices.
+    def clear_all(self) -> int:
+        """Delete all downloaded data.
 
         Returns
         -------
-        counts : tuple of (int, int)
-            Number of (downloads, indices) deleted.
+        count : int
+            Number of downloads deleted.
         """
-        idx_count = self.delete_all_indices()
-        dl_count = self.delete_all_downloads()
-        return (dl_count, idx_count)
+        return self.delete_all_downloads()
 
     def disk_usage(self) -> int:
         """Get total disk usage in bytes.

@@ -18,7 +18,7 @@ class ScorerConfig:
     Attributes
     ----------
     scorer : str
-        Name of the scorer to use (e.g., 'frequency', 'similarity').
+        Name of the scorer to use (e.g., 'mlp').
     reference : str
         Name of the reference to use (e.g., 'swissprot').
     k : int
@@ -27,19 +27,23 @@ class ScorerConfig:
         Additional parameters for the scorer.
     reference_params : dict
         Additional parameters for the reference.
+    training_params : dict
+        Optional training parameters for trainable scorers.
 
     Example
     -------
     >>> config = ScorerConfig.from_preset('default')
     >>> scorer = config.build()
+    >>> scorer.train(peptides, labels, target_categories=['human', 'viruses'])
     >>> scores = scorer.score(['MTMDKSEL'])
     """
 
-    scorer: str = 'frequency'
+    scorer: str = 'mlp'
     reference: str = 'swissprot'
     k: int = 8
     scorer_params: Dict[str, Any] = field(default_factory=dict)
     reference_params: Dict[str, Any] = field(default_factory=dict)
+    training_params: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary.
@@ -66,11 +70,12 @@ class ScorerConfig:
             Configuration instance.
         """
         return cls(
-            scorer=data.get('scorer', 'frequency'),
+            scorer=data.get('scorer', 'mlp'),
             reference=data.get('reference', 'swissprot'),
             k=data.get('k', 8),
             scorer_params=data.get('scorer_params', {}),
             reference_params=data.get('reference_params', {}),
+            training_params=data.get('training_params', {}),
         )
 
     @classmethod
@@ -134,7 +139,7 @@ class ScorerConfig:
         Parameters
         ----------
         name : str
-            Preset name (e.g., 'default', 'pathogen', 'similarity_blosum62').
+            Preset name (e.g., 'default', 'fast').
 
         Returns
         -------
@@ -148,110 +153,101 @@ class ScorerConfig:
         """
         return get_preset(name)
 
-    def build(self, auto_load: bool = True):
+    def build(
+        self,
+        auto_load: bool = True,
+        train_data: Optional[List[str]] = None,
+        train_labels: Optional[Any] = None,
+        target_categories: Optional[List[str]] = None,
+        **train_overrides: Any
+    ):
         """Build scorer from this configuration.
 
         Parameters
         ----------
         auto_load : bool, default=True
             If True, automatically load the reference.
+        train_data : list of str, optional
+            Training peptides for trainable scorers.
+        train_labels : array-like, optional
+            Training labels for trainable scorers.
+        target_categories : list of str, optional
+            Category names for multi-label training.
+        **train_overrides : dict
+            Overrides for training parameters.
 
         Returns
         -------
         scorer : BaseScorer
-            Configured and fitted scorer.
+            Configured scorer. Trainable scorers are returned untrained
+            unless train_data and train_labels are provided.
         """
         from .registry import create_scorer, create_reference
+        from .trainable import TrainableScorer
 
-        # Create reference
+        # Create and fit scorer
+        scorer_params = {'k': self.k, **self.scorer_params}
+        scorer = create_scorer(self.scorer, **scorer_params)
+        if isinstance(scorer, TrainableScorer):
+            if train_data is not None and train_labels is not None:
+                train_kwargs = {**self.training_params, **train_overrides}
+                scorer.train(
+                    peptides=train_data,
+                    labels=train_labels,
+                    target_categories=target_categories,
+                    **train_kwargs,
+                )
+            return scorer
+        # Non-trainable scorers require a reference
         ref_params = {'k': self.k, **self.reference_params}
         reference = create_reference(self.reference, **ref_params)
         if auto_load:
             reference.load()
 
-        # Create and fit scorer
-        scorer_params = {'k': self.k, **self.scorer_params}
-        scorer = create_scorer(self.scorer, **scorer_params)
         scorer.fit(reference)
-
         return scorer
 
 
 # Preset configurations
 PRESETS: Dict[str, ScorerConfig] = {
     'default': ScorerConfig(
-        scorer='frequency',
+        scorer='mlp',
         reference='swissprot',
         k=8,
         scorer_params={
-            'aggregate': 'mean',
-            'pseudocount': 1e-10,
+            'hidden_layer_sizes': (256, 128, 64),
+            'activation': 'relu',
+            'alpha': 0.0001,
+            'early_stopping': True,
+            'use_dipeptides': True,
         },
         reference_params={
-            'categories': None,  # All categories
+            'categories': None,  # All categories available in SwissProt
         },
-    ),
-    'pathogen': ScorerConfig(
-        scorer='frequency',
-        reference='swissprot',
-        k=8,
-        scorer_params={
-            'aggregate': 'mean',
-            'pseudocount': 1e-10,
-        },
-        reference_params={
-            'categories': ['bacteria', 'viruses'],
-        },
-    ),
-    'human': ScorerConfig(
-        scorer='frequency',
-        reference='swissprot',
-        k=8,
-        scorer_params={
-            'aggregate': 'mean',
-            'pseudocount': 1e-10,
-        },
-        reference_params={
-            'categories': ['human'],
-        },
-    ),
-    'similarity_blosum62': ScorerConfig(
-        scorer='similarity',
-        reference='swissprot',
-        k=8,
-        scorer_params={
-            'matrix': 'blosum62',
-            'distance_metric': 'min_distance',
-            'max_candidates': 1000,
-        },
-        reference_params={
-            'categories': None,
-        },
-    ),
-    'similarity_pmbec': ScorerConfig(
-        scorer='similarity',
-        reference='swissprot',
-        k=8,
-        scorer_params={
-            'matrix': 'pmbec',
-            'distance_metric': 'min_distance',
-            'max_candidates': 1000,
-        },
-        reference_params={
-            'categories': None,
+        training_params={
+            'epochs': 200,
+            'learning_rate': 0.001,
+            'verbose': True,
         },
     ),
     'fast': ScorerConfig(
-        scorer='frequency',
+        scorer='mlp',
         reference='swissprot',
         k=8,
         scorer_params={
-            'aggregate': 'mean',
-            'pseudocount': 1e-10,
+            'hidden_layer_sizes': (128, 64),
+            'activation': 'relu',
+            'alpha': 0.0001,
+            'early_stopping': True,
+            'use_dipeptides': False,
         },
         reference_params={
-            'categories': ['human'],
-            'use_set': True,  # No frequencies, faster lookup
+            'categories': None,
+        },
+        training_params={
+            'epochs': 50,
+            'learning_rate': 0.001,
+            'verbose': True,
         },
     ),
 }
@@ -288,6 +284,7 @@ def get_preset(name: str) -> ScorerConfig:
         k=preset.k,
         scorer_params=preset.scorer_params.copy(),
         reference_params=preset.reference_params.copy(),
+        training_params=preset.training_params.copy(),
     )
 
 

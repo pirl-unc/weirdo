@@ -5,9 +5,9 @@ based on how "foreign" they are relative to a reference dataset.
 
 Quick Start
 -----------
->>> from weirdo.scorers import FrequencyScorer, SwissProtReference
->>> ref = SwissProtReference(categories=['human']).load()
->>> scorer = FrequencyScorer(k=8).fit(ref)
+>>> from weirdo.scorers import MLPScorer
+>>> scorer = MLPScorer(k=8, hidden_layer_sizes=(128, 64))
+>>> scorer.train(peptides, labels, target_categories=['human', 'viruses'])
 >>> scores = scorer.score(['MTMDKSEL', 'ACDEFGHI'])
 
 Using Presets
@@ -15,6 +15,7 @@ Using Presets
 >>> from weirdo.scorers import ScorerConfig
 >>> config = ScorerConfig.from_preset('default')
 >>> scorer = config.build()
+>>> scorer.train(peptides, labels, target_categories=['human', 'viruses'])
 >>> scores = scorer.score(['MTMDKSEL'])
 
 Adding Custom Scorers
@@ -60,8 +61,6 @@ from .trainable import TrainableScorer
 
 # Concrete implementations (import to trigger registration)
 from .swissprot import SwissProtReference
-from .frequency import FrequencyScorer
-from .similarity import SimilarityScorer
 
 # ML-based scorer
 from .mlp import MLPScorer
@@ -91,8 +90,6 @@ __all__ = [
     'list_presets',
     # Implementations
     'SwissProtReference',
-    'FrequencyScorer',
-    'SimilarityScorer',
-    # ML scorer (if torch available)
+    # ML scorer
     'MLPScorer',
 ]

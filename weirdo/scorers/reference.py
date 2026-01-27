@@ -11,7 +11,7 @@ from typing import Dict, Iterator, List, Optional, Set, Tuple, Union
 class BaseReference(ABC):
     """Abstract base class for reference datasets.
 
-    A reference dataset provides k-mer frequency information
+    A reference dataset provides k-mer presence or frequency information
     used by scorers to compute foreignness scores.
 
     Example
@@ -21,7 +21,7 @@ class BaseReference(ABC):
     >>> ref.contains('MTMDKSEL')
     True
     >>> ref.get_frequency('MTMDKSEL')
-    0.00123
+    1.0
     """
 
     def __init__(
@@ -88,7 +88,7 @@ class BaseReference(ABC):
         Returns
         -------
         frequency : float
-            Frequency of k-mer (0.0 to 1.0) or default if not found.
+            Frequency or presence of k-mer (0.0 to 1.0) or default if not found.
         """
         pass
 
