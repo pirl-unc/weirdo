@@ -39,7 +39,7 @@ peptides, labels = ref.get_training_data(
 
 ### Feature Extraction
 
-The MLP extracts **663 features** from each peptide:
+The MLP extracts **495 features** from each peptide:
 
 #### Amino Acid Properties (48 features)
 
@@ -81,12 +81,6 @@ The MLP extracts **663 features** from each peptide:
 | AA frequencies | 20 | Fraction of each amino acid |
 | Dipeptide frequencies | 400 | Fraction of each AA pair (20×20) |
 
-#### Positional Features (168 features)
-
-| Feature | Count | Description |
-|---------|-------|-------------|
-| K-mer one-hot | k×21 | Position-specific AA encoding (168 for k=8) |
-
 ### Training
 
 ```python
@@ -125,7 +119,7 @@ scorer.train(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `k` | int | 8 | K-mer size for positional features |
+| `k` | int | 8 | K-mer window size for aggregating long peptides |
 | `hidden_layer_sizes` | tuple | (256, 128, 64) | Hidden layer dimensions |
 | `activation` | str | 'relu' | Activation: 'relu', 'tanh', 'logistic' |
 | `alpha` | float | 0.0001 | L2 regularization strength |
@@ -184,11 +178,11 @@ Options:
 
 #### `features_dataframe(peptides)` - Feature Extraction
 
-Returns DataFrame with all 663 features:
+Returns DataFrame with all 495 features:
 
 ```python
 df = scorer.features_dataframe(['MTMDKSEL', 'SIINFEKL'])
-# Shape: (2, 664) - 663 features + peptide column
+# Shape: (2, 496) - 495 features + peptide column
 
 # Get feature names
 names = scorer.get_feature_names()

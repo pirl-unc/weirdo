@@ -1,8 +1,10 @@
 """Tests for SwissProtReference with real CSV data."""
 
 import os
+import warnings
 import pytest
 import numpy as np
+from sklearn.exceptions import ConvergenceWarning
 
 from weirdo.scorers import (
     SwissProtReference,
@@ -221,7 +223,9 @@ class TestSwissProtWithScorers:
         )
 
         scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), random_state=3)
-        scorer.train(peptides=peptides, labels=labels, target_categories=categories, epochs=20, verbose=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            scorer.train(peptides=peptides, labels=labels, target_categories=categories, epochs=20, verbose=False)
 
         df = scorer.predict_dataframe(['MTMDKSEL'])
         assert 'foreignness' in df.columns

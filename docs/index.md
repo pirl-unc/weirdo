@@ -9,12 +9,11 @@ A Python library for computing peptide foreignness scores—predicting whether a
 WEIRDO trains a neural network on k-mer presence data from SwissProt to predict organism category membership:
 
 ```
-Peptide → Feature Extraction (663 features) → MLP → Category Probabilities → Foreignness Score
+Peptide → Feature Extraction (495 features) → MLP → Category Probabilities → Foreignness Score
              ↓                                              ↓
     - AA properties (48)                        human: 0.82
     - Structural (27)                          viruses: 0.12
     - Composition (420)                       bacteria: 0.08
-    - Positional (168)                         mammals: 0.79
                                                     ↓
                                     foreignness = max(pathogens) / (max(pathogens) + max(self))
                                                 = 0.12 / (0.12 + 0.82) = 0.13
@@ -67,14 +66,13 @@ Predict probability of peptide appearing in 10 organism categories:
 
 ### Rich Feature Extraction
 
-663 features capturing peptide properties:
+495 features capturing peptide properties:
 
 | Feature Group | Count | Description |
 |---------------|-------|-------------|
 | AA Properties | 48 | Hydropathy, mass, volume, etc. (12 props × 4 stats) |
 | Structural | 27 | Secondary structure, charge patterns, disorder |
 | Composition | 420 | AA frequencies (20) + dipeptides (400) |
-| Positional | 168 | K-mer one-hot encoding (k × 21) |
 
 ### Variable-Length Peptides
 

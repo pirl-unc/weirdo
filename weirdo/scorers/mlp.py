@@ -1,8 +1,8 @@
 """MLP-based origin scorer.
 
 Neural network model for learning category probabilities from labeled data.
-Uses rich peptide features including amino acid properties, n-gram
-frequencies, and one-hot encoding.
+Uses rich peptide features including amino acid properties and composition
+statistics.
 """
 
 import pickle
@@ -246,30 +246,6 @@ def _compute_structural_features(peptide: str) -> np.ndarray:
     return np.array(features, dtype=np.float32)
 
 
-def _compute_kmer_onehot(peptide: str, k: int) -> np.ndarray:
-    """Compute averaged one-hot encoding over k-mers.
-
-    Returns array of shape (k * 21,).
-    """
-    if len(peptide) < k:
-        peptide = peptide + 'X' * (k - len(peptide))
-
-    # Extract k-mers and average their one-hot encodings
-    n_kmers = len(peptide) - k + 1
-    onehot_sum = np.zeros(k * NUM_AMINO_ACIDS, dtype=np.float32)
-
-    for i in range(n_kmers):
-        kmer = peptide[i:i+k]
-        for j, aa in enumerate(kmer):
-            idx = AA_TO_IDX.get(aa, 20)
-            onehot_sum[j * NUM_AMINO_ACIDS + idx] += 1
-
-    # Average over k-mers
-    onehot_sum /= n_kmers
-
-    return onehot_sum
-
-
 def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> np.ndarray:
     """Extract all features from a peptide.
 
@@ -278,14 +254,13 @@ def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> n
     - Structural/physicochemical features (27 features)
     - Amino acid composition (20 features)
     - Dipeptide composition (400 features, optional)
-    - K-mer one-hot encoding (k × 21 features)
 
     Parameters
     ----------
     peptide : str
         Peptide sequence.
     k : int
-        K-mer size for positional one-hot features.
+        Unused; retained for backward compatibility.
     use_dipeptides : bool
         Include dipeptide composition features.
 
@@ -300,7 +275,6 @@ def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> n
         _compute_property_features(peptide, properties),  # 48 features (12 props × 4 stats)
         _compute_structural_features(peptide),             # 27 features
         _compute_composition_features(peptide),            # 20 features
-        _compute_kmer_onehot(peptide, k),                  # k*21 features
     ]
 
     if use_dipeptides:
@@ -317,14 +291,13 @@ class MLPScorer(TrainableScorer):
     - Amino acid properties (hydropathy, mass, polarity, etc.)
     - Amino acid composition (single AA frequencies)
     - Dipeptide composition (AA pair frequencies)
-    - K-mer one-hot encoding
 
     All features are normalized using StandardScaler before training.
 
     Parameters
     ----------
     k : int, default=8
-        K-mer size for one-hot features.
+        K-mer size used to window long peptides for aggregation.
     hidden_layer_sizes : tuple of int, default=(256, 128, 64)
         Sizes of hidden layers.
     activation : str, default='relu'
@@ -851,9 +824,9 @@ class MLPScorer(TrainableScorer):
         Returns
         -------
         df : pd.DataFrame
-            DataFrame with 663 feature columns (+ peptide column if include_peptide=True).
+            DataFrame with 495 feature columns (+ peptide column if include_peptide=True).
             Features: 48 AA properties, 27 structural, 20 AA composition,
-            168 k-mer one-hot, 400 dipeptides.
+            400 dipeptides (if enabled).
         """
         import pandas as pd
 
@@ -950,11 +923,6 @@ class MLPScorer(TrainableScorer):
         # Amino acid composition (20 features)
         for aa in AMINO_ACIDS:
             names.append(f'aa_freq_{aa}')
-
-        # K-mer one-hot (k * 21 features)
-        for pos in range(self.k):
-            for aa in AMINO_ACIDS + 'X':
-                names.append(f'kmer_pos{pos}_{aa}')
 
         # Dipeptide composition (400 features)
         if self._params.get('use_dipeptides', True):

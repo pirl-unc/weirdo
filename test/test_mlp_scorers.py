@@ -13,7 +13,6 @@ from weirdo.scorers.mlp import (
     _compute_property_features,
     _compute_composition_features,
     _compute_dipeptide_features,
-    _compute_kmer_onehot,
     _get_aa_properties,
     AMINO_ACIDS,
 )
@@ -37,12 +36,6 @@ class TestFeatureExtraction:
         assert features[0] == 1.0  # AA is at index 0*20 + 0 = 0
         assert np.isfinite(features).all()
 
-    def test_compute_kmer_onehot(self):
-        """Test k-mer one-hot encoding."""
-        features = _compute_kmer_onehot('AA', k=2)
-        assert len(features) == 2 * 21  # k * 21 amino acids
-        assert np.isfinite(features).all()
-
     def test_compute_property_features(self):
         """Test amino acid property feature extraction."""
         properties = _get_aa_properties()
@@ -54,16 +47,16 @@ class TestFeatureExtraction:
     def test_extract_features(self):
         """Test full feature extraction."""
         features = extract_features('MTMDKSEL', k=8, use_dipeptides=True)
-        # 48 (properties) + 27 (structural) + 20 (composition) + 168 (8*21 kmer) + 400 (dipeptides) = 663
-        expected_length = 48 + 27 + 20 + 8 * 21 + 400
+        # 48 (properties) + 27 (structural) + 20 (composition) + 400 (dipeptides) = 495
+        expected_length = 48 + 27 + 20 + 400
         assert len(features) == expected_length
         assert np.isfinite(features).all()
 
     def test_extract_features_no_dipeptides(self):
         """Test feature extraction without dipeptides."""
         features = extract_features('MTMDKSEL', k=8, use_dipeptides=False)
-        # 48 (properties) + 27 (structural) + 20 (composition) + 168 (8*21 kmer) = 263
-        expected_length = 48 + 27 + 20 + 8 * 21
+        # 48 (properties) + 27 (structural) + 20 (composition) = 95
+        expected_length = 48 + 27 + 20
         assert len(features) == expected_length
         assert np.isfinite(features).all()
 
@@ -73,7 +66,7 @@ class TestFeatureExtraction:
         names = scorer.get_feature_names()
 
         # Should have names for all features
-        expected_count = 48 + 27 + 20 + 8 * 21 + 400
+        expected_count = 48 + 27 + 20 + 400
         assert len(names) == expected_count
 
         # Check some specific feature names
@@ -82,8 +75,8 @@ class TestFeatureExtraction:
         assert 'frac_cysteine' in names
         assert 'arginine_ratio' in names
         assert 'aa_freq_A' in names
-        assert 'kmer_pos0_A' in names
         assert 'dipep_AA' in names
+        assert all('kmer_pos' not in name for name in names)
 
 
 class TestMLPScorer:
