@@ -47,16 +47,16 @@ class TestFeatureExtraction:
     def test_extract_features(self):
         """Test full feature extraction."""
         features = extract_features('MTMDKSEL', k=8, use_dipeptides=True)
-        # 48 (properties) + 27 (structural) + 20 (composition) + 400 (dipeptides) = 495
-        expected_length = 48 + 27 + 20 + 400
+        # 48 + 27 + 20 + 12 (seq stats) + 80 (reduced alph) + 5 (dipep stats) + 400 (dipeps) = 592
+        expected_length = 48 + 27 + 20 + 12 + 80 + 5 + 400
         assert len(features) == expected_length
         assert np.isfinite(features).all()
 
     def test_extract_features_no_dipeptides(self):
         """Test feature extraction without dipeptides."""
         features = extract_features('MTMDKSEL', k=8, use_dipeptides=False)
-        # 48 (properties) + 27 (structural) + 20 (composition) = 95
-        expected_length = 48 + 27 + 20
+        # 48 + 27 + 20 + 12 (seq stats) + 80 (reduced alph) = 187
+        expected_length = 48 + 27 + 20 + 12 + 80
         assert len(features) == expected_length
         assert np.isfinite(features).all()
 
@@ -66,7 +66,7 @@ class TestFeatureExtraction:
         names = scorer.get_feature_names()
 
         # Should have names for all features
-        expected_count = 48 + 27 + 20 + 400
+        expected_count = 48 + 27 + 20 + 12 + 80 + 5 + 400
         assert len(names) == expected_count
 
         # Check some specific feature names
@@ -75,6 +75,9 @@ class TestFeatureExtraction:
         assert 'frac_cysteine' in names
         assert 'arginine_ratio' in names
         assert 'aa_freq_A' in names
+        assert 'seq_length' in names
+        assert 'murphy8_freq_A' in names
+        assert 'dipep_entropy' in names
         assert 'dipep_AA' in names
         assert all('kmer_pos' not in name for name in names)
 

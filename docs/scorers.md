@@ -39,7 +39,7 @@ peptides, labels = ref.get_training_data(
 
 ### Feature Extraction
 
-The MLP extracts **495 features** from each peptide:
+The MLP extracts **592 features** from each peptide:
 
 #### Amino Acid Properties (48 features)
 
@@ -80,6 +80,38 @@ The MLP extracts **495 features** from each peptide:
 |---------|-------|-------------|
 | AA frequencies | 20 | Fraction of each amino acid |
 | Dipeptide frequencies | 400 | Fraction of each AA pair (20×20) |
+
+#### Sequence Statistics (12 features)
+
+| Feature | Description |
+|---------|-------------|
+| seq_length | Peptide length |
+| seq_log_length | log(1 + length) |
+| seq_sqrt_length | sqrt(length) |
+| frac_unknown | Fraction of non-canonical residues |
+| unique_frac | Unique AA fraction (unique/20) |
+| max_run_frac | Longest homopolymer run / length |
+| repeat_frac | Adjacent repeats / (length-1) |
+| entropy_aa | Normalized AA entropy |
+| effective_aa | Effective alphabet size (normalized) |
+| max_aa_freq | Most frequent AA fraction |
+| top2_aa_freq | Sum of top-2 AA fractions |
+| gini_aa | Gini impurity of AA distribution |
+
+#### Reduced Alphabet Frequencies (80 features)
+
+Composition across common reduced alphabets (Murphy, GBMR, SDM, etc.).
+Each alphabet contributes one feature per reduced group.
+
+#### Dipeptide Summary (5 features)
+
+| Feature | Description |
+|---------|-------------|
+| dipep_entropy | Normalized dipeptide entropy |
+| dipep_gini | Dipeptide Gini impurity |
+| dipep_max_freq | Max dipeptide frequency |
+| dipep_top2_freq | Sum of top-2 dipeptide frequencies |
+| dipep_homodimer_frac | Sum of homodipeptide frequencies |
 
 ### Training
 
@@ -124,7 +156,7 @@ scorer.train(
 | `activation` | str | 'relu' | Activation: 'relu', 'tanh', 'logistic' |
 | `alpha` | float | 0.0001 | L2 regularization strength |
 | `early_stopping` | bool | True | Stop when validation loss plateaus |
-| `use_dipeptides` | bool | True | Include 400 dipeptide features |
+| `use_dipeptides` | bool | True | Include dipeptide frequencies + summary stats |
 
 ### Prediction Methods
 
@@ -178,11 +210,11 @@ Options:
 
 #### `features_dataframe(peptides)` - Feature Extraction
 
-Returns DataFrame with all 495 features:
+Returns DataFrame with all 592 features:
 
 ```python
 df = scorer.features_dataframe(['MTMDKSEL', 'SIINFEKL'])
-# Shape: (2, 496) - 495 features + peptide column
+# Shape: (2, 593) - 592 features + peptide column
 
 # Get feature names
 names = scorer.get_feature_names()

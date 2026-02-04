@@ -86,7 +86,7 @@ Each 8-mer has True/False labels for each category, indicating whether it appear
 
 ## Feature Extraction
 
-The MLP uses **495 features** extracted from each peptide:
+The MLP uses **592 features** extracted from each peptide:
 
 ### Amino Acid Properties (48 features)
 12 physicochemical properties × 4 statistics (mean, std, min, max):
@@ -106,6 +106,18 @@ The MLP uses **495 features** extracted from each peptide:
 ### Composition Features (420 features)
 - **Amino acid frequencies** (20): fraction of each amino acid
 - **Dipeptide frequencies** (400): fraction of each amino acid pair
+
+### Sequence Statistics (12 features)
+- Length, log-length, sqrt-length
+- Unknown fraction, unique AA fraction
+- Max run length, repeat fraction
+- Entropy/complexity (entropy, effective AAs, Gini, top-2/maximum frequency)
+
+### Reduced Alphabet Frequencies (80 features)
+- Composition across common reduced alphabets (Murphy, GBMR, SDM, etc.)
+
+### Dipeptide Summary (5 features)
+- Entropy, Gini, max/top2 frequency, homodipeptide fraction
 
 ## API Reference
 
@@ -163,7 +175,7 @@ df = scorer.predict_dataframe(['MTMDKSEL', 'SIINFEKL', 'NLVPMVATV'])
 ```python
 # Extract features as DataFrame
 df = scorer.features_dataframe(['MTMDKSEL', 'SIINFEKL'])
-# Shape: (2, 496) - 495 features + peptide column
+# Shape: (2, 593) - 592 features + peptide column
 
 # Feature names
 names = scorer.get_feature_names()

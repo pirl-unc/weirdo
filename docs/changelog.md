@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-02-04
+
+### Added
+
+- Sequence-level statistics (length, repeats, entropy, complexity)
+- Reduced alphabet composition features (Murphy/GBMR/SDM, etc.)
+- Dipeptide summary statistics (entropy, Gini, maxima, homodimers)
+
+### Changed
+
+- MLP feature vector expanded to 592 non-positional features
+- Test warnings suppressed for short-epoch MLP training
+
 ## [2.0.3] - 2026-01-27
 
 ### Changed

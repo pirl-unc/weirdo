@@ -1,8 +1,10 @@
 """Tests for the scorer module."""
 
+import warnings
 import numpy as np
 import pytest
 from typing import Dict, Iterator, List, Optional, Tuple
+from sklearn.exceptions import ConvergenceWarning
 
 from weirdo.scorers import (
     BaseScorer,
@@ -261,7 +263,9 @@ class TestIntegration:
         peptides = ['MTMDKSEL', 'XXXXXXXX'] * 20
         labels = [0.0, 1.0] * 20
         scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), batch_size=10, random_state=1)
-        scorer.train(peptides=peptides, labels=labels, epochs=30, verbose=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            scorer.train(peptides=peptides, labels=labels, epochs=30, verbose=False)
 
         # Create many peptides
         peptides = ['AAAAAAAAAA' + str(i) for i in range(100)]

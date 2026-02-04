@@ -15,6 +15,7 @@ from sklearn.preprocessing import StandardScaler
 
 from .trainable import TrainableScorer
 from .registry import register_scorer
+from ..reduced_alphabet import alphabets as REDUCED_ALPHABETS
 
 
 # Amino acid to index mapping
@@ -98,7 +99,7 @@ def _compute_property_features(peptide: str, properties: Dict[str, Dict[str, flo
 
     For each property, compute: mean, std, min, max over the peptide.
     Returns array of shape (n_properties * 4,).
-    """
+"""
     features = []
 
     for prop_name, prop_dict in properties.items():
@@ -246,6 +247,156 @@ def _compute_structural_features(peptide: str) -> np.ndarray:
     return np.array(features, dtype=np.float32)
 
 
+def _build_reduced_alphabet_index():
+    """Build reduced alphabet group indices in a stable order."""
+    alphabet_order = list(REDUCED_ALPHABETS.keys())
+    alphabet_groups = {}
+    for name in alphabet_order:
+        mapping = REDUCED_ALPHABETS[name]
+        groups: List[str] = []
+        for aa in AMINO_ACIDS:
+            rep = mapping.get(aa)
+            if rep is None:
+                continue
+            if rep not in groups:
+                groups.append(rep)
+        alphabet_groups[name] = {
+            'groups': groups,
+            'rep_to_idx': {rep: idx for idx, rep in enumerate(groups)},
+        }
+    return alphabet_order, alphabet_groups
+
+
+REDUCED_ALPHABET_ORDER, REDUCED_ALPHABET_GROUPS = _build_reduced_alphabet_index()
+
+
+def _compute_sequence_stats(peptide: str) -> np.ndarray:
+    """Compute sequence-level non-positional statistics."""
+    if not peptide:
+        return np.zeros(12, dtype=np.float32)
+
+    n = len(peptide)
+    log_len = np.log1p(n)
+    sqrt_len = np.sqrt(n)
+
+    counts = np.zeros(20, dtype=np.float32)
+    unknown = 0
+    for aa in peptide:
+        idx = AMINO_ACIDS.find(aa)
+        if idx >= 0:
+            counts[idx] += 1
+        else:
+            unknown += 1
+
+    total = counts.sum()
+    if total > 0:
+        freqs = counts / total
+        nonzero = freqs[freqs > 0]
+        entropy = -np.sum(nonzero * np.log(nonzero))
+        entropy_norm = entropy / np.log(20)
+        effective = np.exp(entropy) / 20.0
+        gini = 1.0 - np.sum(freqs ** 2)
+        max_freq = float(freqs.max())
+        top2 = float(np.sort(freqs)[-2:].sum())
+        unique_frac = float(np.count_nonzero(counts) / 20.0)
+    else:
+        entropy_norm = 0.0
+        effective = 0.0
+        gini = 0.0
+        max_freq = 0.0
+        top2 = 0.0
+        unique_frac = 0.0
+
+    # Run-length and repeat statistics
+    max_run = 1
+    repeats = 0
+    current_run = 1
+    for i in range(1, n):
+        if peptide[i] == peptide[i - 1]:
+            repeats += 1
+            current_run += 1
+        else:
+            current_run = 1
+        if current_run > max_run:
+            max_run = current_run
+
+    max_run_frac = max_run / n
+    repeat_frac = repeats / max(1, n - 1)
+    frac_unknown = unknown / n
+
+    return np.array([
+        n,
+        log_len,
+        sqrt_len,
+        frac_unknown,
+        unique_frac,
+        max_run_frac,
+        repeat_frac,
+        entropy_norm,
+        effective,
+        max_freq,
+        top2,
+        gini,
+    ], dtype=np.float32)
+
+
+def _compute_reduced_alphabet_features(peptide: str) -> np.ndarray:
+    """Compute reduced alphabet composition features."""
+    if not peptide:
+        total_features = sum(
+            len(REDUCED_ALPHABET_GROUPS[name]['groups'])
+            for name in REDUCED_ALPHABET_ORDER
+        )
+        return np.zeros(total_features, dtype=np.float32)
+
+    features: List[np.ndarray] = []
+    for name in REDUCED_ALPHABET_ORDER:
+        mapping = REDUCED_ALPHABETS[name]
+        groups = REDUCED_ALPHABET_GROUPS[name]['groups']
+        rep_to_idx = REDUCED_ALPHABET_GROUPS[name]['rep_to_idx']
+        counts = np.zeros(len(groups), dtype=np.float32)
+        total = 0
+        for aa in peptide:
+            rep = mapping.get(aa)
+            if rep is None:
+                continue
+            counts[rep_to_idx[rep]] += 1
+            total += 1
+        if total > 0:
+            counts /= total
+        features.append(counts)
+
+    return np.concatenate(features) if features else np.array([], dtype=np.float32)
+
+
+def _compute_dipeptide_summary(dipeptide_freqs: np.ndarray) -> np.ndarray:
+    """Compute summary statistics from dipeptide frequencies."""
+    if dipeptide_freqs.size == 0:
+        return np.zeros(5, dtype=np.float32)
+
+    total = dipeptide_freqs.sum()
+    if total > 0:
+        probs = dipeptide_freqs / total
+        nonzero = probs[probs > 0]
+        entropy = -np.sum(nonzero * np.log(nonzero))
+        entropy_norm = entropy / np.log(probs.size)
+        gini = 1.0 - np.sum(probs ** 2)
+        max_freq = float(probs.max())
+        top2 = float(np.sort(probs)[-2:].sum()) if probs.size >= 2 else max_freq
+        homodipep = float(np.trace(probs.reshape(20, 20)))
+    else:
+        entropy_norm = 0.0
+        gini = 0.0
+        max_freq = 0.0
+        top2 = 0.0
+        homodipep = 0.0
+
+    return np.array(
+        [entropy_norm, gini, max_freq, top2, homodipep],
+        dtype=np.float32,
+    )
+
+
 def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> np.ndarray:
     """Extract all features from a peptide.
 
@@ -254,6 +405,9 @@ def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> n
     - Structural/physicochemical features (27 features)
     - Amino acid composition (20 features)
     - Dipeptide composition (400 features, optional)
+    - Dipeptide summary statistics (5 features, optional)
+    - Sequence-level statistics (12 features)
+    - Reduced alphabet compositions (80 features)
 
     Parameters
     ----------
@@ -275,10 +429,14 @@ def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> n
         _compute_property_features(peptide, properties),  # 48 features (12 props × 4 stats)
         _compute_structural_features(peptide),             # 27 features
         _compute_composition_features(peptide),            # 20 features
+        _compute_sequence_stats(peptide),                  # 12 features
+        _compute_reduced_alphabet_features(peptide),       # 80 features
     ]
 
     if use_dipeptides:
-        feature_parts.append(_compute_dipeptide_features(peptide))  # 400 features
+        dipep_freqs = _compute_dipeptide_features(peptide)
+        feature_parts.append(_compute_dipeptide_summary(dipep_freqs))  # 5 features
+        feature_parts.append(dipep_freqs)  # 400 features
 
     return np.concatenate(feature_parts)
 
@@ -291,6 +449,8 @@ class MLPScorer(TrainableScorer):
     - Amino acid properties (hydropathy, mass, polarity, etc.)
     - Amino acid composition (single AA frequencies)
     - Dipeptide composition (AA pair frequencies)
+    - Sequence-level statistics (entropy, repeats, complexity)
+    - Reduced alphabet compositions (Murphy/GBMR/SDM, etc.)
 
     All features are normalized using StandardScaler before training.
 
@@ -824,9 +984,10 @@ class MLPScorer(TrainableScorer):
         Returns
         -------
         df : pd.DataFrame
-            DataFrame with 495 feature columns (+ peptide column if include_peptide=True).
+            DataFrame with 592 feature columns (+ peptide column if include_peptide=True).
             Features: 48 AA properties, 27 structural, 20 AA composition,
-            400 dipeptides (if enabled).
+            12 sequence stats, 80 reduced alphabet frequencies, 5 dipeptide
+            summaries, 400 dipeptides (if enabled).
         """
         import pandas as pd
 
@@ -923,6 +1084,38 @@ class MLPScorer(TrainableScorer):
         # Amino acid composition (20 features)
         for aa in AMINO_ACIDS:
             names.append(f'aa_freq_{aa}')
+
+        # Sequence statistics (12 features)
+        names.extend([
+            'seq_length',
+            'seq_log_length',
+            'seq_sqrt_length',
+            'frac_unknown',
+            'unique_frac',
+            'max_run_frac',
+            'repeat_frac',
+            'entropy_aa',
+            'effective_aa',
+            'max_aa_freq',
+            'top2_aa_freq',
+            'gini_aa',
+        ])
+
+        # Reduced alphabet compositions (80 features)
+        for name in REDUCED_ALPHABET_ORDER:
+            groups = REDUCED_ALPHABET_GROUPS[name]['groups']
+            for rep in groups:
+                names.append(f'{name}_freq_{rep}')
+
+        # Dipeptide summary (5 features)
+        if self._params.get('use_dipeptides', True):
+            names.extend([
+                'dipep_entropy',
+                'dipep_gini',
+                'dipep_max_freq',
+                'dipep_top2_freq',
+                'dipep_homodimer_frac',
+            ])
 
         # Dipeptide composition (400 features)
         if self._params.get('use_dipeptides', True):

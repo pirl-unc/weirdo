@@ -204,7 +204,9 @@ class TestSwissProtWithScorers:
         )
 
         scorer = MLPScorer(k=8, hidden_layer_sizes=(32,), random_state=2)
-        scorer.train(peptides=peptides, labels=labels, target_categories=categories, epochs=30, verbose=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            scorer.train(peptides=peptides, labels=labels, target_categories=categories, epochs=30, verbose=False)
 
         peptide = 'MTMDKSELTMDKSELVMDKSELVD'  # 24-mer
         score = scorer.score([peptide])[0]
