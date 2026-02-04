@@ -12,19 +12,28 @@ echo "Running tests..."
 ./test.sh
 
 echo "Installing build tools..."
-python3 -m pip install --upgrade build twine
+if command -v uv >/dev/null 2>&1; then
+  echo "Using uv for build tooling..."
+  uv tool install --quiet build twine
+  BUILD_CMD="uv tool run build"
+  TWINE_CMD="uv tool run twine"
+else
+  python3 -m pip install --upgrade build twine
+  BUILD_CMD="python3 -m build"
+  TWINE_CMD="python3 -m twine"
+fi
 
 echo "Cleaning old builds..."
 rm -rf dist/ build/ *.egg-info
 
 echo "Building package..."
-python3 -m build
+$BUILD_CMD
 
 echo "Checking git status..."
 git --version
 
 echo "Uploading to PyPI..."
-python3 -m twine upload dist/*
+$TWINE_CMD upload dist/*
 
 echo "Creating git tag..."
 VERSION=$(python3 -c "from weirdo import __version__; print(__version__)")
