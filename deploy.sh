@@ -14,8 +14,9 @@ echo "Running tests..."
 echo "Installing build tools..."
 if command -v uv >/dev/null 2>&1; then
   echo "Using uv for build tooling..."
-  uv tool install --quiet build twine
-  BUILD_CMD="uv tool run build"
+  uv tool install --quiet build
+  uv tool install --quiet twine
+  BUILD_CMD="uv tool run pyproject-build"
   TWINE_CMD="uv tool run twine"
 else
   python3 -m pip install --upgrade build twine
