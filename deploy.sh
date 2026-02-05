@@ -38,10 +38,17 @@ echo "Checking git status..."
 git --version
 
 echo "Uploading to PyPI..."
-$TWINE_CMD upload dist/*
+$TWINE_CMD upload --skip-existing dist/*
 
 echo "Creating git tag..."
-VERSION=$(python3 -c "from weirdo import __version__; print(__version__)")
+VERSION=$(python3 - <<'PY'
+import re
+from pathlib import Path
+text = Path("weirdo/__init__.py").read_text()
+match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+print(match.group(1))
+PY
+)
 git tag "v${VERSION}"
 
 echo "Pushing tags..."
