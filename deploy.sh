@@ -14,10 +14,14 @@ echo "Running tests..."
 echo "Installing build tools..."
 if command -v uv >/dev/null 2>&1; then
   echo "Using uv for build tooling..."
-  uv tool install --quiet build
-  uv tool install --quiet twine
-  BUILD_CMD="uv tool run pyproject-build"
-  TWINE_CMD="uv tool run twine"
+  if [ ! -d ".venv" ]; then
+    uv venv .venv
+  fi
+  # shellcheck disable=SC1091
+  source .venv/bin/activate
+  uv pip install --upgrade build twine
+  BUILD_CMD="python -m build"
+  TWINE_CMD="python -m twine"
 else
   python3 -m pip install --upgrade build twine
   BUILD_CMD="python3 -m build"
