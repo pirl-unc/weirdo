@@ -72,3 +72,32 @@ with open(join(MATRIX_DIR, 'helix_vs_coil.txt'), 'r') as f:
     # Coil vs. Helix
     coil_vs_helix_dict = transpose_interaction_dict(helix_vs_coil_dict)
     coil_vs_helix_array = dict_to_amino_acid_matrix(coil_vs_helix_dict)
+
+# Backward-compatible aliases matching historical public names used in docs.
+strand_vs_coil = strand_vs_coil_dict
+coil_vs_strand = coil_vs_strand_dict
+helix_vs_strand = helix_vs_strand_dict
+strand_vs_helix = strand_vs_helix_dict
+helix_vs_coil = helix_vs_coil_dict
+coil_vs_helix = coil_vs_helix_dict
+
+__all__ = [
+    "strand_vs_coil",
+    "coil_vs_strand",
+    "helix_vs_strand",
+    "strand_vs_helix",
+    "helix_vs_coil",
+    "coil_vs_helix",
+    "strand_vs_coil_dict",
+    "coil_vs_strand_dict",
+    "helix_vs_strand_dict",
+    "strand_vs_helix_dict",
+    "helix_vs_coil_dict",
+    "coil_vs_helix_dict",
+    "strand_vs_coil_array",
+    "coil_vs_strand_array",
+    "helix_vs_strand_array",
+    "strand_vs_helix_array",
+    "helix_vs_coil_array",
+    "coil_vs_helix_array",
+]

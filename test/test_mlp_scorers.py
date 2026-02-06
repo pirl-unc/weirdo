@@ -211,6 +211,54 @@ class TestMLPScorer:
             scores = scorer.score(['MTMDKSEL'])
             assert np.isfinite(scores[0])
 
+    def test_train_with_external_validation_sets_metadata(self):
+        """External validation data should produce validation-loss metadata."""
+        peptides = ['MTMDKSEL', 'ACDEFGHI'] * 20
+        labels = [0.0, 1.0] * 20
+        val_peptides = ['MTMDKSEL', 'ACDEFGHI'] * 5
+        val_labels = [0.0, 1.0] * 5
+
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), random_state=7)
+        scorer.train(
+            peptides=peptides,
+            labels=labels,
+            val_peptides=val_peptides,
+            val_labels=val_labels,
+            epochs=30,
+            verbose=False,
+        )
+
+        assert 'final_val_loss' in scorer._metadata
+        assert 'best_val_loss' in scorer._metadata
+        assert np.isfinite(scorer._metadata['final_val_loss'])
+        assert scorer._metadata['final_val_loss'] >= 0.0
+
+    def test_train_requires_both_validation_inputs(self):
+        """Providing only one validation argument should fail fast."""
+        peptides = ['MTMDKSEL', 'ACDEFGHI'] * 20
+        labels = [0.0, 1.0] * 20
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), random_state=11)
+
+        with pytest.raises(ValueError, match="Provide both val_peptides and val_labels"):
+            scorer.train(peptides=peptides, labels=labels, val_peptides=['MTMDKSEL'], epochs=10, verbose=False)
+
+    def test_predict_dataframe_missing_category_group_raises(self):
+        """predict_dataframe should reject invalid foreign/self category groups."""
+        peptides = ['MTMDKSEL', 'ACDEFGHI'] * 20
+        labels = [[1.0, 0.0], [0.0, 1.0]] * 20
+        categories = ['human', 'viruses']
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(16,), random_state=17)
+        scorer.train(
+            peptides=peptides,
+            labels=labels,
+            target_categories=categories,
+            epochs=20,
+            verbose=False,
+        )
+
+        with pytest.raises(ValueError, match="No pathogen categories found"):
+            scorer.predict_dataframe(['MTMDKSEL'], pathogen_categories=['bacteria'])
+
 
 class TestModelManager:
     """Tests for model manager."""

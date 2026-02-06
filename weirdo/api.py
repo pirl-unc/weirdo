@@ -143,7 +143,9 @@ def score_peptide(
     model_dir : str, optional
         Custom model directory when loading by name.
     preset : str, optional
-        Scoring preset for non-trainable scorers.
+        Scoring preset used to construct a scorer.
+        For trainable presets, provide training data via kwargs
+        or pass a trained model.
     aggregate : str, default='mean'
         How to aggregate k-mer probabilities for long peptides.
     **kwargs : dict
@@ -161,7 +163,7 @@ def score_peptide(
     """
     if model is None:
         if preset is None:
-            raise ValueError("Provide a trained model or a preset for non-trainable scorers.")
+            raise ValueError("Provide a trained model or a preset (with training data if trainable).")
         scorer = create_scorer(preset, **kwargs)
     elif isinstance(model, str):
         scorer = load_model(model, model_dir)
@@ -169,7 +171,10 @@ def score_peptide(
         scorer = model
 
     if isinstance(scorer, TrainableScorer) and not scorer.is_trained:
-        raise RuntimeError("Scorer is not trained. Train or load a trained model before scoring.")
+        raise RuntimeError(
+            "Scorer is not trained. Train it (e.g. via create_scorer(train_data=..., "
+            "train_labels=...)) or load a trained model before scoring."
+        )
 
     try:
         scores = scorer.score([peptide], aggregate=aggregate)
@@ -197,7 +202,9 @@ def score_peptides(
     model_dir : str, optional
         Custom model directory when loading by name.
     preset : str, optional
-        Scoring preset for non-trainable scorers.
+        Scoring preset used to construct a scorer.
+        For trainable presets, provide training data via kwargs
+        or pass a trained model.
     aggregate : str, default='mean'
         How to aggregate k-mer probabilities for long peptides.
     **kwargs : dict
@@ -215,7 +222,7 @@ def score_peptides(
     """
     if model is None:
         if preset is None:
-            raise ValueError("Provide a trained model or a preset for non-trainable scorers.")
+            raise ValueError("Provide a trained model or a preset (with training data if trainable).")
         scorer = create_scorer(preset, **kwargs)
     elif isinstance(model, str):
         scorer = load_model(model, model_dir)
@@ -223,7 +230,10 @@ def score_peptides(
         scorer = model
 
     if isinstance(scorer, TrainableScorer) and not scorer.is_trained:
-        raise RuntimeError("Scorer is not trained. Train or load a trained model before scoring.")
+        raise RuntimeError(
+            "Scorer is not trained. Train it (e.g. via create_scorer(train_data=..., "
+            "train_labels=...)) or load a trained model before scoring."
+        )
 
     try:
         return scorer.score(peptides, aggregate=aggregate)
@@ -320,7 +330,7 @@ def load_model(name: str, model_dir: Optional[str] = None) -> BaseScorer:
 
 
 def save_model(
-    scorer: BaseScorer,
+    scorer: TrainableScorer,
     name: str,
     model_dir: Optional[str] = None,
     overwrite: bool = False,
@@ -366,7 +376,7 @@ def get_available_scorers() -> List[str]:
     Example
     -------
     >>> print(get_available_scorers())
-    ['mlp']
+    ['mlp', 'similarity']
     """
     from .scorers import list_scorers
     return list_scorers()

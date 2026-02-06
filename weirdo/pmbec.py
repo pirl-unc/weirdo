@@ -18,7 +18,7 @@ from .amino_acid_alphabet import dict_to_amino_acid_matrix
 
 def read_pmbec_coefficients(
         key_type='row',
-        verbose=True,
+        verbose=False,
         filename=join(MATRIX_DIR, 'pmbec.mat')):
     """
     Parameters
@@ -81,5 +81,5 @@ def read_pmbec_coefficients(
     return d
 
 # dictionary of PMBEC coefficient accessed like pmbec_dict["V"]["R"]
-pmbec_dict = read_pmbec_coefficients(key_type="row")
+pmbec_dict = read_pmbec_coefficients(key_type="row", verbose=False)
 pmbec_matrix = dict_to_amino_acid_matrix(pmbec_dict)

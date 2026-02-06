@@ -291,6 +291,28 @@ peptides, labels = ref.get_training_data(
 
 ---
 
+## SimilarityScorer
+
+Reference-based scorer using substitution matrices (BLOSUM/PMBEC) to measure
+distance from reference k-mers.
+
+```python
+from weirdo.scorers import SimilarityScorer, SwissProtReference
+
+ref = SwissProtReference(categories=['human']).load()
+scorer = SimilarityScorer(matrix='blosum62', distance_metric='min_distance')
+scorer.fit(ref)
+scores = scorer.score(['MTMDKSEL', 'SIINFEKL'])
+```
+
+Key parameters:
+
+- `matrix`: `blosum30`, `blosum50`, `blosum62`, `pmbec`
+- `distance_metric`: `min_distance`, `mean_distance`, `max_similarity`
+- `aggregate`: `mean`, `max`, `min`, `sum`
+
+---
+
 ## CLI Commands
 
 ```bash

@@ -117,6 +117,12 @@ class DataManager:
         with open(self.metadata_file, 'w') as f:
             json.dump(self._metadata, f, indent=2, default=str)
 
+    def reset_metadata(self) -> None:
+        """Reset in-memory metadata and remove metadata file from disk."""
+        self._metadata = {'downloads': {}}
+        if self.metadata_file.exists():
+            self.metadata_file.unlink()
+
     def _log(self, msg: str) -> None:
         """Print message if verbose."""
         if self.verbose:
@@ -400,15 +406,23 @@ class DataManager:
 
         print()
 
-    def clear_all(self) -> int:
+    def clear_all(self, include_metadata: bool = False) -> int:
         """Delete all downloaded data.
+
+        Parameters
+        ----------
+        include_metadata : bool, default=False
+            If True, also delete metadata.json and reset metadata state.
 
         Returns
         -------
         count : int
             Number of downloads deleted.
         """
-        return self.delete_all_downloads()
+        count = self.delete_all_downloads()
+        if include_metadata:
+            self.reset_metadata()
+        return count
 
     def disk_usage(self) -> int:
         """Get total disk usage in bytes.

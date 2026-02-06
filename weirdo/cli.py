@@ -16,6 +16,11 @@ import argparse
 from .reduced_alphabet import alphabets
 
 
+def _translate_sequence(sequence, alphabet):
+    """Translate a sequence using a reduced alphabet mapping."""
+    return "".join([alphabet.get(aa, aa) for aa in sequence])
+
+
 def create_parser():
     """Create argument parser."""
     parser = argparse.ArgumentParser(
@@ -59,12 +64,12 @@ def create_parser():
     clear_parser.add_argument(
         '--downloads',
         action='store_true',
-        help='Clear only downloaded data files',
+        help='Clear downloaded dataset files (default behavior)',
     )
     clear_parser.add_argument(
         '--all',
         action='store_true',
-        help='Clear all downloaded data',
+        help='Clear downloads and reset data metadata',
     )
     clear_parser.add_argument(
         '-y', '--yes',
@@ -86,6 +91,7 @@ def create_parser():
     )
     score_parser.add_argument(
         '-m', '--model',
+        required=True,
         help='Trained model name to use for scoring',
     )
 
@@ -215,25 +221,32 @@ def cmd_data_download(args):
 
 def cmd_data_clear(args):
     """Handle: weirdo data clear"""
+    if args.downloads and args.all:
+        print("Choose either --downloads or --all, not both.")
+        return 1
+
     from .data_manager import get_data_manager
     dm = get_data_manager()
-
-    # Determine what to clear
-    clear_downloads = args.downloads or args.all or (not args.downloads)
 
     # Confirm
     if not args.yes:
         status = dm.status()
         size_mb = status['total_size_mb']
-        print(f"This will delete downloads ({size_mb:.1f} MB)")
+        if args.all:
+            print(f"This will delete downloads ({size_mb:.1f} MB) and reset metadata.")
+        else:
+            print(f"This will delete downloads ({size_mb:.1f} MB)")
         response = input("Continue? [y/N] ")
         if response.lower() not in ('y', 'yes'):
             print("Aborted.")
             return 1
 
     # Clear
-    if clear_downloads:
-        count = dm.delete_all_downloads()
+    if args.all:
+        count = dm.clear_all(include_metadata=True)
+        print(f"Deleted {count} downloads and reset metadata")
+    else:
+        count = dm.clear_all(include_metadata=False)
         print(f"Deleted {count} downloads")
 
     return 0
@@ -248,11 +261,6 @@ def cmd_data_path(args):
 
 def cmd_score(args):
     """Handle: weirdo score"""
-    if not args.model:
-        print("A trained model is required to score peptides.")
-        print("Train one with: weirdo models train --data train.csv --name my-model")
-        return 1
-
     from .model_manager import load_model
 
     print(f"Scoring {len(args.peptides)} peptide(s) with model '{args.model}'...")
@@ -286,11 +294,44 @@ def cmd_translate(args):
     alphabet = alphabets[args.alphabet]
 
     if args.input_sequence:
-        result = "".join([alphabet.get(aa, aa) for aa in args.input_sequence])
+        result = _translate_sequence(args.input_sequence, alphabet)
         print(f"{args.input_sequence} -> {result}")
     elif args.input_fasta:
-        print("FASTA translation not yet implemented")
-        return 1
+        try:
+            with open(args.input_fasta, 'r') as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            print(f"Error: FASTA file not found: {args.input_fasta}")
+            return 1
+
+        output_lines = []
+        sequence_chunks = []
+        saw_header = False
+
+        for raw_line in lines:
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            if line.startswith('>'):
+                saw_header = True
+                if sequence_chunks:
+                    sequence = "".join(sequence_chunks)
+                    output_lines.append(_translate_sequence(sequence, alphabet))
+                    sequence_chunks = []
+                output_lines.append(line)
+            else:
+                sequence_chunks.append(line)
+
+        if sequence_chunks:
+            sequence = "".join(sequence_chunks)
+            output_lines.append(_translate_sequence(sequence, alphabet))
+
+        if not saw_header:
+            print("Error: FASTA file must contain at least one header line starting with '>'")
+            return 1
+
+        print("\n".join(output_lines))
 
     return 0
 
@@ -363,10 +404,14 @@ def cmd_models_info(args):
             print(f"  Final train loss: {info.metadata['final_train_loss']:.4f}")
         elif 'loss' in info.metadata:
             print(f"  Final train loss: {info.metadata['loss']:.4f}")
+        if 'final_val_loss' in info.metadata:
+            print(f"  Final val loss: {info.metadata['final_val_loss']:.4f}")
         if 'best_val_loss' in info.metadata:
             print(f"  Best val loss: {info.metadata['best_val_loss']:.4f}")
         elif 'best_loss' in info.metadata:
             print(f"  Best val loss: {info.metadata['best_loss']:.4f}")
+        if 'best_val_score' in info.metadata:
+            print(f"  Best val score: {info.metadata['best_val_score']:.4f}")
 
     return 0
 
@@ -524,17 +569,23 @@ def cmd_models_path(args):
 
 def cmd_models_scorers(args):
     """Handle: weirdo models scorers"""
-    from .scorers import list_scorers
+    from .scorers import list_scorers, get_scorer, TrainableScorer
 
     print("Available scorer types:")
     print()
 
     scorers = list_scorers()
     for name in scorers:
-        print(f"  {name:<20} (ML-based, requires training)")
+        scorer_cls = get_scorer(name)
+        if issubclass(scorer_cls, TrainableScorer):
+            descriptor = "ML-based, requires training"
+        else:
+            descriptor = "Reference-based, requires fit(reference)"
+        print(f"  {name:<20} ({descriptor})")
 
     print()
-    print("ML-based scorers use train() with labeled peptide data.")
+    print("Trainable scorers use train() with labeled peptide data.")
+    print("Reference-based scorers require a fitted reference dataset.")
 
     return 0
 

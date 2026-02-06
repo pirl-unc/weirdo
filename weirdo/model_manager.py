@@ -257,8 +257,12 @@ class ModelManager:
                 print(f"    Epochs trained: {model.metadata['n_epochs']}")
             if 'final_train_loss' in model.metadata:
                 print(f"    Final train loss: {model.metadata['final_train_loss']:.4f}")
+            if 'final_val_loss' in model.metadata:
+                print(f"    Final val loss: {model.metadata['final_val_loss']:.4f}")
             if 'best_val_loss' in model.metadata:
                 print(f"    Best val loss: {model.metadata['best_val_loss']:.4f}")
+            if 'best_val_score' in model.metadata:
+                print(f"    Best val score: {model.metadata['best_val_score']:.4f}")
             if 'k' in model.params:
                 print(f"    K-mer size: {model.params['k']}")
 

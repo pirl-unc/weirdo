@@ -128,7 +128,7 @@ def index_to_short_name(idx):
     return extended_amino_acids[idx].short_name
 
 def index_to_letter(idx):
-    return extended_amino_acids[idx]
+    return extended_amino_acids[idx].letter
 
 def letter_to_index(x):
     """
@@ -144,7 +144,7 @@ def letter_to_short_name(x):
     return index_to_short_name(letter_to_index(x))
 
 def peptide_to_short_amino_acid_names(xs):
-    return [amino_acid_letter_indices[x] for x in xs]
+    return [letter_to_short_name(x) for x in xs]
 
 def dict_to_amino_acid_matrix(d, alphabet=canonical_amino_acids):
     n_aa = len(d)
@@ -155,4 +155,3 @@ def dict_to_amino_acid_matrix(d, alphabet=canonical_amino_acids):
             value = d_row[aa_col.letter]
             result_matrix[i, j] = value
     return result_matrix
-

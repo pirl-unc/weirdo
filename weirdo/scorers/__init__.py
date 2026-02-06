@@ -65,6 +65,9 @@ from .swissprot import SwissProtReference
 # ML-based scorer
 from .mlp import MLPScorer
 
+# Reference-based scorer
+from .similarity import SimilarityScorer
+
 __all__ = [
     # Base classes
     'BaseScorer',
@@ -92,4 +95,6 @@ __all__ = [
     'SwissProtReference',
     # ML scorer
     'MLPScorer',
+    # Reference-based scorer
+    'SimilarityScorer',
 ]

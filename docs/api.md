@@ -24,7 +24,7 @@ Score a single peptide for foreignness using a trained model.
 - `peptide`: Peptide sequence to score
 - `model`: Model name (from ModelManager) or an instantiated scorer
 - `model_dir`: Custom model directory when loading by name
-- `preset`: Preset for non-trainable scorers
+- `preset`: Preset used to construct a scorer (trainable presets need training data)
 - `aggregate`: How to aggregate k-mer probabilities for long peptides
 - `**kwargs`: Additional arguments passed to `create_scorer()`
 
@@ -60,7 +60,7 @@ Score multiple peptides for foreignness using a trained model.
 - `peptides`: Sequence of peptide strings
 - `model`: Model name (from ModelManager) or an instantiated scorer
 - `model_dir`: Custom model directory when loading by name
-- `preset`: Preset for non-trainable scorers
+- `preset`: Preset used to construct a scorer (trainable presets need training data)
 - `aggregate`: How to aggregate k-mer probabilities for long peptides
 - `**kwargs`: Additional arguments passed to `create_scorer()`
 

@@ -60,9 +60,9 @@ class TrainableScorer(BatchScorer):
     def train(
         self,
         peptides: Sequence[str],
-        labels: Sequence[float],
+        labels: Any,
         val_peptides: Optional[Sequence[str]] = None,
-        val_labels: Optional[Sequence[float]] = None,
+        val_labels: Optional[Any] = None,
         epochs: Optional[int] = None,
         learning_rate: Optional[float] = None,
         verbose: bool = True,

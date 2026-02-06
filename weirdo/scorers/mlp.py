@@ -7,7 +7,7 @@ statistics.
 
 import pickle
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from sklearn.neural_network import MLPRegressor
@@ -532,9 +532,9 @@ class MLPScorer(TrainableScorer):
     def train(
         self,
         peptides: Sequence[str],
-        labels: Sequence[float],
+        labels: Any,
         val_peptides: Optional[Sequence[str]] = None,
-        val_labels: Optional[Sequence[float]] = None,
+        val_labels: Optional[Any] = None,
         epochs: Optional[int] = None,
         learning_rate: Optional[float] = None,
         verbose: bool = True,
@@ -552,9 +552,10 @@ class MLPScorer(TrainableScorer):
             Target labels in [0, 1]. Can be 1D (single foreignness score)
             or 2D (multi-label with one column per category).
         val_peptides : sequence of str, optional
-            Not used (sklearn handles validation internally).
-        val_labels : sequence of float, optional
-            Not used.
+            Validation peptides for external validation-loss reporting.
+            If provided, val_labels must also be provided.
+        val_labels : sequence of float or 2D array, optional
+            Validation labels.
         epochs : int, optional
             Maximum training iterations (maps to max_iter). Defaults to max_iter.
         learning_rate : float, optional
@@ -572,6 +573,29 @@ class MLPScorer(TrainableScorer):
         -------
         self : MLPScorer
         """
+        peptides = list(peptides)
+        if not peptides:
+            raise ValueError("Training data cannot be empty.")
+
+        y = np.array(labels)
+        if len(peptides) != len(y):
+            raise ValueError(
+                f"Length mismatch: {len(peptides)} peptides but {len(y)} labels."
+            )
+
+        if (val_peptides is None) != (val_labels is None):
+            raise ValueError("Provide both val_peptides and val_labels together.")
+
+        if val_peptides is not None and val_labels is not None:
+            val_peptides = list(val_peptides)
+            y_val = np.array(val_labels)
+            if len(val_peptides) != len(y_val):
+                raise ValueError(
+                    f"Length mismatch: {len(val_peptides)} val peptides but {len(y_val)} val labels."
+                )
+        else:
+            y_val = None
+
         self._target_categories = target_categories
         if epochs is None:
             epochs = self._params['max_iter']
@@ -579,7 +603,6 @@ class MLPScorer(TrainableScorer):
             learning_rate = self._params['learning_rate_init']
         # Extract features
         X = self._extract_features(peptides)
-        y = np.array(labels)
         if target_categories is not None:
             if y.ndim == 1 and len(target_categories) != 1:
                 raise ValueError("target_categories length must match label dimensions.")
@@ -621,8 +644,30 @@ class MLPScorer(TrainableScorer):
         self._metadata['n_features'] = X.shape[1]
         self._metadata['n_epochs'] = self._model.n_iter_
         self._metadata['final_train_loss'] = float(self._model.loss_)
-        if hasattr(self._model, 'best_loss_') and self._model.best_loss_ is not None:
-            self._metadata['best_val_loss'] = float(self._model.best_loss_)
+        if (
+            hasattr(self._model, 'best_validation_score_')
+            and self._model.best_validation_score_ is not None
+        ):
+            self._metadata['best_val_score'] = float(self._model.best_validation_score_)
+
+        if val_peptides is not None and y_val is not None:
+            X_val = self._extract_features(val_peptides)
+            X_val_scaled = self._scaler.transform(X_val)
+            y_val_pred = self._model.predict(X_val_scaled)
+            y_val_pred_arr = np.array(y_val_pred)
+            y_val_arr = np.array(y_val)
+            if y_val_pred_arr.ndim == 1:
+                y_val_pred_arr = y_val_pred_arr.reshape(-1, 1)
+            if y_val_arr.ndim == 1:
+                y_val_arr = y_val_arr.reshape(-1, 1)
+            if y_val_pred_arr.shape != y_val_arr.shape:
+                raise ValueError(
+                    "Validation labels shape does not match predictions: "
+                    f"pred={y_val_pred_arr.shape}, labels={y_val_arr.shape}"
+                )
+            val_loss = float(np.mean((y_val_pred_arr - y_val_arr) ** 2))
+            self._metadata['final_val_loss'] = val_loss
+            self._metadata['best_val_loss'] = val_loss
 
         self._training_history = [
             {'epoch': i + 1, 'loss': loss}
@@ -943,12 +988,21 @@ class MLPScorer(TrainableScorer):
             if cat in self._target_categories
         ]
 
+        if not pathogen_idx:
+            raise ValueError(
+                f"No pathogen categories found. Available: {self._target_categories}"
+            )
+        if not self_idx:
+            raise ValueError(
+                f"No self categories found. Available: {self._target_categories}"
+            )
+
         peptides = list(peptides)
         probs = self.predict_proba(peptides, aggregate=aggregate)
         results = []
         for peptide, row_probs in zip(peptides, probs):
-            max_pathogen = row_probs[pathogen_idx].max() if pathogen_idx else 0.0
-            max_self = row_probs[self_idx].max() if self_idx else 0.0
+            max_pathogen = row_probs[pathogen_idx].max()
+            max_self = row_probs[self_idx].max()
             denom = max_pathogen + max_self
             foreignness = max_pathogen / denom if denom > 0 else 0.5
 

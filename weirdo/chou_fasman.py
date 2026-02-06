@@ -11,7 +11,7 @@
 # limitations under the License.
 
 
-from .amino_acid_alphabet import amino_acid_name_indices
+from .amino_acid_alphabet import canonical_amino_acids
 
 # Chou-Fasman of structural properties from
 # http://prowl.rockefeller.edu/aainfo/chou.htm
@@ -39,6 +39,12 @@ Valine         106    170       50      0.062   0.048   0.028   0.053
 """
 
 
+AMINO_ACID_NAME_TO_LETTER = {
+    aa.full_name: aa.letter
+    for aa in canonical_amino_acids
+}
+
+
 def parse_chou_fasman(table):
     alpha_helix_score_dict = {}
     beta_sheet_score_dict = {}
@@ -55,8 +61,8 @@ def parse_chou_fasman(table):
         else:
             name = fields[0]
 
-        assert name in amino_acid_name_indices, "Invalid amino acid name %s" % name
-        letter = amino_acid_name_indices[name]
+        assert name in AMINO_ACID_NAME_TO_LETTER, "Invalid amino acid name %s" % name
+        letter = AMINO_ACID_NAME_TO_LETTER[name]
         alpha = int(fields[1])
         beta = int(fields[2])
         turn = int(fields[3])
