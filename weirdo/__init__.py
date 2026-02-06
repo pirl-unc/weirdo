@@ -55,7 +55,7 @@ from .scorers import (
 # ML scorer
 from .scorers import MLPScorer
 
-__version__ = "2.1.1"
+__version__ = "2.1.2"
 
 __all__ = [
     # Amino acid data

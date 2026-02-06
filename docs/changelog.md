@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.2] - 2026-02-06
+
+### Fixed
+
+- Resolved documentation/API mismatches for scorer behavior and utilities
+- Implemented FASTA translation path in CLI and clarified clear-data semantics
+- Added edge-case validation checks for MLP training and foreignness dataframe categories
+- Made PMBEC import silent and aligned amino-acid helper outputs with function names
+
+### Added
+
+- Regression tests for CLI edge cases, data manager cleanup behavior, and logical consistency checks
+
 ## [2.1.1] - 2026-02-05
 
 ### Fixed
