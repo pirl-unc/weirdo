@@ -98,6 +98,34 @@ Create a scorer from a preset configuration.
 
 ---
 
+## Model Artifacts
+
+### `weirdo.list_models`
+
+- `list_models(model_dir=None)` → List locally installed trained models
+
+### `weirdo.load_model`
+
+- `load_model(name, model_dir=None)` → Load a local model by name
+
+### `weirdo.save_model`
+
+- `save_model(scorer, name, model_dir=None, overwrite=False)` → Save a trained model
+
+### `weirdo.list_pretrained_models`
+
+- `list_pretrained_models(model_dir=None)` → List built-in downloadable model descriptors
+
+### `weirdo.download_pretrained_model`
+
+- `download_pretrained_model(name, model_dir=None, overwrite=False)` → Download/install a built-in pretrained model
+
+### `weirdo.download_model_from_url`
+
+- `download_model_from_url(name, url, model_dir=None, overwrite=False, expected_sha256=None)` → Download/install a model archive from direct URL
+
+---
+
 ## Scorer Classes
 
 ### `weirdo.scorers.MLPScorer`

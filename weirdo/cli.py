@@ -6,6 +6,8 @@ Usage:
     weirdo data clear           # Clear all data
     weirdo score --model NAME PEPTIDE...  # Score peptides
     weirdo models list          # List trained models
+    weirdo models available     # List downloadable pretrained models
+    weirdo models download NAME # Download pretrained model weights
     weirdo models train         # Train a new model
     weirdo models info NAME     # Show model info
 """
@@ -192,6 +194,40 @@ def create_parser():
 
     # models scorers
     models_scorers_parser = models_subparsers.add_parser('scorers', help='List available scorer types')
+
+    # models available
+    models_available_parser = models_subparsers.add_parser(
+        'available',
+        help='List downloadable pretrained models',
+    )
+
+    # models download
+    models_download_parser = models_subparsers.add_parser(
+        'download',
+        help='Download pretrained model weights',
+    )
+    models_download_parser.add_argument(
+        'name',
+        nargs='?',
+        help='Pretrained model name (or custom local name when using --url)',
+    )
+    models_download_parser.add_argument(
+        '--url',
+        help='Custom URL to a .tar.gz model artifact',
+    )
+    models_download_parser.add_argument(
+        '--save-as',
+        help='Local model name when downloading with --url',
+    )
+    models_download_parser.add_argument(
+        '--sha256',
+        help='Expected SHA256 checksum for archive verification',
+    )
+    models_download_parser.add_argument(
+        '-f', '--force',
+        action='store_true',
+        help='Overwrite existing local model with same name',
+    )
 
     return parser
 
@@ -567,6 +603,70 @@ def cmd_models_path(args):
     return 0
 
 
+def cmd_models_available(args):
+    """Handle: weirdo models available"""
+    from .model_manager import list_pretrained_models
+
+    models = list_pretrained_models()
+    if not models:
+        print("No built-in pretrained models are configured.")
+        print("Use custom URL download: weirdo models download --url URL --save-as NAME")
+        return 0
+
+    print("Downloadable pretrained models:")
+    print("-" * 60)
+    for model in models:
+        print(f"\n  {model['name']}")
+        if model.get('description'):
+            print(f"    {model['description']}")
+        if model.get('url'):
+            print(f"    URL: {model['url']}")
+        if model.get('sha256'):
+            print(f"    SHA256: {model['sha256']}")
+    return 0
+
+
+def cmd_models_download(args):
+    """Handle: weirdo models download"""
+    from .model_manager import download_pretrained_model, download_model_from_url
+
+    if args.url:
+        if args.save_as and args.name:
+            print("Provide either positional NAME or --save-as with --url, not both.")
+            return 1
+        model_name = args.save_as or args.name
+        if not model_name:
+            print("When using --url, provide a model name via positional NAME or --save-as.")
+            return 1
+        try:
+            path = download_model_from_url(
+                name=model_name,
+                url=args.url,
+                overwrite=args.force,
+                expected_sha256=args.sha256,
+            )
+        except (FileExistsError, RuntimeError, ValueError) as e:
+            print(f"Error: {e}")
+            return 1
+        print(f"Downloaded model '{model_name}' to: {path}")
+        return 0
+
+    if args.save_as or args.sha256:
+        print("--save-as and --sha256 can only be used with --url.")
+        return 1
+    if not args.name:
+        print("Provide a pretrained model name or use --url for a custom artifact.")
+        return 1
+
+    try:
+        path = download_pretrained_model(name=args.name, overwrite=args.force)
+    except (FileExistsError, RuntimeError, ValueError) as e:
+        print(f"Error: {e}")
+        return 1
+    print(f"Downloaded pretrained model '{args.name}' to: {path}")
+    return 0
+
+
 def cmd_models_scorers(args):
     """Handle: weirdo models scorers"""
     from .scorers import list_scorers, get_scorer, TrainableScorer
@@ -638,6 +738,10 @@ def run(args_list=None):
             return cmd_models_train(args)
         elif args.models_command == 'path':
             return cmd_models_path(args)
+        elif args.models_command == 'available':
+            return cmd_models_available(args)
+        elif args.models_command == 'download':
+            return cmd_models_download(args)
         elif args.models_command == 'scorers':
             return cmd_models_scorers(args)
 

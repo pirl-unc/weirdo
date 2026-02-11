@@ -326,4 +326,7 @@ weirdo models list      # List trained models
 weirdo models train --data train.csv --name my-model
 weirdo models info my-model
 weirdo models delete my-model
+weirdo models available
+weirdo models download MODEL_NAME
+weirdo models download --url https://.../model.tar.gz --save-as my-model
 ```

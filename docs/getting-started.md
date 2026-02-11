@@ -97,6 +97,17 @@ CLI scoring:
 weirdo score --model my-model MTMDKSEL SIINFEKL
 ```
 
+Download pretrained weights:
+
+```bash
+# Built-in named models (if configured in your installed version)
+weirdo models available
+weirdo models download MODEL_NAME
+
+# Or a custom archive URL (GitHub release asset, etc.)
+weirdo models download --url https://github.com/ORG/REPO/releases/download/vX.Y.Z/MODEL_NAME.tar.gz --save-as MODEL_NAME
+```
+
 ## Understanding Scores
 
 Foreignness scores are in [0, 1]:

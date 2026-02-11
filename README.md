@@ -209,10 +209,55 @@ weirdo data list            # Show data status
 weirdo models list          # List trained models
 weirdo models train --data train.csv --name my-model
 weirdo models info my-model # Show model details
+weirdo models available     # List built-in downloadable pretrained models
+weirdo models download NAME # Download pretrained weights by name
+weirdo models download --url https://.../model.tar.gz --save-as my-model
 
 # Scoring
 weirdo score --model my-model MTMDKSEL SIINFEKL
 ```
+
+## Long-Run Training on Modal
+
+Use `scripts/train_modal_long_run.py` to run long remote training and export
+weights as a `.tar.gz` archive:
+
+```bash
+# One-time setup: seed full SwissProt CSV into Modal data volume
+modal volume put weirdo-data-cache data/swissprot-8mers.csv downloads/swissprot-8mers.csv --force
+```
+
+```bash
+modal run scripts/train_modal_long_run.py \
+  --model-name swissprot-mlp-modal \
+  --epochs 1000 \
+  --max-samples 2000000 \
+  --output-archive ./swissprot-mlp-modal.tar.gz
+```
+
+The script:
+- trains `MLPScorer` remotely
+- saves model files to a Modal volume
+- packages weights into `MODEL_NAME.tar.gz`
+- can return archive bytes to your local machine (`--output-archive`)
+- reads SwissProt from `--swissprot-path` (default: `/root/.weirdo/downloads/swissprot-8mers.csv`)
+
+## Distributing Model Weights
+
+Recommended flow:
+
+1. Train and export `MODEL_NAME.tar.gz` (Modal script above).
+2. Upload archive to a GitHub Release asset (or other HTTPS hosting).
+3. Download after install via CLI:
+
+```bash
+# Direct URL (no code change needed)
+weirdo models download --url https://github.com/ORG/REPO/releases/download/vX.Y.Z/MODEL_NAME.tar.gz --save-as MODEL_NAME
+```
+
+If you want named built-in downloads (`weirdo models download MODEL_NAME`),
+add an entry to `PRETRAINED_MODELS` in `weirdo/model_manager.py` and release a
+new package version.
 
 ## Architecture
 

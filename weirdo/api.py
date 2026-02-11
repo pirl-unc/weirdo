@@ -363,6 +363,34 @@ def save_model(
     return str(_save_model(scorer, name, model_dir, overwrite))
 
 
+def list_pretrained_models(model_dir: Optional[str] = None) -> List[Dict[str, Any]]:
+    """List configured downloadable pretrained model descriptors."""
+    from .model_manager import list_pretrained_models as _list_pretrained_models
+    return _list_pretrained_models(model_dir)
+
+
+def download_pretrained_model(
+    name: str,
+    model_dir: Optional[str] = None,
+    overwrite: bool = False,
+) -> str:
+    """Download and install a pretrained model from the registry."""
+    from .model_manager import download_pretrained_model as _download_pretrained_model
+    return str(_download_pretrained_model(name, model_dir, overwrite))
+
+
+def download_model_from_url(
+    name: str,
+    url: str,
+    model_dir: Optional[str] = None,
+    overwrite: bool = False,
+    expected_sha256: Optional[str] = None,
+) -> str:
+    """Download and install a model archive from a direct URL."""
+    from .model_manager import download_model_from_url as _download_model_from_url
+    return str(_download_model_from_url(name, url, model_dir, overwrite, expected_sha256))
+
+
 def get_available_scorers() -> List[str]:
     """Get list of available scorer types.
 

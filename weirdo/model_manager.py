@@ -3,14 +3,51 @@
 Handles saving, loading, and listing trained ML models.
 """
 
+import hashlib
 import json
 import os
+import shutil
+import tarfile
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+from urllib.error import URLError
+from urllib.request import urlretrieve
 
 # Default model storage directory
 DEFAULT_MODEL_DIR = Path.home() / '.weirdo' / 'models'
+
+# Public registry of downloadable pretrained model artifacts.
+# These URLs should point to .tar.gz archives containing model files
+# (config.json, model.pt, optional metadata.json).
+PRETRAINED_MODELS: Dict[str, Dict[str, Optional[str]]] = {}
+
+
+def _sha256_file(path: Path) -> str:
+    """Compute SHA256 for a file."""
+    hasher = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b''):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _safe_extract_tar(archive_path: Path, extract_dir: Path) -> None:
+    """Extract a tar archive while preventing path traversal and symlink abuse."""
+    extract_dir = extract_dir.resolve()
+    with tarfile.open(archive_path, 'r:*') as tar:
+        for member in tar.getmembers():
+            if member.issym() or member.islnk():
+                raise RuntimeError("Archive contains symlinks, which are not allowed.")
+            member_path = (extract_dir / member.name).resolve()
+            if not str(member_path).startswith(str(extract_dir)):
+                raise RuntimeError(f"Unsafe archive path detected: {member.name}")
+        try:
+            tar.extractall(path=extract_dir, filter='data')
+        except TypeError:
+            # Python <3.12 does not support extraction filters.
+            tar.extractall(path=extract_dir)
 
 
 class ModelInfo:
@@ -234,6 +271,101 @@ class ModelManager:
             return True
         return False
 
+    def list_pretrained_models(self) -> List[Dict[str, Any]]:
+        """List configured downloadable pretrained model descriptors."""
+        results: List[Dict[str, Any]] = []
+        for name in sorted(PRETRAINED_MODELS.keys()):
+            info = PRETRAINED_MODELS[name]
+            results.append({
+                'name': name,
+                'description': info.get('description', ''),
+                'url': info.get('url'),
+                'sha256': info.get('sha256'),
+            })
+        return results
+
+    def download_pretrained(self, name: str, overwrite: bool = False) -> Path:
+        """Download and install a pretrained model by registry name."""
+        if name not in PRETRAINED_MODELS:
+            available = sorted(PRETRAINED_MODELS.keys())
+            raise ValueError(f"Unknown pretrained model '{name}'. Available: {available}")
+
+        info = PRETRAINED_MODELS[name]
+        url = info.get('url')
+        if not url:
+            raise ValueError(f"Pretrained model '{name}' has no download URL configured.")
+
+        return self.download_from_url(
+            name=name,
+            url=url,
+            overwrite=overwrite,
+            expected_sha256=info.get('sha256'),
+        )
+
+    def _find_extracted_model_dir(self, extract_root: Path) -> Path:
+        """Find model directory containing config.json and model.pt after extraction."""
+        candidates: List[Path] = []
+        if (extract_root / 'config.json').exists() and (extract_root / 'model.pt').exists():
+            candidates.append(extract_root)
+
+        for child in extract_root.iterdir():
+            if child.is_dir() and (child / 'config.json').exists() and (child / 'model.pt').exists():
+                candidates.append(child)
+
+        if len(candidates) != 1:
+            raise RuntimeError(
+                "Model archive must contain exactly one model directory with "
+                "config.json and model.pt."
+            )
+        return candidates[0]
+
+    def download_from_url(
+        self,
+        name: str,
+        url: str,
+        overwrite: bool = False,
+        expected_sha256: Optional[str] = None,
+    ) -> Path:
+        """Download a model archive from URL and install it into model storage."""
+        target_dir = self._model_dir / name
+        if target_dir.exists():
+            if not overwrite:
+                raise FileExistsError(
+                    f"Model already exists: {name}. Use overwrite=True to replace."
+                )
+            shutil.rmtree(target_dir)
+
+        temp_fd, temp_archive = tempfile.mkstemp(suffix='.tar.gz')
+        os.close(temp_fd)
+        temp_archive_path = Path(temp_archive)
+        extract_root = Path(tempfile.mkdtemp(prefix='weirdo-model-extract-'))
+
+        try:
+            urlretrieve(url, str(temp_archive_path))
+            if expected_sha256:
+                observed_sha256 = _sha256_file(temp_archive_path)
+                if observed_sha256.lower() != expected_sha256.lower():
+                    raise RuntimeError(
+                        "SHA256 mismatch for downloaded model archive: "
+                        f"expected {expected_sha256}, got {observed_sha256}"
+                    )
+
+            _safe_extract_tar(temp_archive_path, extract_root)
+            source_dir = self._find_extracted_model_dir(extract_root)
+
+            shutil.copytree(source_dir, target_dir)
+            return target_dir
+        except URLError as e:
+            raise RuntimeError(f"Failed to download model archive: {e}") from e
+        except Exception:
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            raise
+        finally:
+            if temp_archive_path.exists():
+                temp_archive_path.unlink()
+            shutil.rmtree(extract_root, ignore_errors=True)
+
     def print_models(self) -> None:
         """Print formatted list of available models."""
         models = self.list_models()
@@ -348,3 +480,33 @@ def save_model(
     path : Path
     """
     return get_model_manager(model_dir).save(scorer, name, overwrite)
+
+
+def list_pretrained_models(model_dir: Optional[Union[str, Path]] = None) -> List[Dict[str, Any]]:
+    """List configured pretrained model descriptors."""
+    return get_model_manager(model_dir).list_pretrained_models()
+
+
+def download_pretrained_model(
+    name: str,
+    model_dir: Optional[Union[str, Path]] = None,
+    overwrite: bool = False,
+) -> Path:
+    """Download and install a pretrained model from the registry."""
+    return get_model_manager(model_dir).download_pretrained(name=name, overwrite=overwrite)
+
+
+def download_model_from_url(
+    name: str,
+    url: str,
+    model_dir: Optional[Union[str, Path]] = None,
+    overwrite: bool = False,
+    expected_sha256: Optional[str] = None,
+) -> Path:
+    """Download and install a model archive from a direct URL."""
+    return get_model_manager(model_dir).download_from_url(
+        name=name,
+        url=url,
+        overwrite=overwrite,
+        expected_sha256=expected_sha256,
+    )

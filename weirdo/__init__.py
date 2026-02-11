@@ -22,6 +22,9 @@ from .api import (
     list_models,
     load_model,
     save_model,
+    list_pretrained_models,
+    download_pretrained_model,
+    download_model_from_url,
     get_available_scorers,
 )
 
@@ -82,6 +85,9 @@ __all__ = [
     "list_models",
     "load_model",
     "save_model",
+    "list_pretrained_models",
+    "download_pretrained_model",
+    "download_model_from_url",
     "ModelManager",
     "get_model_manager",
     "ModelInfo",
