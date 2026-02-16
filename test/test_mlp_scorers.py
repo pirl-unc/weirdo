@@ -212,6 +212,60 @@ class TestMLPScorer:
                 verbose=False,
             )
 
+    def test_train_streaming_progress_arguments_validation(self):
+        """Streaming training should validate progress-related arguments."""
+        rows = [('MTMDKSEL', 1.0), ('XXXXXXXX', 0.0)] * 4
+
+        def row_iterator_factory():
+            return iter(rows)
+
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(8,), random_state=5)
+        with pytest.raises(ValueError, match="progress_every_samples must be positive"):
+            scorer.train_streaming(
+                row_iterator_factory=row_iterator_factory,
+                epochs=1,
+                batch_size=2,
+                progress_every_samples=0,
+                verbose=False,
+            )
+        with pytest.raises(ValueError, match="total_rows_hint must be positive"):
+            scorer.train_streaming(
+                row_iterator_factory=row_iterator_factory,
+                epochs=1,
+                batch_size=2,
+                progress_every_samples=2,
+                total_rows_hint=-1,
+                verbose=False,
+            )
+
+    def test_train_streaming_emits_row_progress_logs(self, capsys):
+        """Streaming training should print row-level progress during long passes."""
+        rows = [('MTMDKSEL', 1.0), ('XXXXXXXX', 0.0)] * 12
+
+        def row_iterator_factory():
+            return iter(rows)
+
+        scorer = MLPScorer(
+            k=8,
+            hidden_layer_sizes=(16,),
+            random_state=42,
+            early_stopping=False,
+        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            scorer.train_streaming(
+                row_iterator_factory=row_iterator_factory,
+                epochs=1,
+                batch_size=3,
+                progress_every_samples=6,
+                total_rows_hint=len(rows),
+                verbose=True,
+            )
+
+        output = capsys.readouterr().out
+        assert "[scaler]" in output
+        assert "[epoch 1]" in output
+
     def test_score_peptides(self):
         """Test scoring peptides with trained model."""
         peptides = ['MTMDKSEL', 'ACDEFGHI'] * 20

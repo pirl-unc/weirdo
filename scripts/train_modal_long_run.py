@@ -68,6 +68,9 @@ def train_remote(
     max_samples: int = 0,
     epochs: int = 500,
     learning_rate: float = 1e-3,
+    batch_size: int = 2048,
+    progress_every_samples: int = 500000,
+    total_rows_hint: int = 0,
     hidden_layers_csv: str = "256,128,64",
     target_categories_csv: str = DEFAULT_TARGET_CATEGORIES,
     swissprot_path: str = DEFAULT_SWISSPROT_PATH,
@@ -117,6 +120,9 @@ def train_remote(
             target_categories=target_categories,
             epochs=epochs,
             learning_rate=learning_rate,
+            batch_size=batch_size,
+            progress_every_samples=progress_every_samples,
+            total_rows_hint=(None if total_rows_hint <= 0 else total_rows_hint),
             verbose=True,
         )
     else:
@@ -138,6 +144,7 @@ def train_remote(
             target_categories=target_categories,
             epochs=epochs,
             learning_rate=learning_rate,
+            batch_size=batch_size,
             verbose=True,
         )
 
@@ -191,6 +198,9 @@ def main(
     max_samples: int = 0,
     epochs: int = 500,
     learning_rate: float = 1e-3,
+    batch_size: int = 2048,
+    progress_every_samples: int = 500000,
+    total_rows_hint: int = 0,
     hidden_layers: str = "256,128,64",
     target_categories: str = DEFAULT_TARGET_CATEGORIES,
     swissprot_path: str = DEFAULT_SWISSPROT_PATH,
@@ -203,6 +213,9 @@ def main(
         max_samples=max_samples,
         epochs=epochs,
         learning_rate=learning_rate,
+        batch_size=batch_size,
+        progress_every_samples=progress_every_samples,
+        total_rows_hint=total_rows_hint,
         hidden_layers_csv=hidden_layers,
         target_categories_csv=target_categories,
         swissprot_path=swissprot_path,

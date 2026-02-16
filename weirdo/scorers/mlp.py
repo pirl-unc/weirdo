@@ -6,6 +6,7 @@ statistics.
 """
 
 import pickle
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
@@ -683,6 +684,13 @@ class MLPScorer(TrainableScorer):
             Print training progress.
         plot_loss : bool, str, or Path, optional
             Save loss curve plot.
+        batch_size : int, optional
+            Number of rows per update step.
+        progress_every_samples : int, optional
+            Emit progress logs every N processed rows during scaler fit and each
+            epoch. Default is 250000.
+        total_rows_hint : int, optional
+            Estimated total stream size for scaler-pass ETA reporting.
 
         Returns
         -------
@@ -691,6 +699,17 @@ class MLPScorer(TrainableScorer):
         batch_size = int(kwargs.pop('batch_size', self.batch_size))
         if batch_size <= 0:
             raise ValueError("batch_size must be positive.")
+        progress_every_samples = int(kwargs.pop('progress_every_samples', 250000))
+        if progress_every_samples <= 0:
+            raise ValueError("progress_every_samples must be positive.")
+        total_rows_hint_arg = kwargs.pop('total_rows_hint', None)
+        total_rows_hint: Optional[int]
+        if total_rows_hint_arg is None:
+            total_rows_hint = None
+        else:
+            total_rows_hint = int(total_rows_hint_arg)
+            if total_rows_hint <= 0:
+                raise ValueError("total_rows_hint must be positive when provided.")
 
         if epochs is None:
             epochs = self._params['max_iter']
@@ -727,6 +746,8 @@ class MLPScorer(TrainableScorer):
         self._scaler = StandardScaler()
         n_train = 0
         n_features = 0
+        scaler_start = time.time()
+        next_scaler_log = progress_every_samples
         for X_batch, _ in self._iter_feature_batches_from_rows(
             row_iterator_factory=row_iterator_factory,
             batch_size=batch_size,
@@ -736,8 +757,31 @@ class MLPScorer(TrainableScorer):
             n_train += X_batch.shape[0]
             n_features = X_batch.shape[1]
 
+            if verbose and n_train >= next_scaler_log:
+                elapsed = max(time.time() - scaler_start, 1e-9)
+                rows_per_sec = n_train / elapsed
+                message = (
+                    f"[scaler] rows={n_train:,} "
+                    f"rate={rows_per_sec:,.0f} rows/s"
+                )
+                if total_rows_hint is not None:
+                    pct = (100.0 * n_train) / max(float(total_rows_hint), 1.0)
+                    remaining = max(total_rows_hint - n_train, 0)
+                    eta_sec = remaining / max(rows_per_sec, 1e-9)
+                    message += f" ({pct:.2f}% est, ETA {eta_sec / 60.0:.1f} min)"
+                print(message)
+                while n_train >= next_scaler_log:
+                    next_scaler_log += progress_every_samples
+
         if n_train == 0:
             raise ValueError("Training data cannot be empty.")
+        if verbose:
+            elapsed = max(time.time() - scaler_start, 1e-9)
+            rows_per_sec = n_train / elapsed
+            print(
+                f"[scaler] complete rows={n_train:,} "
+                f"in {elapsed / 60.0:.2f} min ({rows_per_sec:,.0f} rows/s)"
+            )
 
         # Incremental MLP training over multiple streaming passes.
         self._model = MLPRegressor(
@@ -757,6 +801,10 @@ class MLPScorer(TrainableScorer):
         self._training_history = []
         for epoch_idx in range(int(epochs)):
             batch_losses: List[float] = []
+            epoch_num = epoch_idx + 1
+            epoch_rows = 0
+            epoch_start = time.time()
+            next_epoch_log = progress_every_samples
             for X_batch, y_batch in self._iter_feature_batches_from_rows(
                 row_iterator_factory=row_iterator_factory,
                 batch_size=batch_size,
@@ -770,16 +818,34 @@ class MLPScorer(TrainableScorer):
                     y_fit = y_batch
                 self._model.partial_fit(X_scaled, y_fit)
                 batch_losses.append(float(self._model.loss_))
+                epoch_rows += X_batch.shape[0]
+
+                if verbose and epoch_rows >= next_epoch_log:
+                    elapsed = max(time.time() - epoch_start, 1e-9)
+                    rows_per_sec = epoch_rows / elapsed
+                    remaining = max(n_train - epoch_rows, 0)
+                    eta_sec = remaining / max(rows_per_sec, 1e-9)
+                    pct = (100.0 * epoch_rows) / max(float(n_train), 1.0)
+                    print(
+                        f"[epoch {epoch_num}] rows={epoch_rows:,}/{n_train:,} "
+                        f"({pct:.1f}%) rate={rows_per_sec:,.0f} rows/s "
+                        f"ETA {eta_sec / 60.0:.1f} min"
+                    )
+                    while epoch_rows >= next_epoch_log:
+                        next_epoch_log += progress_every_samples
 
             if not batch_losses:
                 raise ValueError("Training data cannot be empty.")
 
             epoch_loss = float(np.mean(batch_losses))
-            epoch_num = epoch_idx + 1
             self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
 
             if verbose:
-                print(f"Iteration {epoch_num}, loss = {epoch_loss:.8f}")
+                epoch_minutes = (time.time() - epoch_start) / 60.0
+                print(
+                    f"Iteration {epoch_num}, loss = {epoch_loss:.8f} "
+                    f"(epoch_time={epoch_minutes:.2f} min)"
+                )
 
         self._is_trained = True
         self._is_fitted = True
