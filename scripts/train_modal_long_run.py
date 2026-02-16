@@ -25,6 +25,7 @@ import modal
 APP_NAME = "weirdo-train-long-run"
 ARTIFACTS_VOLUME_NAME = "weirdo-model-artifacts"
 DATA_CACHE_VOLUME_NAME = "weirdo-data-cache"
+WEIRDO_GIT_REF = "60d88139b2aa880108060d7b9dccecfb441151cc"
 
 DEFAULT_TARGET_CATEGORIES = (
     "archaea,bacteria,fungi,human,invertebrates,mammals,plants,rodents,vertebrates,viruses"
@@ -37,7 +38,10 @@ def _build_image() -> modal.Image:
         modal.Image.debian_slim(python_version="3.12")
         .apt_install("git")
         .run_commands("python -m pip install --upgrade pip")
-        .run_commands("git clone https://github.com/pirl-unc/weirdo.git /root/weirdo")
+        .run_commands(
+            "git clone https://github.com/pirl-unc/weirdo.git /root/weirdo "
+            f"&& cd /root/weirdo && git checkout {WEIRDO_GIT_REF}"
+        )
         .workdir("/root/weirdo")
         .run_commands("python -m pip install .")
     )
