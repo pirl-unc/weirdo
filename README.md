@@ -241,6 +241,7 @@ The script:
 - packages weights into `MODEL_NAME.tar.gz`
 - can return archive bytes to your local machine (`--output-archive`)
 - reads SwissProt from `--swissprot-path` (default: `/root/.weirdo/downloads/swissprot-8mers.csv`)
+- treats `--max-samples 0` (default) as "use all available rows"
 
 ## Distributing Model Weights
 

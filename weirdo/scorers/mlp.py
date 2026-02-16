@@ -7,7 +7,7 @@ statistics.
 
 import pickle
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from sklearn.neural_network import MLPRegressor
@@ -513,10 +513,10 @@ class MLPScorer(TrainableScorer):
 
     def _extract_features(self, peptides: Sequence[str]) -> np.ndarray:
         """Extract features from a list of peptides."""
-        return np.array([
+        return np.asarray([
             extract_features(p, self.k, self._params['use_dipeptides'])
             for p in peptides
-        ])
+        ], dtype=np.float32)
 
     def _predict_raw_kmers(self, kmers: Sequence[str]) -> np.ndarray:
         """Predict raw model outputs for k-mers (no aggregation)."""
@@ -526,8 +526,280 @@ class MLPScorer(TrainableScorer):
             raise RuntimeError("Model is not initialized. Train or load a model first.")
 
         X = self._extract_features(kmers)
-        X_scaled = self._scaler.transform(X)
+        X_scaled = self._scaler.transform(X).astype(np.float32, copy=False)
         return self._model.predict(X_scaled)
+
+    def _iter_feature_batches(
+        self,
+        peptides: Sequence[str],
+        labels: np.ndarray,
+        batch_size: int,
+        shuffle: bool,
+        rng: np.random.RandomState,
+    ) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """Yield feature/label batches without materializing the full feature matrix."""
+        n_samples = len(peptides)
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive.")
+
+        if shuffle:
+            order = np.arange(n_samples)
+            rng.shuffle(order)
+            for start in range(0, n_samples, batch_size):
+                batch_idx = order[start:start + batch_size]
+                batch_peptides = [peptides[i] for i in batch_idx]
+                X_batch = self._extract_features(batch_peptides).astype(np.float32, copy=False)
+                y_batch = np.asarray(labels[batch_idx], dtype=np.float32)
+                yield X_batch, y_batch
+            return
+
+        for start in range(0, n_samples, batch_size):
+            stop = min(start + batch_size, n_samples)
+            batch_peptides = peptides[start:stop]
+            X_batch = self._extract_features(batch_peptides).astype(np.float32, copy=False)
+            y_batch = np.asarray(labels[start:stop], dtype=np.float32)
+            yield X_batch, y_batch
+
+    def _predict_batches(self, peptides: Sequence[str], batch_size: int) -> np.ndarray:
+        """Predict in batches to avoid building a full feature matrix."""
+        if self._model is None or self._scaler is None:
+            raise RuntimeError("Model is not initialized. Train or load a model first.")
+
+        outputs: List[np.ndarray] = []
+        for start in range(0, len(peptides), batch_size):
+            stop = min(start + batch_size, len(peptides))
+            X_batch = self._extract_features(peptides[start:stop]).astype(np.float32, copy=False)
+            X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
+            outputs.append(np.asarray(self._model.predict(X_scaled), dtype=np.float32))
+
+        if not outputs:
+            return np.array([], dtype=np.float32)
+        if outputs[0].ndim == 1:
+            return np.concatenate(outputs, axis=0)
+        return np.vstack(outputs)
+
+    def _validation_metrics(
+        self,
+        val_peptides: Sequence[str],
+        val_labels: np.ndarray,
+        batch_size: int,
+    ) -> Tuple[float, float]:
+        """Compute validation MSE and R^2 score in batches."""
+        y_pred = np.asarray(self._predict_batches(val_peptides, batch_size), dtype=np.float32)
+        y_true = np.asarray(val_labels, dtype=np.float32)
+
+        if y_pred.ndim == 1:
+            y_pred = y_pred.reshape(-1, 1)
+        if y_true.ndim == 1:
+            y_true = y_true.reshape(-1, 1)
+        if y_pred.shape != y_true.shape:
+            raise ValueError(
+                "Validation labels shape does not match predictions: "
+                f"pred={y_pred.shape}, labels={y_true.shape}"
+            )
+
+        mse = float(np.mean((y_pred - y_true) ** 2))
+
+        y_mean = y_true.mean(axis=0)
+        ss_res = np.sum((y_true - y_pred) ** 2, axis=0)
+        ss_tot = np.sum((y_true - y_mean) ** 2, axis=0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            r2_each = np.where(ss_tot > 0, 1.0 - (ss_res / ss_tot), 0.0)
+        r2 = float(np.mean(r2_each))
+
+        return mse, r2
+
+    def _normalize_label_row(self, label: Any) -> np.ndarray:
+        """Convert a single label row to 1D float32 array."""
+        arr = np.asarray(label, dtype=np.float32)
+        if arr.ndim == 0:
+            return arr.reshape(1)
+        if arr.ndim != 1:
+            raise ValueError(f"Each label row must be scalar or 1D, got shape {arr.shape}.")
+        return arr
+
+    def _iter_feature_batches_from_rows(
+        self,
+        row_iterator_factory: Callable[[], Iterator[Tuple[str, Any]]],
+        batch_size: int,
+        expected_label_dim: int,
+    ) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """Yield feature/label batches from a row iterator factory."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive.")
+        if expected_label_dim <= 0:
+            raise ValueError("expected_label_dim must be positive.")
+
+        peptides_batch: List[str] = []
+        labels_batch: List[np.ndarray] = []
+
+        for peptide, label in row_iterator_factory():
+            label_row = self._normalize_label_row(label)
+            if label_row.shape[0] != expected_label_dim:
+                raise ValueError(
+                    "Inconsistent label dimensions in row iterator: "
+                    f"expected {expected_label_dim}, got {label_row.shape[0]}"
+                )
+
+            peptides_batch.append(peptide)
+            labels_batch.append(label_row)
+
+            if len(peptides_batch) >= batch_size:
+                X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
+                y_batch = np.stack(labels_batch).astype(np.float32, copy=False)
+                yield X_batch, y_batch
+                peptides_batch = []
+                labels_batch = []
+
+        if peptides_batch:
+            X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
+            y_batch = np.stack(labels_batch).astype(np.float32, copy=False)
+            yield X_batch, y_batch
+
+    def train_streaming(
+        self,
+        row_iterator_factory: Callable[[], Iterator[Tuple[str, Any]]],
+        target_categories: Optional[List[str]] = None,
+        epochs: Optional[int] = None,
+        learning_rate: Optional[float] = None,
+        verbose: bool = True,
+        plot_loss: Union[bool, str, Path, None] = None,
+        **kwargs,
+    ) -> 'MLPScorer':
+        """Train using a row iterator factory without materializing all samples.
+
+        Parameters
+        ----------
+        row_iterator_factory : callable
+            Callable that returns a fresh iterator yielding ``(peptide, label)``
+            pairs for each pass.
+        target_categories : list of str, optional
+            Names of target categories (for multi-label training).
+        epochs : int, optional
+            Number of epochs.
+        learning_rate : float, optional
+            Initial learning rate.
+        verbose : bool, default=True
+            Print training progress.
+        plot_loss : bool, str, or Path, optional
+            Save loss curve plot.
+
+        Returns
+        -------
+        self : MLPScorer
+        """
+        batch_size = int(kwargs.pop('batch_size', self.batch_size))
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive.")
+
+        if epochs is None:
+            epochs = self._params['max_iter']
+        if learning_rate is None:
+            learning_rate = self._params['learning_rate_init']
+
+        # Probe one row to infer label dimensionality.
+        probe_iterator = row_iterator_factory()
+        try:
+            probe_item = next(probe_iterator)
+        except StopIteration:
+            raise ValueError("Training data cannot be empty.")
+        if not isinstance(probe_item, tuple) or len(probe_item) != 2:
+            raise ValueError(
+                "row_iterator_factory must yield (peptide, label) pairs."
+            )
+        _, probe_label = probe_item
+        label_dim = int(self._normalize_label_row(probe_label).shape[0])
+
+        if target_categories is not None:
+            if label_dim != len(target_categories):
+                raise ValueError(
+                    "target_categories length must match label dimensions: "
+                    f"{len(target_categories)} != {label_dim}"
+                )
+        elif label_dim > 1:
+            raise ValueError(
+                "Multi-label streaming training requires target_categories."
+            )
+
+        self._target_categories = target_categories
+
+        # Fit scaler incrementally with one pass over the stream.
+        self._scaler = StandardScaler()
+        n_train = 0
+        n_features = 0
+        for X_batch, _ in self._iter_feature_batches_from_rows(
+            row_iterator_factory=row_iterator_factory,
+            batch_size=batch_size,
+            expected_label_dim=label_dim,
+        ):
+            self._scaler.partial_fit(X_batch)
+            n_train += X_batch.shape[0]
+            n_features = X_batch.shape[1]
+
+        if n_train == 0:
+            raise ValueError("Training data cannot be empty.")
+
+        # Incremental MLP training over multiple streaming passes.
+        self._model = MLPRegressor(
+            hidden_layer_sizes=self._params['hidden_layer_sizes'],
+            activation=self._params['activation'],
+            alpha=self._params['alpha'],
+            learning_rate_init=learning_rate,
+            max_iter=1,
+            early_stopping=False,
+            n_iter_no_change=int(kwargs.pop('n_iter_no_change', 10)),
+            random_state=self._params['random_state'],
+            shuffle=False,
+            warm_start=True,
+            verbose=False,
+        )
+
+        self._training_history = []
+        for epoch_idx in range(int(epochs)):
+            batch_losses: List[float] = []
+            for X_batch, y_batch in self._iter_feature_batches_from_rows(
+                row_iterator_factory=row_iterator_factory,
+                batch_size=batch_size,
+                expected_label_dim=label_dim,
+            ):
+                X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
+                y_fit: Union[np.ndarray, Sequence[float]]
+                if y_batch.shape[1] == 1:
+                    y_fit = y_batch.ravel()
+                else:
+                    y_fit = y_batch
+                self._model.partial_fit(X_scaled, y_fit)
+                batch_losses.append(float(self._model.loss_))
+
+            if not batch_losses:
+                raise ValueError("Training data cannot be empty.")
+
+            epoch_loss = float(np.mean(batch_losses))
+            epoch_num = epoch_idx + 1
+            self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
+
+            if verbose:
+                print(f"Iteration {epoch_num}, loss = {epoch_loss:.8f}")
+
+        self._is_trained = True
+        self._is_fitted = True
+
+        final_train_loss = float(self._training_history[-1]['loss'])
+        self._metadata['n_train'] = n_train
+        self._metadata['n_features'] = n_features
+        self._metadata['n_epochs'] = len(self._training_history)
+        self._metadata['final_train_loss'] = final_train_loss
+
+        if verbose:
+            print("\nTraining complete:")
+            print(f"  Features: {n_features}")
+            print(f"  Iterations: {len(self._training_history)}")
+            print(f"  Final loss: {final_train_loss:.4f}")
+
+        if plot_loss:
+            self._save_loss_plot(plot_loss, verbose=verbose)
+
+        return self
 
     def train(
         self,
@@ -577,18 +849,20 @@ class MLPScorer(TrainableScorer):
         if not peptides:
             raise ValueError("Training data cannot be empty.")
 
-        y = np.array(labels)
+        y = np.asarray(labels, dtype=np.float32)
         if len(peptides) != len(y):
             raise ValueError(
                 f"Length mismatch: {len(peptides)} peptides but {len(y)} labels."
             )
+        if y.ndim not in (1, 2):
+            raise ValueError(f"Labels must be 1D or 2D, got shape {y.shape}.")
 
         if (val_peptides is None) != (val_labels is None):
             raise ValueError("Provide both val_peptides and val_labels together.")
 
         if val_peptides is not None and val_labels is not None:
             val_peptides = list(val_peptides)
-            y_val = np.array(val_labels)
+            y_val = np.asarray(val_labels, dtype=np.float32)
             if len(val_peptides) != len(y_val):
                 raise ValueError(
                     f"Length mismatch: {len(val_peptides)} val peptides but {len(y_val)} val labels."
@@ -601,84 +875,162 @@ class MLPScorer(TrainableScorer):
             epochs = self._params['max_iter']
         if learning_rate is None:
             learning_rate = self._params['learning_rate_init']
-        # Extract features
-        X = self._extract_features(peptides)
+
         if target_categories is not None:
             if y.ndim == 1 and len(target_categories) != 1:
                 raise ValueError("target_categories length must match label dimensions.")
             if y.ndim == 2 and y.shape[1] != len(target_categories):
                 raise ValueError("target_categories length must match label dimensions.")
 
-        # Scale features to zero mean, unit variance
-        self._scaler = StandardScaler()
-        X_scaled = self._scaler.fit_transform(X)
+        batch_size = int(kwargs.pop('batch_size', self.batch_size))
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive.")
+        shuffle_batches = bool(kwargs.pop('shuffle_batches', True))
+        tol = float(kwargs.pop('tol', 1e-4))
+        n_iter_no_change = int(kwargs.pop('n_iter_no_change', 10))
 
-        # Disable early stopping if dataset is too small
+        # Disable automatic validation split when too small.
         use_early_stopping = self._params['early_stopping']
         if use_early_stopping and len(peptides) < 20:
             use_early_stopping = False
             if verbose:
                 print("Note: Early stopping disabled (dataset too small)")
 
-        # Create and train model
+        train_peptides = peptides
+        y_train = y
+
+        # Emulate sklearn early stopping using a held-out split when external
+        # validation data is not provided.
+        if use_early_stopping and y_val is None:
+            n_val = max(1, int(round(0.1 * len(peptides))))
+            if n_val >= len(peptides):
+                use_early_stopping = False
+            else:
+                split_rng = np.random.RandomState(self._params['random_state'])
+                indices = np.arange(len(peptides))
+                split_rng.shuffle(indices)
+                val_idx = indices[:n_val]
+                train_idx = indices[n_val:]
+                val_peptides = [peptides[i] for i in val_idx]
+                y_val = np.asarray(y[val_idx], dtype=np.float32)
+                train_peptides = [peptides[i] for i in train_idx]
+                y_train = np.asarray(y[train_idx], dtype=np.float32)
+
+        rng = np.random.RandomState(self._params['random_state'])
+
+        # Fit scaler incrementally over batches.
+        self._scaler = StandardScaler()
+        for X_batch, _ in self._iter_feature_batches(
+            train_peptides,
+            y_train,
+            batch_size=batch_size,
+            shuffle=False,
+            rng=rng,
+        ):
+            self._scaler.partial_fit(X_batch)
+
+        # Train incrementally with partial_fit to avoid building a full feature matrix.
         self._model = MLPRegressor(
             hidden_layer_sizes=self._params['hidden_layer_sizes'],
             activation=self._params['activation'],
             alpha=self._params['alpha'],
             learning_rate_init=learning_rate,
-            max_iter=epochs,
-            early_stopping=use_early_stopping,
-            validation_fraction=0.1 if use_early_stopping else 0.0,
-            n_iter_no_change=10,
+            max_iter=1,
+            early_stopping=False,
+            n_iter_no_change=n_iter_no_change,
             random_state=self._params['random_state'],
-            verbose=verbose,
+            shuffle=False,
+            warm_start=True,
+            verbose=False,
         )
 
-        self._model.fit(X_scaled, y)
+        self._training_history = []
+        best_val_score: Optional[float] = None
+        best_val_loss: Optional[float] = None
+        final_val_loss: Optional[float] = None
+        no_improve_count = 0
+
+        for epoch_idx in range(int(epochs)):
+            batch_losses: List[float] = []
+
+            for X_batch, y_batch in self._iter_feature_batches(
+                train_peptides,
+                y_train,
+                batch_size=batch_size,
+                shuffle=shuffle_batches,
+                rng=rng,
+            ):
+                X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
+                y_fit: Union[np.ndarray, Sequence[float]]
+                if y_batch.ndim == 2 and y_batch.shape[1] == 1:
+                    y_fit = y_batch.ravel()
+                else:
+                    y_fit = y_batch
+                self._model.partial_fit(X_scaled, y_fit)
+                batch_losses.append(float(self._model.loss_))
+
+            if not batch_losses:
+                raise ValueError("Training data cannot be empty.")
+
+            epoch_loss = float(np.mean(batch_losses))
+            epoch_num = epoch_idx + 1
+            self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
+
+            val_score: Optional[float] = None
+            if val_peptides is not None and y_val is not None:
+                final_val_loss, val_score = self._validation_metrics(
+                    val_peptides=val_peptides,
+                    val_labels=y_val,
+                    batch_size=batch_size,
+                )
+
+            if verbose:
+                print(f"Iteration {epoch_num}, loss = {epoch_loss:.8f}")
+                if val_score is not None:
+                    print(f"Validation score: {val_score:.6f}")
+
+            if use_early_stopping and val_score is not None and final_val_loss is not None:
+                if best_val_score is None or val_score > best_val_score + tol:
+                    best_val_score = float(val_score)
+                    best_val_loss = float(final_val_loss)
+                    no_improve_count = 0
+                else:
+                    no_improve_count += 1
+                    if no_improve_count >= n_iter_no_change:
+                        if verbose:
+                            print(
+                                "Validation score did not improve more than "
+                                f"tol={tol:.6f} for {n_iter_no_change} consecutive epochs. "
+                                "Stopping."
+                            )
+                        break
 
         self._is_trained = True
         self._is_fitted = True
 
+        n_features = int(getattr(self._scaler, 'n_features_in_', 0))
+        n_epochs_run = len(self._training_history)
+        final_train_loss = float(self._training_history[-1]['loss'])
+
         # Save training metadata
         self._metadata['n_train'] = len(peptides)
-        self._metadata['n_features'] = X.shape[1]
-        self._metadata['n_epochs'] = self._model.n_iter_
-        self._metadata['final_train_loss'] = float(self._model.loss_)
-        if (
-            hasattr(self._model, 'best_validation_score_')
-            and self._model.best_validation_score_ is not None
-        ):
-            self._metadata['best_val_score'] = float(self._model.best_validation_score_)
+        self._metadata['n_features'] = n_features
+        self._metadata['n_epochs'] = n_epochs_run
+        self._metadata['final_train_loss'] = final_train_loss
+        if best_val_score is not None:
+            self._metadata['best_val_score'] = float(best_val_score)
 
-        if val_peptides is not None and y_val is not None:
-            X_val = self._extract_features(val_peptides)
-            X_val_scaled = self._scaler.transform(X_val)
-            y_val_pred = self._model.predict(X_val_scaled)
-            y_val_pred_arr = np.array(y_val_pred)
-            y_val_arr = np.array(y_val)
-            if y_val_pred_arr.ndim == 1:
-                y_val_pred_arr = y_val_pred_arr.reshape(-1, 1)
-            if y_val_arr.ndim == 1:
-                y_val_arr = y_val_arr.reshape(-1, 1)
-            if y_val_pred_arr.shape != y_val_arr.shape:
-                raise ValueError(
-                    "Validation labels shape does not match predictions: "
-                    f"pred={y_val_pred_arr.shape}, labels={y_val_arr.shape}"
-                )
-            val_loss = float(np.mean((y_val_pred_arr - y_val_arr) ** 2))
-            self._metadata['final_val_loss'] = val_loss
-            self._metadata['best_val_loss'] = val_loss
-
-        self._training_history = [
-            {'epoch': i + 1, 'loss': loss}
-            for i, loss in enumerate(self._model.loss_curve_)
-        ]
+        if val_peptides is not None and y_val is not None and final_val_loss is not None:
+            self._metadata['final_val_loss'] = float(final_val_loss)
+            self._metadata['best_val_loss'] = float(
+                best_val_loss if best_val_loss is not None else final_val_loss
+            )
 
         if verbose:
-            print(f"\nTraining complete:")
-            print(f"  Features: {X.shape[1]}")
-            print(f"  Iterations: {self._model.n_iter_}")
-            print(f"  Final loss: {self._model.loss_:.4f}")
+            print("\nTraining complete:")
+            print(f"  Features: {n_features}")
+            print(f"  Iterations: {n_epochs_run}")
+            print(f"  Final loss: {final_train_loss:.4f}")
 
         # Save loss curve plot if requested
         if plot_loss:
@@ -716,8 +1068,10 @@ class MLPScorer(TrainableScorer):
         else:
             save_path = Path(path)
 
-        # Get loss curve
-        loss_curve = self._model.loss_curve_
+        # Get loss curve from epoch-level training history.
+        loss_curve = [entry['loss'] for entry in self._training_history]
+        if not loss_curve:
+            raise RuntimeError("No training history is available to plot.")
 
         # Create plot
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -1059,10 +1413,10 @@ class MLPScorer(TrainableScorer):
                 kmers = [peptide[i:i+self.k] for i in range(len(peptide) - self.k + 1)]
 
             # Extract features for all k-mers
-            kmer_features = np.array([
+            kmer_features = np.asarray([
                 extract_features(kmer, self.k, self._params['use_dipeptides'])
                 for kmer in kmers
-            ])
+            ], dtype=np.float32)
 
             # Aggregate across k-mers
             if aggregate == 'mean':

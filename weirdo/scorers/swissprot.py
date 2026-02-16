@@ -426,6 +426,7 @@ class SwissProtReference(StreamingReference):
             Categories to use as targets. Default: ['human', 'viruses', 'bacteria'].
         max_samples : int, optional
             Maximum number of samples to return (for memory efficiency).
+            If 0 or negative, use all available samples.
         multi_label : bool, default=False
             If True, return multi-label array (one column per category).
             If False, return single foreignness score (1 if not in first target category).
@@ -457,6 +458,9 @@ class SwissProtReference(StreamingReference):
 
         if target_categories is None:
             target_categories = ['human', 'viruses', 'bacteria']
+
+        if max_samples is not None and max_samples <= 0:
+            max_samples = None
 
         # Validate categories
         for cat in target_categories:

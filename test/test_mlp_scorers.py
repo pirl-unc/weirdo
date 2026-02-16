@@ -123,6 +123,95 @@ class TestMLPScorer:
         assert scorer.is_trained
         assert len(scorer.training_history) > 0
 
+    def test_train_uses_feature_batches(self, monkeypatch):
+        """Training should process features in bounded-size batches."""
+        peptides = ['MTMDKSEL', 'ACDEFGHI', 'KLMNPQRS', 'XXXXXXXX'] * 25
+        labels = [0.0, 0.0, 1.0, 1.0] * 25
+
+        calls = []
+        original_extract = MLPScorer._extract_features
+
+        def tracked_extract(self, batch_peptides):
+            calls.append(len(batch_peptides))
+            return original_extract(self, batch_peptides)
+
+        monkeypatch.setattr(MLPScorer, '_extract_features', tracked_extract)
+
+        scorer = MLPScorer(
+            k=8,
+            hidden_layer_sizes=(16,),
+            batch_size=7,
+            early_stopping=False,
+            random_state=42,
+        )
+        scorer.train(peptides=peptides, labels=labels, epochs=5, verbose=False)
+
+        assert calls, "Expected feature extraction calls during training."
+        assert max(calls) <= 7
+
+    def test_iter_feature_batches_casts_to_float32(self):
+        """Batch iterator should cast feature and label arrays to float32."""
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(8,), random_state=1)
+        peptides = ['MTMDKSEL', 'ACDEFGHI', 'KLMNPQRS', 'TVWYACDE', 'XXXXXXXX']
+        labels = np.array([0, 1, 0, 1, 1], dtype=np.float64)
+
+        batches = list(
+            scorer._iter_feature_batches(
+                peptides=peptides,
+                labels=labels,
+                batch_size=2,
+                shuffle=False,
+                rng=np.random.RandomState(0),
+            )
+        )
+
+        assert batches
+        assert all(X.dtype == np.float32 for X, _ in batches)
+        assert all(y.dtype == np.float32 for _, y in batches)
+
+    def test_train_streaming_multilabel(self):
+        """Streaming training should work for multi-label data."""
+        rows = (
+            [('MTMDKSEL', [1.0, 0.0]), ('XXXXXXXX', [0.0, 1.0])]
+            + [('ACDEFGHI', [1.0, 0.0]), ('WWWWWWWW', [0.0, 1.0])]
+        ) * 20
+
+        def row_iterator_factory():
+            return iter(rows)
+
+        scorer = MLPScorer(
+            k=8,
+            hidden_layer_sizes=(16,),
+            random_state=42,
+            early_stopping=False,
+        )
+        scorer.train_streaming(
+            row_iterator_factory=row_iterator_factory,
+            target_categories=['human', 'viruses'],
+            epochs=8,
+            batch_size=10,
+            verbose=False,
+        )
+
+        assert scorer.is_trained
+        assert scorer._metadata['n_train'] == len(rows)
+        assert len(scorer.training_history) == 8
+
+    def test_train_streaming_requires_target_categories_for_multilabel(self):
+        """Multi-label row streams should require target_categories."""
+        rows = [('MTMDKSEL', [1.0, 0.0]), ('XXXXXXXX', [0.0, 1.0])]
+
+        def row_iterator_factory():
+            return iter(rows)
+
+        scorer = MLPScorer(k=8, hidden_layer_sizes=(8,), random_state=3)
+        with pytest.raises(ValueError, match="requires target_categories"):
+            scorer.train_streaming(
+                row_iterator_factory=row_iterator_factory,
+                epochs=2,
+                verbose=False,
+            )
+
     def test_score_peptides(self):
         """Test scoring peptides with trained model."""
         peptides = ['MTMDKSEL', 'ACDEFGHI'] * 20

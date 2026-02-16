@@ -10,7 +10,7 @@ Seed full SwissProt data once into the Modal data volume:
     modal volume put weirdo-data-cache data/swissprot-8mers.csv downloads/swissprot-8mers.csv --force
 
 Run long training remotely:
-    modal run scripts/train_modal_long_run.py --model-name swissprot-mlp-modal --epochs 1000 --max-samples 2000000
+    modal run scripts/train_modal_long_run.py --model-name swissprot-mlp-modal --epochs 1000
 
 Download resulting weights to a local file:
     modal run scripts/train_modal_long_run.py --model-name swissprot-mlp-modal --output-archive ./swissprot-mlp-modal.tar.gz
@@ -61,7 +61,7 @@ data_cache_volume = modal.Volume.from_name(DATA_CACHE_VOLUME_NAME, create_if_mis
 )
 def train_remote(
     model_name: str,
-    max_samples: int = 500_000,
+    max_samples: int = 0,
     epochs: int = 500,
     learning_rate: float = 1e-3,
     hidden_layers_csv: str = "256,128,64",
@@ -69,7 +69,10 @@ def train_remote(
     swissprot_path: str = DEFAULT_SWISSPROT_PATH,
     seed: int = 42,
 ) -> dict[str, object]:
-    """Train model remotely and persist model + archive in volume."""
+    """Train model remotely and persist model + archive in volume.
+
+    Use ``max_samples=0`` to train on all available rows.
+    """
     from pathlib import Path
     import tarfile
 
@@ -88,28 +91,51 @@ def train_remote(
             "downloads/swissprot-8mers.csv --force"
         )
 
-    ref = SwissProtReference(data_path=str(data_path), auto_download=False).load()
-    peptides, labels = ref.get_training_data(
-        target_categories=target_categories,
-        multi_label=True,
-        max_samples=max_samples,
-        shuffle=True,
-        seed=seed,
-    )
-
     scorer = MLPScorer(
         k=8,
         hidden_layer_sizes=hidden_layers,
         random_state=seed,
     )
-    scorer.train(
-        peptides=peptides,
-        labels=labels,
-        target_categories=target_categories,
-        epochs=epochs,
-        learning_rate=learning_rate,
-        verbose=True,
-    )
+    if max_samples <= 0:
+        # Stream all rows from CSV to keep memory bounded for full SwissProt runs.
+        ref = SwissProtReference(
+            data_path=str(data_path),
+            auto_download=False,
+            lazy=True,
+        ).load()
+
+        def row_iterator_factory():
+            for kmer, cats in ref.iter_kmers_with_categories():
+                yield kmer, [1.0 if cats.get(cat, False) else 0.0 for cat in target_categories]
+
+        scorer.train_streaming(
+            row_iterator_factory=row_iterator_factory,
+            target_categories=target_categories,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            verbose=True,
+        )
+    else:
+        ref = SwissProtReference(
+            data_path=str(data_path),
+            auto_download=False,
+            lazy=True,
+        ).load()
+        peptides, labels = ref.get_training_data(
+            target_categories=target_categories,
+            multi_label=True,
+            max_samples=max_samples,
+            shuffle=True,
+            seed=seed,
+        )
+        scorer.train(
+            peptides=peptides,
+            labels=labels,
+            target_categories=target_categories,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            verbose=True,
+        )
 
     manager = ModelManager(model_dir=Path("/artifacts/models"))
     saved_model_dir = manager.save(scorer, name=model_name, overwrite=True)
@@ -158,7 +184,7 @@ def read_archive_bytes(model_name: str) -> bytes:
 @app.local_entrypoint()
 def main(
     model_name: str = "swissprot-mlp-modal",
-    max_samples: int = 500_000,
+    max_samples: int = 0,
     epochs: int = 500,
     learning_rate: float = 1e-3,
     hidden_layers: str = "256,128,64",

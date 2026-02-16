@@ -168,6 +168,28 @@ class TestSwissProtReference:
         with pytest.raises(FileNotFoundError):
             ref.load()
 
+    def test_get_training_data_zero_max_samples_uses_all_rows(self):
+        """max_samples=0 should be treated as 'use all samples'."""
+        ref = SwissProtReference(data_path=FIXTURE_PATH).load()
+        categories = ['human', 'viruses', 'bacteria']
+
+        peptides_all, labels_all = ref.get_training_data(
+            target_categories=categories,
+            multi_label=True,
+            max_samples=None,
+            shuffle=False,
+        )
+        peptides_zero, labels_zero = ref.get_training_data(
+            target_categories=categories,
+            multi_label=True,
+            max_samples=0,
+            shuffle=False,
+        )
+
+        assert len(peptides_zero) == len(peptides_all)
+        assert peptides_zero == peptides_all
+        np.testing.assert_array_equal(labels_zero, labels_all)
+
 
 class TestSwissProtWithScorers:
     """Integration tests for SwissProtReference with scorers."""
