@@ -19,13 +19,31 @@ Download resulting weights to a local file:
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import modal
 
 
 APP_NAME = "weirdo-train-long-run"
 ARTIFACTS_VOLUME_NAME = "weirdo-model-artifacts"
 DATA_CACHE_VOLUME_NAME = "weirdo-data-cache"
-WEIRDO_GIT_REF = "60d88139b2aa880108060d7b9dccecfb441151cc"
+
+def _resolve_weirdo_git_ref() -> str:
+    """Resolve WEIRDO git ref for Modal image build."""
+    explicit_ref = os.getenv("WEIRDO_GIT_REF", "").strip()
+    if explicit_ref:
+        return explicit_ref
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+    except Exception:
+        # Fallback for environments without git metadata.
+        return "main"
+
+
+WEIRDO_GIT_REF = _resolve_weirdo_git_ref()
 
 DEFAULT_TARGET_CATEGORIES = (
     "archaea,bacteria,fungi,human,invertebrates,mammals,plants,rodents,vertebrates,viruses"
