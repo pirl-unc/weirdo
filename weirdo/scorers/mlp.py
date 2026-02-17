@@ -6,6 +6,7 @@ statistics.
 """
 
 import pickle
+import multiprocessing as mp
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
@@ -442,6 +443,12 @@ def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> n
     return np.concatenate(feature_parts)
 
 
+def _extract_features_worker(args: Tuple[str, int, bool]) -> np.ndarray:
+    """Helper for multiprocessing feature extraction."""
+    peptide, k, use_dipeptides = args
+    return extract_features(peptide, k, use_dipeptides)
+
+
 @register_scorer('mlp', description='MLP foreignness scorer with rich peptide features')
 class MLPScorer(TrainableScorer):
     """MLP-based origin scorer using rich peptide features.
@@ -624,17 +631,30 @@ class MLPScorer(TrainableScorer):
         row_iterator_factory: Callable[[], Iterator[Tuple[str, Any]]],
         batch_size: int,
         expected_label_dim: int,
+        max_rows: Optional[int] = None,
+        feature_pool: Any = None,
+        pool_chunksize: int = 256,
     ) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
         """Yield feature/label batches from a row iterator factory."""
         if batch_size <= 0:
             raise ValueError("batch_size must be positive.")
         if expected_label_dim <= 0:
             raise ValueError("expected_label_dim must be positive.")
+        if max_rows is not None and max_rows <= 0:
+            raise ValueError("max_rows must be positive when provided.")
+        if pool_chunksize <= 0:
+            raise ValueError("pool_chunksize must be positive.")
 
         peptides_batch: List[str] = []
         labels_batch: List[np.ndarray] = []
+        rows_emitted = 0
 
-        for peptide, label in row_iterator_factory():
+        row_iter = iter(row_iterator_factory())
+        while max_rows is None or rows_emitted < max_rows:
+            try:
+                peptide, label = next(row_iter)
+            except StopIteration:
+                break
             label_row = self._normalize_label_row(label)
             if label_row.shape[0] != expected_label_dim:
                 raise ValueError(
@@ -644,16 +664,31 @@ class MLPScorer(TrainableScorer):
 
             peptides_batch.append(peptide)
             labels_batch.append(label_row)
+            rows_emitted += 1
 
             if len(peptides_batch) >= batch_size:
-                X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
+                if feature_pool is None:
+                    X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
+                else:
+                    task_iter = ((p, self.k, self._params['use_dipeptides']) for p in peptides_batch)
+                    X_batch = np.asarray(
+                        list(feature_pool.imap(_extract_features_worker, task_iter, chunksize=pool_chunksize)),
+                        dtype=np.float32,
+                    )
                 y_batch = np.stack(labels_batch).astype(np.float32, copy=False)
                 yield X_batch, y_batch
                 peptides_batch = []
                 labels_batch = []
 
         if peptides_batch:
-            X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
+            if feature_pool is None:
+                X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
+            else:
+                task_iter = ((p, self.k, self._params['use_dipeptides']) for p in peptides_batch)
+                X_batch = np.asarray(
+                    list(feature_pool.imap(_extract_features_worker, task_iter, chunksize=pool_chunksize)),
+                    dtype=np.float32,
+                )
             y_batch = np.stack(labels_batch).astype(np.float32, copy=False)
             yield X_batch, y_batch
 
@@ -691,6 +726,15 @@ class MLPScorer(TrainableScorer):
             epoch. Default is 250000.
         total_rows_hint : int, optional
             Estimated total stream size for scaler-pass ETA reporting.
+        scaler_max_rows : int, optional
+            Cap rows used to fit scaler. If <= 0, uses full stream.
+        train_max_rows_per_epoch : int, optional
+            Cap streamed rows consumed per epoch. If <= 0, uses full stream.
+        parallel_workers : int, optional
+            Number of worker processes for feature extraction. If <= 1, uses
+            single-process feature extraction.
+        parallel_chunksize : int, optional
+            Chunk size for multiprocessing feature extraction.
 
         Returns
         -------
@@ -703,6 +747,10 @@ class MLPScorer(TrainableScorer):
         if progress_every_samples <= 0:
             raise ValueError("progress_every_samples must be positive.")
         total_rows_hint_arg = kwargs.pop('total_rows_hint', None)
+        scaler_max_rows_arg = int(kwargs.pop('scaler_max_rows', 0))
+        train_max_rows_per_epoch_arg = int(kwargs.pop('train_max_rows_per_epoch', 0))
+        parallel_workers = int(kwargs.pop('parallel_workers', 1))
+        parallel_chunksize = int(kwargs.pop('parallel_chunksize', 256))
         total_rows_hint: Optional[int]
         if total_rows_hint_arg is None:
             total_rows_hint = None
@@ -710,6 +758,14 @@ class MLPScorer(TrainableScorer):
             total_rows_hint = int(total_rows_hint_arg)
             if total_rows_hint <= 0:
                 raise ValueError("total_rows_hint must be positive when provided.")
+        scaler_max_rows = scaler_max_rows_arg if scaler_max_rows_arg > 0 else None
+        train_max_rows_per_epoch = (
+            train_max_rows_per_epoch_arg if train_max_rows_per_epoch_arg > 0 else None
+        )
+        if parallel_workers <= 0:
+            raise ValueError("parallel_workers must be positive.")
+        if parallel_chunksize <= 0:
+            raise ValueError("parallel_chunksize must be positive.")
 
         if epochs is None:
             epochs = self._params['max_iter']
@@ -742,130 +798,161 @@ class MLPScorer(TrainableScorer):
 
         self._target_categories = target_categories
 
-        # Fit scaler incrementally with one pass over the stream.
-        self._scaler = StandardScaler()
-        n_train = 0
-        n_features = 0
-        scaler_start = time.time()
-        next_scaler_log = progress_every_samples
-        for X_batch, _ in self._iter_feature_batches_from_rows(
-            row_iterator_factory=row_iterator_factory,
-            batch_size=batch_size,
-            expected_label_dim=label_dim,
-        ):
-            self._scaler.partial_fit(X_batch)
-            n_train += X_batch.shape[0]
-            n_features = X_batch.shape[1]
+        feature_pool = None
+        try:
+            if parallel_workers > 1:
+                available_methods = set(mp.get_all_start_methods())
+                start_method = 'fork' if 'fork' in available_methods else 'spawn'
+                feature_pool = mp.get_context(start_method).Pool(processes=parallel_workers)
 
-            if verbose and n_train >= next_scaler_log:
-                elapsed = max(time.time() - scaler_start, 1e-9)
-                rows_per_sec = n_train / elapsed
-                message = (
-                    f"[scaler] rows={n_train:,} "
-                    f"rate={rows_per_sec:,.0f} rows/s"
-                )
-                if total_rows_hint is not None:
-                    pct = (100.0 * n_train) / max(float(total_rows_hint), 1.0)
-                    remaining = max(total_rows_hint - n_train, 0)
-                    eta_sec = remaining / max(rows_per_sec, 1e-9)
-                    message += f" ({pct:.2f}% est, ETA {eta_sec / 60.0:.1f} min)"
-                print(message)
-                while n_train >= next_scaler_log:
-                    next_scaler_log += progress_every_samples
-
-        if n_train == 0:
-            raise ValueError("Training data cannot be empty.")
-        if verbose:
-            elapsed = max(time.time() - scaler_start, 1e-9)
-            rows_per_sec = n_train / elapsed
-            print(
-                f"[scaler] complete rows={n_train:,} "
-                f"in {elapsed / 60.0:.2f} min ({rows_per_sec:,.0f} rows/s)"
-            )
-
-        # Incremental MLP training over multiple streaming passes.
-        self._model = MLPRegressor(
-            hidden_layer_sizes=self._params['hidden_layer_sizes'],
-            activation=self._params['activation'],
-            alpha=self._params['alpha'],
-            learning_rate_init=learning_rate,
-            max_iter=1,
-            early_stopping=False,
-            n_iter_no_change=int(kwargs.pop('n_iter_no_change', 10)),
-            random_state=self._params['random_state'],
-            shuffle=False,
-            warm_start=True,
-            verbose=False,
-        )
-
-        self._training_history = []
-        for epoch_idx in range(int(epochs)):
-            batch_losses: List[float] = []
-            epoch_num = epoch_idx + 1
-            epoch_rows = 0
-            epoch_start = time.time()
-            next_epoch_log = progress_every_samples
-            for X_batch, y_batch in self._iter_feature_batches_from_rows(
+            # Fit scaler incrementally with one pass over the stream.
+            self._scaler = StandardScaler()
+            n_train = 0
+            n_features = 0
+            scaler_start = time.time()
+            next_scaler_log = progress_every_samples
+            scaler_target_rows = scaler_max_rows or total_rows_hint
+            for X_batch, _ in self._iter_feature_batches_from_rows(
                 row_iterator_factory=row_iterator_factory,
                 batch_size=batch_size,
                 expected_label_dim=label_dim,
+                max_rows=scaler_max_rows,
+                feature_pool=feature_pool,
+                pool_chunksize=parallel_chunksize,
             ):
-                X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
-                y_fit: Union[np.ndarray, Sequence[float]]
-                if y_batch.shape[1] == 1:
-                    y_fit = y_batch.ravel()
-                else:
-                    y_fit = y_batch
-                self._model.partial_fit(X_scaled, y_fit)
-                batch_losses.append(float(self._model.loss_))
-                epoch_rows += X_batch.shape[0]
+                self._scaler.partial_fit(X_batch)
+                n_train += X_batch.shape[0]
+                n_features = X_batch.shape[1]
 
-                if verbose and epoch_rows >= next_epoch_log:
-                    elapsed = max(time.time() - epoch_start, 1e-9)
-                    rows_per_sec = epoch_rows / elapsed
-                    remaining = max(n_train - epoch_rows, 0)
-                    eta_sec = remaining / max(rows_per_sec, 1e-9)
-                    pct = (100.0 * epoch_rows) / max(float(n_train), 1.0)
-                    print(
-                        f"[epoch {epoch_num}] rows={epoch_rows:,}/{n_train:,} "
-                        f"({pct:.1f}%) rate={rows_per_sec:,.0f} rows/s "
-                        f"ETA {eta_sec / 60.0:.1f} min"
+                if verbose and n_train >= next_scaler_log:
+                    elapsed = max(time.time() - scaler_start, 1e-9)
+                    rows_per_sec = n_train / elapsed
+                    message = (
+                        f"[scaler] rows={n_train:,} "
+                        f"rate={rows_per_sec:,.0f} rows/s"
                     )
-                    while epoch_rows >= next_epoch_log:
-                        next_epoch_log += progress_every_samples
+                    if scaler_target_rows is not None:
+                        pct = (100.0 * n_train) / max(float(scaler_target_rows), 1.0)
+                        remaining = max(scaler_target_rows - n_train, 0)
+                        eta_sec = remaining / max(rows_per_sec, 1e-9)
+                        message += f" ({pct:.2f}% est, ETA {eta_sec / 60.0:.1f} min)"
+                    print(message)
+                    while n_train >= next_scaler_log:
+                        next_scaler_log += progress_every_samples
 
-            if not batch_losses:
+            if n_train == 0:
                 raise ValueError("Training data cannot be empty.")
-
-            epoch_loss = float(np.mean(batch_losses))
-            self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
-
             if verbose:
-                epoch_minutes = (time.time() - epoch_start) / 60.0
+                elapsed = max(time.time() - scaler_start, 1e-9)
+                rows_per_sec = n_train / elapsed
                 print(
-                    f"Iteration {epoch_num}, loss = {epoch_loss:.8f} "
-                    f"(epoch_time={epoch_minutes:.2f} min)"
+                    f"[scaler] complete rows={n_train:,} "
+                    f"in {elapsed / 60.0:.2f} min ({rows_per_sec:,.0f} rows/s)"
                 )
 
-        self._is_trained = True
-        self._is_fitted = True
+            # Incremental MLP training over multiple streaming passes.
+            self._model = MLPRegressor(
+                hidden_layer_sizes=self._params['hidden_layer_sizes'],
+                activation=self._params['activation'],
+                alpha=self._params['alpha'],
+                learning_rate_init=learning_rate,
+                max_iter=1,
+                early_stopping=False,
+                n_iter_no_change=int(kwargs.pop('n_iter_no_change', 10)),
+                random_state=self._params['random_state'],
+                shuffle=False,
+                warm_start=True,
+                verbose=False,
+            )
 
-        final_train_loss = float(self._training_history[-1]['loss'])
-        self._metadata['n_train'] = n_train
-        self._metadata['n_features'] = n_features
-        self._metadata['n_epochs'] = len(self._training_history)
-        self._metadata['final_train_loss'] = final_train_loss
+            self._training_history = []
+            epoch_row_target = train_max_rows_per_epoch or total_rows_hint
+            for epoch_idx in range(int(epochs)):
+                batch_losses: List[float] = []
+                epoch_num = epoch_idx + 1
+                epoch_rows = 0
+                epoch_start = time.time()
+                next_epoch_log = progress_every_samples
+                for X_batch, y_batch in self._iter_feature_batches_from_rows(
+                    row_iterator_factory=row_iterator_factory,
+                    batch_size=batch_size,
+                    expected_label_dim=label_dim,
+                    max_rows=train_max_rows_per_epoch,
+                    feature_pool=feature_pool,
+                    pool_chunksize=parallel_chunksize,
+                ):
+                    X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
+                    y_fit: Union[np.ndarray, Sequence[float]]
+                    if y_batch.shape[1] == 1:
+                        y_fit = y_batch.ravel()
+                    else:
+                        y_fit = y_batch
+                    self._model.partial_fit(X_scaled, y_fit)
+                    batch_losses.append(float(self._model.loss_))
+                    epoch_rows += X_batch.shape[0]
 
-        if verbose:
-            print("\nTraining complete:")
-            print(f"  Features: {n_features}")
-            print(f"  Iterations: {len(self._training_history)}")
-            print(f"  Final loss: {final_train_loss:.4f}")
+                    if verbose and epoch_rows >= next_epoch_log:
+                        elapsed = max(time.time() - epoch_start, 1e-9)
+                        rows_per_sec = epoch_rows / elapsed
+                        if epoch_row_target is not None:
+                            remaining = max(epoch_row_target - epoch_rows, 0)
+                            eta_sec = remaining / max(rows_per_sec, 1e-9)
+                            pct = (100.0 * epoch_rows) / max(float(epoch_row_target), 1.0)
+                            print(
+                                f"[epoch {epoch_num}] rows={epoch_rows:,}/{epoch_row_target:,} "
+                                f"({pct:.1f}%) rate={rows_per_sec:,.0f} rows/s "
+                                f"ETA {eta_sec / 60.0:.1f} min"
+                            )
+                        else:
+                            print(
+                                f"[epoch {epoch_num}] rows={epoch_rows:,} "
+                                f"rate={rows_per_sec:,.0f} rows/s"
+                            )
+                        while epoch_rows >= next_epoch_log:
+                            next_epoch_log += progress_every_samples
 
-        if plot_loss:
-            self._save_loss_plot(plot_loss, verbose=verbose)
+                if not batch_losses:
+                    raise ValueError("Training data cannot be empty.")
 
-        return self
+                epoch_loss = float(np.mean(batch_losses))
+                self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
+
+                if verbose:
+                    epoch_minutes = (time.time() - epoch_start) / 60.0
+                    print(
+                        f"Iteration {epoch_num}, loss = {epoch_loss:.8f} "
+                        f"(epoch_time={epoch_minutes:.2f} min, rows={epoch_rows:,})"
+                    )
+
+            self._is_trained = True
+            self._is_fitted = True
+
+            final_train_loss = float(self._training_history[-1]['loss'])
+            self._metadata['n_train'] = n_train
+            self._metadata['n_features'] = n_features
+            self._metadata['n_epochs'] = len(self._training_history)
+            self._metadata['final_train_loss'] = final_train_loss
+            self._metadata['scaler_rows'] = n_train
+            self._metadata['scaler_max_rows'] = scaler_max_rows_arg
+            self._metadata['train_max_rows_per_epoch'] = train_max_rows_per_epoch_arg
+            self._metadata['total_rows_hint'] = total_rows_hint
+            self._metadata['parallel_workers'] = parallel_workers
+
+            if verbose:
+                print("\nTraining complete:")
+                print(f"  Features: {n_features}")
+                print(f"  Scaler rows: {n_train}")
+                print(f"  Iterations: {len(self._training_history)}")
+                print(f"  Final loss: {final_train_loss:.4f}")
+
+            if plot_loss:
+                self._save_loss_plot(plot_loss, verbose=verbose)
+
+            return self
+        finally:
+            if feature_pool is not None:
+                feature_pool.close()
+                feature_pool.join()
 
     def train(
         self,

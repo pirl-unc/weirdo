@@ -237,6 +237,50 @@ class TestMLPScorer:
                 total_rows_hint=-1,
                 verbose=False,
             )
+        with pytest.raises(ValueError, match="parallel_workers must be positive"):
+            scorer.train_streaming(
+                row_iterator_factory=row_iterator_factory,
+                epochs=1,
+                batch_size=2,
+                parallel_workers=0,
+                verbose=False,
+            )
+
+    def test_train_streaming_row_limits(self):
+        """Streaming row caps should bound scaler/training stream consumption."""
+        rows = [('MTMDKSEL', 1.0), ('XXXXXXXX', 0.0), ('ACDEFGHI', 1.0), ('WWWWWWWW', 0.0)] * 5
+
+        class RowCounter:
+            def __init__(self, data):
+                self.data = data
+                self.total_yielded = 0
+
+            def factory(self):
+                for item in self.data:
+                    self.total_yielded += 1
+                    yield item
+
+        counter = RowCounter(rows)
+        scorer = MLPScorer(
+            k=8,
+            hidden_layer_sizes=(8,),
+            random_state=4,
+            early_stopping=False,
+        )
+        scorer.train_streaming(
+            row_iterator_factory=counter.factory,
+            epochs=2,
+            batch_size=4,
+            scaler_max_rows=5,
+            train_max_rows_per_epoch=7,
+            verbose=False,
+        )
+
+        # One probe row + scaler pass + two epoch passes.
+        assert counter.total_yielded == 1 + 5 + 7 + 7
+        assert scorer._metadata['scaler_rows'] == 5
+        assert scorer._metadata['scaler_max_rows'] == 5
+        assert scorer._metadata['train_max_rows_per_epoch'] == 7
 
     def test_train_streaming_emits_row_progress_logs(self, capsys):
         """Streaming training should print row-level progress during long passes."""
