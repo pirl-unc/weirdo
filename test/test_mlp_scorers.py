@@ -273,14 +273,50 @@ class TestMLPScorer:
             batch_size=4,
             scaler_max_rows=5,
             train_max_rows_per_epoch=7,
+            epoch_shuffle=False,
             verbose=False,
         )
 
         # One probe row + scaler pass + two epoch passes.
         assert counter.total_yielded == 1 + 5 + 7 + 7
+        assert scorer._metadata['n_train'] == 7
         assert scorer._metadata['scaler_rows'] == 5
         assert scorer._metadata['scaler_max_rows'] == 5
         assert scorer._metadata['train_max_rows_per_epoch'] == 7
+
+    def test_train_streaming_epoch_shuffle_is_seeded(self):
+        """Epoch skip offsets should be deterministic with fixed random_state."""
+        rows = [('MTMDKSEL', 1.0), ('XXXXXXXX', 0.0), ('ACDEFGHI', 1.0), ('WWWWWWWW', 0.0)] * 30
+
+        def row_iterator_factory():
+            return iter(rows)
+
+        scorer_a = MLPScorer(k=8, hidden_layer_sizes=(8,), random_state=123)
+        scorer_b = MLPScorer(k=8, hidden_layer_sizes=(8,), random_state=123)
+
+        scorer_a.train_streaming(
+            row_iterator_factory=row_iterator_factory,
+            epochs=4,
+            batch_size=16,
+            scaler_max_rows=80,
+            train_max_rows_per_epoch=60,
+            total_rows_hint=len(rows),
+            epoch_shuffle=True,
+            verbose=False,
+        )
+        scorer_b.train_streaming(
+            row_iterator_factory=row_iterator_factory,
+            epochs=4,
+            batch_size=16,
+            scaler_max_rows=80,
+            train_max_rows_per_epoch=60,
+            total_rows_hint=len(rows),
+            epoch_shuffle=True,
+            verbose=False,
+        )
+
+        assert scorer_a._metadata['epoch_skip_rows'] == scorer_b._metadata['epoch_skip_rows']
+        assert any(x > 0 for x in scorer_a._metadata['epoch_skip_rows'])
 
     def test_train_streaming_emits_row_progress_logs(self, capsys):
         """Streaming training should print row-level progress during long passes."""

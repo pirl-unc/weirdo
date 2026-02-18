@@ -632,6 +632,7 @@ class MLPScorer(TrainableScorer):
         batch_size: int,
         expected_label_dim: int,
         max_rows: Optional[int] = None,
+        skip_rows: int = 0,
         feature_pool: Any = None,
         pool_chunksize: int = 256,
     ) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
@@ -642,6 +643,8 @@ class MLPScorer(TrainableScorer):
             raise ValueError("expected_label_dim must be positive.")
         if max_rows is not None and max_rows <= 0:
             raise ValueError("max_rows must be positive when provided.")
+        if skip_rows < 0:
+            raise ValueError("skip_rows must be non-negative.")
         if pool_chunksize <= 0:
             raise ValueError("pool_chunksize must be positive.")
 
@@ -650,6 +653,14 @@ class MLPScorer(TrainableScorer):
         rows_emitted = 0
 
         row_iter = iter(row_iterator_factory())
+        skipped = 0
+        while skipped < skip_rows:
+            try:
+                next(row_iter)
+            except StopIteration:
+                return
+            skipped += 1
+
         while max_rows is None or rows_emitted < max_rows:
             try:
                 peptide, label = next(row_iter)
@@ -730,6 +741,12 @@ class MLPScorer(TrainableScorer):
             Cap rows used to fit scaler. If <= 0, uses full stream.
         train_max_rows_per_epoch : int, optional
             Cap streamed rows consumed per epoch. If <= 0, uses full stream.
+        epoch_shuffle : bool, optional
+            Shuffle streamed epoch windows deterministically from ``random_state``.
+            When `train_max_rows_per_epoch` is set, each epoch samples a different
+            deterministic offset into the stream.
+        shuffle_in_batch : bool, optional
+            Shuffle rows within each streamed batch deterministically per epoch.
         parallel_workers : int, optional
             Number of worker processes for feature extraction. If <= 1, uses
             single-process feature extraction.
@@ -749,6 +766,8 @@ class MLPScorer(TrainableScorer):
         total_rows_hint_arg = kwargs.pop('total_rows_hint', None)
         scaler_max_rows_arg = int(kwargs.pop('scaler_max_rows', 0))
         train_max_rows_per_epoch_arg = int(kwargs.pop('train_max_rows_per_epoch', 0))
+        epoch_shuffle = bool(kwargs.pop('epoch_shuffle', True))
+        shuffle_in_batch = bool(kwargs.pop('shuffle_in_batch', True))
         parallel_workers = int(kwargs.pop('parallel_workers', 1))
         parallel_chunksize = int(kwargs.pop('parallel_chunksize', 256))
         total_rows_hint: Optional[int]
@@ -867,20 +886,47 @@ class MLPScorer(TrainableScorer):
 
             self._training_history = []
             epoch_row_target = train_max_rows_per_epoch or total_rows_hint
+            epoch_rows_history: List[int] = []
+            epoch_skip_rows: List[int] = []
+            base_seed = self._params['random_state']
+            if base_seed is None:
+                base_seed = 0
+            sampled_total_rows = (
+                total_rows_hint
+                if total_rows_hint is not None
+                else (n_train if scaler_max_rows is None else None)
+            )
             for epoch_idx in range(int(epochs)):
                 batch_losses: List[float] = []
                 epoch_num = epoch_idx + 1
                 epoch_rows = 0
                 epoch_start = time.time()
                 next_epoch_log = progress_every_samples
+                epoch_rng = np.random.RandomState(base_seed + epoch_num)
+                skip_rows = 0
+                if epoch_shuffle and train_max_rows_per_epoch is not None:
+                    if (
+                        sampled_total_rows is not None
+                        and sampled_total_rows > train_max_rows_per_epoch
+                    ):
+                        max_skip = sampled_total_rows - train_max_rows_per_epoch
+                        skip_rows = int(epoch_rng.randint(0, max_skip + 1))
+                    elif sampled_total_rows is None:
+                        skip_rows = int(epoch_rng.randint(0, train_max_rows_per_epoch))
+                epoch_skip_rows.append(skip_rows)
                 for X_batch, y_batch in self._iter_feature_batches_from_rows(
                     row_iterator_factory=row_iterator_factory,
                     batch_size=batch_size,
                     expected_label_dim=label_dim,
                     max_rows=train_max_rows_per_epoch,
+                    skip_rows=skip_rows,
                     feature_pool=feature_pool,
                     pool_chunksize=parallel_chunksize,
                 ):
+                    if shuffle_in_batch and X_batch.shape[0] > 1:
+                        perm = epoch_rng.permutation(X_batch.shape[0])
+                        X_batch = X_batch[perm]
+                        y_batch = y_batch[perm]
                     X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
                     y_fit: Union[np.ndarray, Sequence[float]]
                     if y_batch.shape[1] == 1:
@@ -916,6 +962,7 @@ class MLPScorer(TrainableScorer):
 
                 epoch_loss = float(np.mean(batch_losses))
                 self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
+                epoch_rows_history.append(epoch_rows)
 
                 if verbose:
                     epoch_minutes = (time.time() - epoch_start) / 60.0
@@ -928,7 +975,8 @@ class MLPScorer(TrainableScorer):
             self._is_fitted = True
 
             final_train_loss = float(self._training_history[-1]['loss'])
-            self._metadata['n_train'] = n_train
+            n_train_effective = int(epoch_rows_history[0]) if epoch_rows_history else 0
+            self._metadata['n_train'] = n_train_effective
             self._metadata['n_features'] = n_features
             self._metadata['n_epochs'] = len(self._training_history)
             self._metadata['final_train_loss'] = final_train_loss
@@ -937,10 +985,15 @@ class MLPScorer(TrainableScorer):
             self._metadata['train_max_rows_per_epoch'] = train_max_rows_per_epoch_arg
             self._metadata['total_rows_hint'] = total_rows_hint
             self._metadata['parallel_workers'] = parallel_workers
+            self._metadata['epoch_rows'] = epoch_rows_history
+            self._metadata['epoch_skip_rows'] = epoch_skip_rows
+            self._metadata['epoch_shuffle'] = epoch_shuffle
+            self._metadata['shuffle_in_batch'] = shuffle_in_batch
 
             if verbose:
                 print("\nTraining complete:")
                 print(f"  Features: {n_features}")
+                print(f"  n_train (per-epoch): {n_train_effective}")
                 print(f"  Scaler rows: {n_train}")
                 print(f"  Iterations: {len(self._training_history)}")
                 print(f"  Final loss: {final_train_loss:.4f}")
