@@ -245,6 +245,14 @@ class TestMLPScorer:
                 parallel_workers=0,
                 verbose=False,
             )
+        with pytest.raises(ValueError, match="epoch_shuffle_max_skip_rows must be non-negative"):
+            scorer.train_streaming(
+                row_iterator_factory=row_iterator_factory,
+                epochs=1,
+                batch_size=2,
+                epoch_shuffle_max_skip_rows=-1,
+                verbose=False,
+            )
 
     def test_train_streaming_row_limits(self):
         """Streaming row caps should bound scaler/training stream consumption."""
@@ -317,6 +325,7 @@ class TestMLPScorer:
 
         assert scorer_a._metadata['epoch_skip_rows'] == scorer_b._metadata['epoch_skip_rows']
         assert any(x > 0 for x in scorer_a._metadata['epoch_skip_rows'])
+        assert all(x <= 60 for x in scorer_a._metadata['epoch_skip_rows'])
 
     def test_train_streaming_emits_row_progress_logs(self, capsys):
         """Streaming training should print row-level progress during long passes."""

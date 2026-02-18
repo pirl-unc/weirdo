@@ -745,6 +745,9 @@ class MLPScorer(TrainableScorer):
             Shuffle streamed epoch windows deterministically from ``random_state``.
             When `train_max_rows_per_epoch` is set, each epoch samples a different
             deterministic offset into the stream.
+        epoch_shuffle_max_skip_rows : int, optional
+            Cap on per-epoch skip distance used for deterministic shuffling.
+            If <= 0, defaults to `train_max_rows_per_epoch`.
         shuffle_in_batch : bool, optional
             Shuffle rows within each streamed batch deterministically per epoch.
         parallel_workers : int, optional
@@ -767,6 +770,7 @@ class MLPScorer(TrainableScorer):
         scaler_max_rows_arg = int(kwargs.pop('scaler_max_rows', 0))
         train_max_rows_per_epoch_arg = int(kwargs.pop('train_max_rows_per_epoch', 0))
         epoch_shuffle = bool(kwargs.pop('epoch_shuffle', True))
+        epoch_shuffle_max_skip_rows_arg = int(kwargs.pop('epoch_shuffle_max_skip_rows', 0))
         shuffle_in_batch = bool(kwargs.pop('shuffle_in_batch', True))
         parallel_workers = int(kwargs.pop('parallel_workers', 1))
         parallel_chunksize = int(kwargs.pop('parallel_chunksize', 256))
@@ -781,6 +785,8 @@ class MLPScorer(TrainableScorer):
         train_max_rows_per_epoch = (
             train_max_rows_per_epoch_arg if train_max_rows_per_epoch_arg > 0 else None
         )
+        if epoch_shuffle_max_skip_rows_arg < 0:
+            raise ValueError("epoch_shuffle_max_skip_rows must be non-negative.")
         if parallel_workers <= 0:
             raise ValueError("parallel_workers must be positive.")
         if parallel_chunksize <= 0:
@@ -905,14 +911,22 @@ class MLPScorer(TrainableScorer):
                 epoch_rng = np.random.RandomState(base_seed + epoch_num)
                 skip_rows = 0
                 if epoch_shuffle and train_max_rows_per_epoch is not None:
+                    max_skip_cap = (
+                        epoch_shuffle_max_skip_rows_arg
+                        if epoch_shuffle_max_skip_rows_arg > 0
+                        else train_max_rows_per_epoch
+                    )
                     if (
                         sampled_total_rows is not None
                         and sampled_total_rows > train_max_rows_per_epoch
                     ):
-                        max_skip = sampled_total_rows - train_max_rows_per_epoch
+                        max_skip = min(
+                            sampled_total_rows - train_max_rows_per_epoch,
+                            max_skip_cap,
+                        )
                         skip_rows = int(epoch_rng.randint(0, max_skip + 1))
                     elif sampled_total_rows is None:
-                        skip_rows = int(epoch_rng.randint(0, train_max_rows_per_epoch))
+                        skip_rows = int(epoch_rng.randint(0, max_skip_cap + 1))
                 epoch_skip_rows.append(skip_rows)
                 for X_batch, y_batch in self._iter_feature_batches_from_rows(
                     row_iterator_factory=row_iterator_factory,
@@ -988,6 +1002,7 @@ class MLPScorer(TrainableScorer):
             self._metadata['epoch_rows'] = epoch_rows_history
             self._metadata['epoch_skip_rows'] = epoch_skip_rows
             self._metadata['epoch_shuffle'] = epoch_shuffle
+            self._metadata['epoch_shuffle_max_skip_rows'] = epoch_shuffle_max_skip_rows_arg
             self._metadata['shuffle_in_batch'] = shuffle_in_batch
 
             if verbose:
