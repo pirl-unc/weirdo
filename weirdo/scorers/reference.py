@@ -5,7 +5,7 @@ reference k-mer data (e.g., from SwissProt).
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Iterator, List, Optional, Set, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple
 
 
 class BaseReference(ABC):

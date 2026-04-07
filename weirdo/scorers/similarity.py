@@ -4,7 +4,7 @@ Scores peptides based on minimum distance to reference k-mers
 using substitution matrices (BLOSUM, PMBEC).
 """
 
-from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 

@@ -5,7 +5,7 @@ following sklearn-style fit/score patterns.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Sequence, Union
 
 import numpy as np
 
