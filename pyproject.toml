@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weirdo"
+requires-python = ">=3.9"
+authors = [{name="Alex Rubinsteyn", email="alex.rubinsteyn@unc.edu"}]
+description = "Metrics of immunological foreignness for candidate T-cell epitopes"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+readme = "README.md"
+dynamic = ["version", "dependencies"]
+
+[tool.setuptools.dynamic]
+version = {attr = "weirdo.__version__"}
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+exclude = ["test", "test.*", "examples"]
+
+[tool.setuptools.package-data]
+weirdo = ["logging.conf", "matrices/*"]
+
+[project.urls]
+"Homepage" = "https://github.com/pirl-unc/weirdo"
+"Bug Tracker" = "https://github.com/pirl-unc/weirdo/issues"
+
+[project.scripts]
+weirdo = "weirdo.cli:run"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.4.0",
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "sphinx-autodoc-typehints>=1.0.0",
+    "tqdm>=4.0.0",
+]
+docs = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "sphinx-autodoc-typehints>=1.0.0",
+]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["F821", "E501", "F841", "E731", "E741"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"test/*" = ["F401"]

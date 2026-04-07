@@ -191,7 +191,6 @@ class ModelManager:
         scorer : TrainableScorer
             Loaded model ready for inference.
         """
-        from .scorers.trainable import TrainableScorer
         from .scorers.mlp import MLPScorer
 
         path = self._model_dir / name

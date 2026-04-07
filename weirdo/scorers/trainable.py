@@ -4,12 +4,10 @@ Provides common infrastructure for training, saving, and loading models.
 """
 
 import json
-import os
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
-import numpy as np
 
 from .base import BatchScorer
 
