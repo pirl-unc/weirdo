@@ -24,7 +24,6 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import numpy as np
-from datacache import Cache
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
@@ -162,7 +161,7 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def fetch_iedb(pmid: str, cache: Cache) -> list[dict]:
+def fetch_iedb(pmid: str, cache) -> list[dict]:
     """Fetch one pinned-paper IEDB export in 1,000-record datacache pages."""
     rows: list[dict] = []
     for page in range(100):
@@ -961,6 +960,10 @@ def main() -> None:
         parser.error("--per-category must be at least 20")
     if args.permutations < 100:
         parser.error("--permutations must be at least 100")
+
+    # datacache and mhcflurry are benchmark-only extras, imported where they
+    # are used so the module stays importable with the core dependencies.
+    from datacache import Cache
 
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
     records = []
