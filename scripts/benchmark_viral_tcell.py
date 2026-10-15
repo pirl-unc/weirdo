@@ -641,12 +641,12 @@ def within_hla_auc(
         presentation_caliper: float | None = None,
         group_fields: tuple[str, ...] = ("hla",)) -> tuple[float | None, int]:
     """Pair outcomes within a stratum and optionally within presentation percentile."""
-    by_hla = defaultdict(list)
+    by_stratum = defaultdict(list)
     for row in rows:
-        by_hla[tuple(row[field] for field in group_fields)].append(row)
+        by_stratum[tuple(row[field] for field in group_fields)].append(row)
     wins = 0.0
     n_pairs = 0
-    for members in by_hla.values():
+    for members in by_stratum.values():
         positive = [r for r in members if r["outcome"] == "Positive"]
         negative = [r for r in members if r["outcome"] == "Negative"]
         for pos in positive:
@@ -693,10 +693,10 @@ def within_hla_permutation_p_value(
     every permutation, exactly as it does for the observed labels.
     """
     strata = []
-    by_hla = defaultdict(list)
+    by_stratum = defaultdict(list)
     for row in rows:
-        by_hla[tuple(row[field] for field in group_fields)].append(row)
-    for members in by_hla.values():
+        by_stratum[tuple(row[field] for field in group_fields)].append(row)
+    for members in by_stratum.values():
         labels = np.asarray(
             [r["outcome"] == "Positive" for r in members], dtype=float)
         if not labels.any() or labels.all():
