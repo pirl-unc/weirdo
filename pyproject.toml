@@ -53,6 +53,7 @@ docs = [
 ]
 benchmark = [
     "datacache>=1.25.1",
+    "mhcflurry>=2.3.0",
 ]
 
 [tool.ruff.lint]

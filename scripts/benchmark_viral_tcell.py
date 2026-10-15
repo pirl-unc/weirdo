@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Exploratory viral T-cell response enrichment against a small WEIRDO-style model.
+"""Compare foreignness definitions on HLA-resolved viral T-cell assays.
 
-This is an analysis script, not a released WEIRDO predictor. It deliberately
-holds SARS/coronavirus-labelled SwissProt proteins out of training and reports
-study-specific, assay-specific comparisons rather than pooling all IEDB rows.
+This is a hypothesis-generation benchmark, not a released WEIRDO predictor.
+Foreignness models are trained only on SwissProt organism labels. T-cell assay
+outcomes are used only for evaluation and for cross-validated conditional
+response models. SARS/coronavirus-labelled SwissProt proteins are held out.
 """
 
 from __future__ import annotations
@@ -19,8 +20,15 @@ from urllib.parse import urlencode
 
 import numpy as np
 from datacache import Cache
-from sklearn.metrics import roc_auc_score
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
+from sklearn.model_selection import StratifiedGroupKFold, train_test_split
 from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+from weirdo.blosum import blosum62_dict
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,9 +39,17 @@ CATEGORIES = (
     "archaea", "bacteria", "fungi", "human", "invertebrates",
     "mammals", "plants", "rodents", "vertebrates", "viruses",
 )
+SELF_CATEGORIES = frozenset(("human", "mammals", "rodents"))
+PATHOGEN_CATEGORIES = frozenset(("bacteria", "viruses"))
 HLA_I = re.compile(r"HLA-[ABC]\*\d{2}:\d{2}$")
-HELD_OUT_VIRUS = re.compile(r"SARS|COV|CORO", re.IGNORECASE)
+# SwissProt coronavirus organism mnemonics include ``_CV...`` (for example,
+# ``SPIKE_CVH22``) plus named aliases such as MERS, PEDV, FIPV, and IBV. The
+# broad holdout prevents training on obvious coronavirus family members.
+HELD_OUT_VIRUS = re.compile(
+    r"SARS|MERS|COV|CORO|_CV|PEDV|FIPV|IBV", re.IGNORECASE)
 MIN_LENGTH, MAX_LENGTH = 8, 14
+PRESENTATION_CALIPER = 0.1  # MHCflurry percentile-rank points.
+PRESENTATION_CALIPER_SENSITIVITY = (0.02, 0.05, 0.1, 0.25)
 
 
 def file_sha256(path: Path) -> str:
@@ -111,9 +127,33 @@ def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
     return result
 
 
+def deduplicate_assays(records: list[dict]) -> tuple[list[dict], Counter]:
+    """Collapse repeat assays and exclude conflicting outcomes."""
+    groups = defaultdict(list)
+    for row in records:
+        key = (row["pmid"], row["exposure"], row["peptide"], row["hla"])
+        groups[key].append(row)
+    deduped = []
+    conflicts = Counter()
+    for key, members in groups.items():
+        outcomes = {r["outcome"] for r in members}
+        if len(outcomes) != 1:
+            conflicts[(key[0], key[1])] += 1
+            continue
+        row = dict(members[0])
+        row["n_assay_rows"] = len(members)
+        deduped.append(row)
+    return deduped, conflicts
+
+
 def sample_protein_peptides(path: Path, per_category: int, seed: int):
-    """Reservoir-sample one 8–14mer per source protein and organism category."""
-    rng = np.random.default_rng(seed)
+    """Reservoir-sample one 8-14mer per source protein and category."""
+    # Independent streams keep, for example, a broader viral exclusion from
+    # changing which human proteins and windows enter the reference sample.
+    rngs = {
+        cat: np.random.default_rng(np.random.SeedSequence([seed, i]))
+        for i, cat in enumerate(CATEGORIES)
+    }
     reservoirs: dict[str, list[str]] = {cat: [] for cat in CATEGORIES}
     seen = Counter()
     held_out = Counter()
@@ -124,8 +164,9 @@ def sample_protein_peptides(path: Path, per_category: int, seed: int):
             if cat not in reservoirs or len(protein) < MIN_LENGTH:
                 continue
             if cat == "viruses" and HELD_OUT_VIRUS.search(row["identifier"]):
-                held_out["labelled_sars_or_coronavirus_proteins"] += 1
+                held_out["sars_or_coronavirus_mnemonic_proteins"] += 1
                 continue
+            rng = rngs[cat]
             length = int(rng.integers(MIN_LENGTH, MAX_LENGTH + 1))
             if len(protein) < length:
                 continue
@@ -149,100 +190,460 @@ def sample_protein_peptides(path: Path, per_category: int, seed: int):
     return peptides, categories, dict(seen), dict(held_out)
 
 
-def vectorize(peptides: list[str]) -> np.ndarray:
-    """Encode whole peptides, with an explicit central-residue TCR-view branch.
+def tcr_face(peptide: str) -> str:
+    """Return a conservative central-face heuristic (P3 through P-1)."""
+    return peptide[2:-1]
 
-    The central-residue branch is a heuristic for class-I exposed positions;
-    it does not claim actual TCR contacts for any particular peptide/HLA.
-    """
-    width = MAX_LENGTH * len(AA) + len(AA) + (MAX_LENGTH - MIN_LENGTH + 1)
+
+def vectorize(peptides: list[str], view: str = "whole") -> np.ndarray:
+    """Encode a whole peptide or anchor-masked, length-normalized TCR face."""
+    length_width = MAX_LENGTH - MIN_LENGTH + 1
+    if view == "whole":
+        width = MAX_LENGTH * len(AA) + length_width
+        result = np.zeros((len(peptides), width), dtype=np.float32)
+        for i, peptide in enumerate(peptides):
+            for pos, aa in enumerate(peptide):
+                result[i, pos * len(AA) + AA_INDEX[aa]] = 1
+            result[i, MAX_LENGTH * len(AA) + len(peptide) - MIN_LENGTH] = 1
+        return result
+    if view != "tcr_face":
+        raise ValueError(f"Unknown peptide view: {view}")
+
+    # Normalize the P3..P-1 face into fixed slots so 8-14mers can share a
+    # compact representation without encoding the dominant P2/P-omega anchors.
+    slots = MAX_LENGTH - 3
+    width = slots * len(AA) + len(AA) + length_width
     result = np.zeros((len(peptides), width), dtype=np.float32)
     for i, peptide in enumerate(peptides):
-        for pos, aa in enumerate(peptide):
-            result[i, pos * len(AA) + AA_INDEX[aa]] = 1
-        central = peptide[2:-1]
-        for aa in central:
-            result[i, MAX_LENGTH * len(AA) + AA_INDEX[aa]] += 1 / len(central)
-        result[i, MAX_LENGTH * len(AA) + len(AA) + len(peptide) - MIN_LENGTH] = 1
+        face = tcr_face(peptide)
+        for pos, aa in enumerate(face):
+            slot = round(pos * (slots - 1) / max(len(face) - 1, 1))
+            result[i, slot * len(AA) + AA_INDEX[aa]] = 1
+            result[i, slots * len(AA) + AA_INDEX[aa]] += 1 / len(face)
+        result[i, slots * len(AA) + len(AA) + len(peptide) - MIN_LENGTH] = 1
     return result
 
 
-def fit_exploratory_model(peptides: list[str], categories: list[str], seed: int):
-    """Keep the SwissProt category-supervised small-MLP training pattern."""
-    model = MLPClassifier(
-        hidden_layer_sizes=(32, 16), alpha=0.01,
-        batch_size=256, max_iter=35, early_stopping=True,
-        n_iter_no_change=6, random_state=seed,
+def _model(family: str, seed: int):
+    if family == "logistic":
+        return make_pipeline(
+            StandardScaler(),
+            LogisticRegression(C=0.25, max_iter=500, random_state=seed),
+        )
+    if family == "mlp":
+        return make_pipeline(
+            StandardScaler(),
+            MLPClassifier(
+                hidden_layer_sizes=(16, 8), alpha=0.05,
+                batch_size=256, max_iter=45, early_stopping=True,
+                n_iter_no_change=6, random_state=seed,
+            ),
+        )
+    if family == "extra_trees":
+        return ExtraTreesClassifier(
+            n_estimators=128, max_depth=8, min_samples_leaf=20,
+            max_features="sqrt", n_jobs=-1, random_state=seed,
+        )
+    raise ValueError(f"Unknown model family: {family}")
+
+
+def _positive_probability(model, matrix: np.ndarray) -> np.ndarray:
+    classes = list(model.classes_)
+    return model.predict_proba(matrix)[:, classes.index(1)]
+
+
+def _binary_target(categories: np.ndarray, target: str):
+    if target == "pathogen_vs_self":
+        keep = np.array([
+            cat in PATHOGEN_CATEGORIES or cat in SELF_CATEGORIES
+            for cat in categories
+        ])
+        labels = np.array([int(cat in PATHOGEN_CATEGORIES) for cat in categories])
+    elif target == "virus_vs_human":
+        keep = np.isin(categories, ["viruses", "human"])
+        labels = np.array([int(cat == "viruses") for cat in categories])
+    else:
+        raise ValueError(f"Unknown binary target: {target}")
+    return keep, labels
+
+
+def deterministic_human_reference(swissprot_path: Path) -> list[str]:
+    """Choose one stable window per human protein and supported length."""
+    result = []
+    with swissprot_path.open(newline="") as stream:
+        for row in csv.DictReader(stream):
+            if row["category"] != "human":
+                continue
+            protein = row["sequence"]
+            for length in range(MIN_LENGTH, MAX_LENGTH + 1):
+                if len(protein) < length:
+                    continue
+                digest = hashlib.sha256(
+                    f"{row['identifier']}|{length}".encode()).digest()
+                start = int.from_bytes(digest[:8], "big") % (
+                    len(protein) - length + 1)
+                peptide = protein[start:start + length]
+                if all(aa in AA_INDEX for aa in peptide):
+                    result.append(peptide)
+    return result
+
+
+def _nearest_human_blosum(
+        human_reference_peptides: list[str],
+        query_peptides: list[str]) -> np.ndarray:
+    """Minimum BLOSUM62 distance from each TCR face to a human face."""
+    human_by_length = defaultdict(list)
+    for peptide in human_reference_peptides:
+        human_by_length[len(peptide)].append(tcr_face(peptide))
+    result = []
+    for peptide in query_peptides:
+        face = tcr_face(peptide)
+        self_similarity = sum(blosum62_dict[aa][aa] for aa in face)
+        max_similarity = max(
+            sum(blosum62_dict[a][b] for a, b in zip(face, reference))
+            for reference in human_by_length[len(peptide)]
+        )
+        result.append((self_similarity - max_similarity) / len(face))
+    return np.asarray(result, dtype=float)
+
+
+def _residue_log_odds(
+        training_peptides: list[str], training_categories: list[str],
+        query_peptides: list[str]) -> np.ndarray:
+    """Mean virus-versus-human residue log odds over the TCR face."""
+    counts = {cat: np.ones(len(AA), dtype=float) for cat in ("human", "viruses")}
+    for peptide, category in zip(training_peptides, training_categories):
+        if category in counts:
+            for aa in tcr_face(peptide):
+                counts[category][AA_INDEX[aa]] += 1
+    frequencies = {cat: values / values.sum() for cat, values in counts.items()}
+    log_ratio = np.log(frequencies["viruses"] / frequencies["human"])
+    return np.asarray([
+        np.mean([log_ratio[AA_INDEX[aa]] for aa in tcr_face(peptide)])
+        for peptide in query_peptides
+    ])
+
+
+def human_tcr_kmer_surprisal(
+        swissprot_path: Path, query_peptides: list[str],
+        k_values: tuple[int, ...] = (3, 4)) -> dict[str, np.ndarray]:
+    """Score TCR faces by smoothed k-mer surprisal in all human proteins."""
+    counts = {k: Counter() for k in k_values}
+    totals = Counter()
+    canonical_amino_acids = frozenset(AA)
+    with swissprot_path.open(newline="") as stream:
+        for row in csv.DictReader(stream):
+            if row["category"] != "human":
+                continue
+            sequence = row["sequence"]
+            is_canonical = set(sequence) <= canonical_amino_acids
+            for k in k_values:
+                n_kmers = max(len(sequence) - k + 1, 0)
+                kmers = [
+                    sequence[i:i + k]
+                    for i in range(n_kmers)
+                ]
+                canonical = (
+                    kmers if is_canonical else
+                    [kmer for kmer in kmers
+                     if set(kmer) <= canonical_amino_acids]
+                )
+                counts[k].update(canonical)
+                totals[k] += len(canonical)
+
+    result = {}
+    pseudocount = 0.5
+    for k in k_values:
+        denominator = totals[k] + pseudocount * (len(AA) ** k)
+        values = []
+        for peptide in query_peptides:
+            face = tcr_face(peptide)
+            kmers = [face[i:i + k] for i in range(len(face) - k + 1)]
+            values.append(float(np.mean([
+                -np.log((counts[k][kmer] + pseudocount) / denominator)
+                for kmer in kmers
+            ])))
+        result[f"human_tcr_{k}mer_surprisal"] = np.asarray(values)
+    return result
+
+
+def train_foreignness_models(
+        peptides: list[str], categories: list[str], query_peptides: list[str],
+        seed: int):
+    """Train compact discriminative and reference-distance definitions."""
+    peptides_array = np.asarray(peptides)
+    categories_array = np.asarray(categories)
+    all_indices = np.arange(len(peptides))
+    train_indices, validation_indices = train_test_split(
+        all_indices, test_size=0.2, stratify=categories_array,
+        random_state=seed,
     )
-    model.fit(vectorize(peptides), categories)
-    return model
+    feature_cache = {}
+
+    def features(view: str, which: str):
+        key = (view, which)
+        if key not in feature_cache:
+            source = peptides if which == "training" else query_peptides
+            feature_cache[key] = vectorize(source, view)
+        return feature_cache[key]
+
+    scores = {}
+    metadata = []
+
+    # Preserve the original multiclass training pattern as one comparison.
+    multiclass = _model("mlp", seed)
+    whole = features("whole", "training")
+    multiclass.fit(whole[train_indices], categories_array[train_indices])
+    validation_prediction = multiclass.predict(whole[validation_indices])
+    metadata.append({
+        "model": "multiclass_mlp_whole",
+        "family": "MLPClassifier(16,8)",
+        "target": "ten SwissProt organism categories",
+        "view": "whole peptide including HLA anchors",
+        "n_train": len(train_indices),
+        "n_validation": len(validation_indices),
+        "validation_metric": "accuracy",
+        "validation_value": float(accuracy_score(
+            categories_array[validation_indices], validation_prediction)),
+    })
+    probabilities = multiclass.predict_proba(features("whole", "query"))
+    class_index = {cat: i for i, cat in enumerate(multiclass.classes_)}
+    pathogen = probabilities[:, [
+        class_index["bacteria"], class_index["viruses"]]].sum(axis=1)
+    selflike = probabilities[:, [
+        class_index["human"], class_index["mammals"],
+        class_index["rodents"]]].sum(axis=1)
+    human = probabilities[:, class_index["human"]]
+    virus = probabilities[:, class_index["viruses"]]
+    scores["multiclass_mlp_whole__pathogen_vs_self"] = (
+        pathogen / np.maximum(pathogen + selflike, 1e-12))
+    scores["multiclass_mlp_whole__one_minus_human"] = 1 - human
+    scores["multiclass_mlp_whole__virus_vs_human"] = (
+        virus / np.maximum(virus + human, 1e-12))
+
+    specifications = (
+        ("logistic_whole", "logistic", "whole", "pathogen_vs_self"),
+        ("logistic_tcr", "logistic", "tcr_face", "pathogen_vs_self"),
+        ("mlp_tcr", "mlp", "tcr_face", "pathogen_vs_self"),
+        ("extra_trees_tcr", "extra_trees", "tcr_face", "pathogen_vs_self"),
+        ("logistic_tcr_virus", "logistic", "tcr_face", "virus_vs_human"),
+    )
+    for name, family, view, target in specifications:
+        keep, labels = _binary_target(categories_array, target)
+        fit_indices = train_indices[keep[train_indices]]
+        eval_indices = validation_indices[keep[validation_indices]]
+        model = _model(family, seed)
+        matrix = features(view, "training")
+        model.fit(matrix[fit_indices], labels[fit_indices])
+        validation_scores = _positive_probability(model, matrix[eval_indices])
+        score_name = f"{name}__{target}"
+        scores[score_name] = _positive_probability(
+            model, features(view, "query"))
+        metadata.append({
+            "model": name,
+            "family": family,
+            "target": target,
+            "view": view,
+            "n_train": len(fit_indices),
+            "n_validation": len(eval_indices),
+            "validation_metric": "roc_auc",
+            "validation_value": float(roc_auc_score(
+                labels[eval_indices], validation_scores)),
+        })
+
+    scores["virus_human_residue_log_odds_tcr"] = _residue_log_odds(
+        list(peptides_array[train_indices]),
+        list(categories_array[train_indices]), query_peptides)
+    return scores, metadata
 
 
-def foreignness_scores(model, peptides: list[str]) -> dict[str, float]:
-    unique = list(dict.fromkeys(peptides))
-    probs = model.predict_proba(vectorize(unique))
-    index = {cat: i for i, cat in enumerate(model.classes_)}
-    pathogen = probs[:, [index["bacteria"], index["viruses"]]].max(axis=1)
-    self_prob = probs[:, [index["human"], index["mammals"], index["rodents"]]].max(axis=1)
-    score = pathogen / np.maximum(pathogen + self_prob, 1e-12)
-    return dict(zip(unique, map(float, score)))
+def add_presentation_predictions(rows: list[dict]):
+    """Add exact peptide/HLA MHCflurry scores, using no source flanks."""
+    import mhcflurry
+    from mhcflurry import Class1PresentationPredictor
+
+    predictor = Class1PresentationPredictor.load()
+    peptides = [row["peptide"] for row in rows]
+    hlas = [row["hla"] for row in rows]
+    predictions = predictor.predict(
+        peptides=peptides,
+        alleles={hla: [hla] for hla in sorted(set(hlas))},
+        sample_names=hlas,
+        include_affinity_percentile=True,
+        verbose=0,
+    ).sort_values("peptide_num")
+    if len(predictions) != len(rows):
+        raise RuntimeError("MHCflurry did not return one prediction per assay")
+    columns = (
+        "affinity", "affinity_percentile", "processing_score",
+        "presentation_score", "presentation_percentile",
+    )
+    for row, (_, prediction) in zip(rows, predictions.iterrows()):
+        for column in columns:
+            row[f"mhcflurry_{column}"] = float(prediction[column])
+    return {
+        "mhcflurry_version": mhcflurry.__version__,
+        "model_provenance": predictor.provenance_string,
+        "uses_source_flanks": False,
+        "explanation": (
+            "Presentation combines exact-HLA affinity with peptide-only "
+            "processing because reliable source-protein coordinates/flanks "
+            "are unavailable in the selected IEDB export."
+        ),
+    }
 
 
-def within_hla_auc(rows: list[dict]) -> tuple[float | None, int]:
-    """Pair positive and negative assay scores only within the same HLA."""
+def within_hla_auc(
+        rows: list[dict], score_column: str = "foreignness",
+        presentation_caliper: float | None = None) -> tuple[float | None, int]:
+    """Pair outcomes within HLA and optionally within presentation percentile."""
     by_hla = defaultdict(list)
     for row in rows:
         by_hla[row["hla"]].append(row)
     wins = 0.0
     n_pairs = 0
     for members in by_hla.values():
-        positive = [r["foreignness"] for r in members if r["outcome"] == "Positive"]
-        negative = [r["foreignness"] for r in members if r["outcome"] == "Negative"]
+        positive = [r for r in members if r["outcome"] == "Positive"]
+        negative = [r for r in members if r["outcome"] == "Negative"]
         for pos in positive:
             for neg in negative:
-                wins += float(pos > neg) + 0.5 * float(pos == neg)
+                if presentation_caliper is not None and abs(
+                    pos["mhcflurry_presentation_percentile"]
+                    - neg["mhcflurry_presentation_percentile"]
+                ) > presentation_caliper:
+                    continue
+                pos_score, neg_score = pos[score_column], neg[score_column]
+                wins += float(pos_score > neg_score) + 0.5 * float(
+                    pos_score == neg_score)
                 n_pairs += 1
     return (wins / n_pairs if n_pairs else None), n_pairs
 
 
-def summarize(records: list[dict], scores: dict[str, float]):
-    """Deduplicate assays by study/exposure/peptide/HLA, excluding conflicts."""
-    groups = defaultdict(list)
-    for row in records:
-        key = (row["pmid"], row["exposure"], row["peptide"], row["hla"])
-        groups[key].append(row)
-    deduped = []
-    conflicts = Counter()
-    for key, members in groups.items():
-        outcomes = {r["outcome"] for r in members}
-        if len(outcomes) != 1:
-            conflicts[(key[0], key[1])] += 1
-            continue
-        row = dict(members[0])
-        row["n_assay_rows"] = len(members)
-        row["foreignness"] = scores[row["peptide"]]
-        deduped.append(row)
-    results = []
+def _subgroups(rows: list[dict]):
     for pmid in PMIDS:
-        for exposure in sorted({r["exposure"] for r in deduped if r["pmid"] == pmid}):
-            subset = [r for r in deduped if r["pmid"] == pmid and r["exposure"] == exposure]
-            pos = [r["foreignness"] for r in subset if r["outcome"] == "Positive"]
-            neg = [r["foreignness"] for r in subset if r["outcome"] == "Negative"]
-            auc = None
-            if pos and neg:
-                y = [int(r["outcome"] == "Positive") for r in subset]
-                auc = float(roc_auc_score(y, [r["foreignness"] for r in subset]))
-            matched_auc, n_hla_pairs = within_hla_auc(subset)
+        exposures = sorted({r["exposure"] for r in rows if r["pmid"] == pmid})
+        for exposure in exposures:
+            yield pmid, exposure, [
+                r for r in rows
+                if r["pmid"] == pmid and r["exposure"] == exposure
+            ]
+
+
+def summarize_scores(
+        rows: list[dict], score_names: list[str], conflicts: Counter):
+    """Report unadjusted, within-HLA, and presentation-matched enrichment."""
+    results = []
+    for pmid, exposure, subset in _subgroups(rows):
+        y = np.asarray([int(r["outcome"] == "Positive") for r in subset])
+        n_positive = int(y.sum())
+        n_negative = int(len(y) - y.sum())
+        for score_name in score_names:
+            values = np.asarray([r[score_name] for r in subset], dtype=float)
+            auc = float(roc_auc_score(y, values)) if len(set(y)) == 2 else None
+            within_auc, n_hla_pairs = within_hla_auc(subset, score_name)
+            matched_auc, n_matched_pairs = within_hla_auc(
+                subset, score_name, PRESENTATION_CALIPER)
+            sensitivity = {}
+            for caliper in PRESENTATION_CALIPER_SENSITIVITY:
+                sensitivity_auc, sensitivity_pairs = within_hla_auc(
+                    subset, score_name, caliper)
+                sensitivity[str(caliper)] = {
+                    "auc": sensitivity_auc,
+                    "n_pairs": sensitivity_pairs,
+                }
             results.append({
-                "pmid": pmid, "exposure": exposure, "n_positive": len(pos),
-                "n_negative": len(neg), "n_conflicted_groups": conflicts[(pmid, exposure)],
-                "mean_positive": float(np.mean(pos)) if pos else None,
-                "mean_negative": float(np.mean(neg)) if neg else None,
+                "pmid": pmid,
+                "exposure": exposure,
+                "score": score_name,
+                "n_positive": n_positive,
+                "n_negative": n_negative,
+                "n_conflicted_groups": conflicts[(pmid, exposure)],
+                "mean_positive": float(values[y == 1].mean()) if n_positive else None,
+                "mean_negative": float(values[y == 0].mean()) if n_negative else None,
                 "auc": auc,
-                "within_hla_auc": matched_auc,
-                "n_within_hla_positive_negative_pairs": n_hla_pairs,
+                "within_hla_auc": within_auc,
+                "n_within_hla_pairs": n_hla_pairs,
+                "presentation_matched_auc": matched_auc,
+                "n_presentation_matched_pairs": n_matched_pairs,
+                "presentation_caliper_sensitivity": sensitivity,
             })
-    return deduped, results
+    return results
+
+
+def _oof_logistic_probabilities(
+        matrix: np.ndarray, outcomes: np.ndarray, groups: np.ndarray,
+        splits: list[tuple[np.ndarray, np.ndarray]], seed: int):
+    result = np.full(len(outcomes), np.nan)
+    last_feature_coefficients = []
+    for train, test in splits:
+        model = make_pipeline(
+            StandardScaler(),
+            LogisticRegression(C=0.25, max_iter=500, random_state=seed),
+        )
+        model.fit(matrix[train], outcomes[train])
+        result[test] = _positive_probability(model, matrix[test])
+        last_feature_coefficients.append(float(model[-1].coef_[0, -1]))
+    if np.isnan(result).any():
+        raise RuntimeError("Cross-validation did not score every assay")
+    return result, last_feature_coefficients
+
+
+def conditional_response_models(
+        rows: list[dict], score_names: list[str], seed: int):
+    """Test incremental signal over presentation + HLA with peptide-grouped CV."""
+    results = []
+    for pmid, exposure, subset in _subgroups(rows):
+        outcomes = np.asarray([
+            int(r["outcome"] == "Positive") for r in subset], dtype=int)
+        if outcomes.sum() < 10 or (1 - outcomes).sum() < 10:
+            continue
+        groups = np.asarray([r["peptide"] for r in subset])
+        hlas = sorted({r["hla"] for r in subset})
+        hla_index = {hla: i for i, hla in enumerate(hlas)}
+        hla_matrix = np.zeros((len(subset), len(hlas)), dtype=float)
+        for i, row in enumerate(subset):
+            hla_matrix[i, hla_index[row["hla"]]] = 1
+        presentation = np.asarray([
+            r["mhcflurry_presentation_score"] for r in subset], dtype=float)
+        presentation = np.log(
+            np.clip(presentation, 1e-6, 1 - 1e-6)
+            / np.clip(1 - presentation, 1e-6, 1 - 1e-6))[:, None]
+        baseline_matrix = np.hstack([presentation, hla_matrix])
+        splitter = StratifiedGroupKFold(
+            n_splits=5, shuffle=True, random_state=seed)
+        splits = list(splitter.split(baseline_matrix, outcomes, groups))
+        baseline_probability, _ = _oof_logistic_probabilities(
+            baseline_matrix, outcomes, groups, splits, seed)
+        baseline_auc = float(roc_auc_score(outcomes, baseline_probability))
+        baseline_log_loss = float(log_loss(outcomes, baseline_probability))
+        for score_name in score_names:
+            foreignness = np.asarray([
+                r[score_name] for r in subset], dtype=float)[:, None]
+            probability, coefficients = _oof_logistic_probabilities(
+                np.hstack([baseline_matrix, foreignness]), outcomes,
+                groups, splits, seed)
+            auc = float(roc_auc_score(outcomes, probability))
+            loss = float(log_loss(outcomes, probability))
+            results.append({
+                "pmid": pmid,
+                "exposure": exposure,
+                "score": score_name,
+                "n_assays": len(subset),
+                "n_unique_peptides": len(set(groups)),
+                "n_folds": len(splits),
+                "baseline": "MHCflurry presentation score + HLA fixed effects",
+                "baseline_auc": baseline_auc,
+                "baseline_log_loss": baseline_log_loss,
+                "augmented_auc": auc,
+                "delta_auc": auc - baseline_auc,
+                "augmented_log_loss": loss,
+                "delta_log_loss": loss - baseline_log_loss,
+                "mean_standardized_foreignness_coefficient": float(
+                    np.mean(coefficients)),
+                "n_positive_foreignness_coefficient_folds": int(
+                    np.sum(np.asarray(coefficients) > 0)),
+            })
+    return results
 
 
 def main() -> None:
@@ -256,6 +657,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.per_category < 20:
         parser.error("--per-category must be at least 20")
+
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
     records = []
     raw_counts = {}
@@ -263,34 +665,138 @@ def main() -> None:
         rows = fetch_iedb(pmid, cache)
         raw_counts[pmid] = len(rows)
         records.extend(prepare_assays(rows, pmid))
+    deduped, conflicts = deduplicate_assays(records)
+    presentation_metadata = add_presentation_predictions(deduped)
+
     peptides, categories, seen, held_out = sample_protein_peptides(
-        args.swissprot_sequences, args.per_category, args.seed,
-    )
-    model = fit_exploratory_model(peptides, categories, args.seed)
-    scores = foreignness_scores(model, [r["peptide"] for r in records])
-    deduped, results = summarize(records, scores)
+        args.swissprot_sequences, args.per_category, args.seed)
+    unique_assay_peptides = list(dict.fromkeys(r["peptide"] for r in deduped))
+    assay_peptide_set = set(unique_assay_peptides)
+    exact_overlap = [
+        (peptide, category) for peptide, category in zip(peptides, categories)
+        if peptide in assay_peptide_set
+    ]
+    if exact_overlap:
+        retained = [
+            (peptide, category)
+            for peptide, category in zip(peptides, categories)
+            if peptide not in assay_peptide_set
+        ]
+        peptides = [peptide for peptide, _ in retained]
+        categories = [category for _, category in retained]
+    score_arrays, model_metadata = train_foreignness_models(
+        peptides, categories, unique_assay_peptides, args.seed)
+    human_reference = deterministic_human_reference(args.swissprot_sequences)
+    score_arrays["nearest_human_blosum62_tcr"] = _nearest_human_blosum(
+        human_reference, unique_assay_peptides)
+    score_arrays.update(human_tcr_kmer_surprisal(
+        args.swissprot_sequences, unique_assay_peptides))
+    peptide_index = {peptide: i for i, peptide in enumerate(unique_assay_peptides)}
+    score_names = list(score_arrays)
+    for row in deduped:
+        i = peptide_index[row["peptide"]]
+        for score_name, values in score_arrays.items():
+            row[score_name] = float(values[i])
+
+    # Presentation is a comparator, not a definition of foreignness.
+    comparator_names = ["mhcflurry_presentation_score"]
+    results = summarize_scores(
+        deduped, comparator_names + score_names, conflicts)
+    conditional_results = conditional_response_models(
+        deduped, score_names, args.seed)
+
     args.cache_root.mkdir(parents=True, exist_ok=True)
     with (args.cache_root / "scored-assays.csv").open("w", newline="") as out:
         writer = csv.DictWriter(out, fieldnames=list(deduped[0]))
         writer.writeheader()
         writer.writerows(deduped)
     report = {
-        "status": "exploratory, unvalidated model; not a released predictor",
+        "status": "exploratory hypothesis generation; not a released predictor",
         "training_source": str(args.swissprot_sequences),
         "training_source_sha256": file_sha256(args.swissprot_sequences),
         "training_counts": dict(Counter(categories)),
         "eligible_proteins_by_category": seen,
         "held_out_virus_proteins": held_out,
-        "model": "whole-peptide one-hot + central composition; MLPClassifier(32,16)",
-        "model_validation_score": float(model.best_validation_score_),
-        "n_epochs": int(model.n_iter_),
+        "exact_assay_peptides_removed_from_training": len(exact_overlap),
+        "deterministic_human_reference_peptides": len(human_reference),
+        "training_split": (
+            "80/20 stratified peptide split; one sampled peptide per source "
+            "protein; homologous proteins are not yet clustered"
+        ),
+        "tcr_face_definition": (
+            "P3 through the penultimate residue, excluding the common class-I "
+            "P2 and C-terminal anchors; length-normalized positional one-hot "
+            "plus composition and peptide length"
+        ),
+        "presentation_conditioning": {
+            **presentation_metadata,
+            "matched_pair_caliper_percentile_points": PRESENTATION_CALIPER,
+            "caliper_sensitivity_percentile_points": list(
+                PRESENTATION_CALIPER_SENSITIVITY),
+            "matched_pair_definition": (
+                "positive/negative assay pairs with identical HLA and absolute "
+                "MHCflurry presentation-percentile difference <= caliper"
+            ),
+            "conditional_model": (
+                "five-fold peptide-grouped logistic regression; baseline is "
+                "MHCflurry presentation score plus HLA fixed effects"
+            ),
+        },
+        "models": model_metadata,
+        "score_definitions": {
+            "multiclass_mlp_whole__pathogen_vs_self": (
+                "sum P(bacteria,viruses) divided by that sum plus "
+                "P(human,mammals,rodents)"
+            ),
+            "multiclass_mlp_whole__one_minus_human": "1 - P(human)",
+            "multiclass_mlp_whole__virus_vs_human": (
+                "P(viruses) / [P(viruses) + P(human)]"
+            ),
+            "logistic_whole__pathogen_vs_self": (
+                "binary pathogen-versus-selflike probability, whole peptide"
+            ),
+            "logistic_tcr__pathogen_vs_self": (
+                "binary pathogen-versus-selflike probability, TCR face"
+            ),
+            "mlp_tcr__pathogen_vs_self": (
+                "small nonlinear pathogen-versus-selflike probability, TCR face"
+            ),
+            "extra_trees_tcr__pathogen_vs_self": (
+                "depth/leaf-constrained tree ensemble probability, TCR face"
+            ),
+            "logistic_tcr_virus__virus_vs_human": (
+                "binary virus-versus-human probability, TCR face"
+            ),
+            "nearest_human_blosum62_tcr": (
+                "minimum normalized BLOSUM62 distance to a length-matched "
+                "TCR face; reference has one deterministic window of every "
+                "supported length per human SwissProt protein"
+            ),
+            "virus_human_residue_log_odds_tcr": (
+                "mean smoothed virus-versus-human amino-acid log odds over "
+                "the TCR face"
+            ),
+            "human_tcr_3mer_surprisal": (
+                "mean smoothed 3-mer surprisal of the TCR face under all "
+                "human SwissProt proteins"
+            ),
+            "human_tcr_4mer_surprisal": (
+                "mean smoothed 4-mer surprisal of the TCR face under all "
+                "human SwissProt proteins"
+            ),
+            "mhcflurry_presentation_score": (
+                "positive-control comparator; not foreignness"
+            ),
+        },
         "seed": args.seed,
         "raw_iedb_rows": raw_counts,
         "n_eligible_assay_rows": len(records),
         "n_deduplicated_assays": len(deduped),
         "results": results,
+        "conditional_cv_results": conditional_results,
     }
-    (args.cache_root / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+    (args.cache_root / "report.json").write_text(
+        json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
 
 
