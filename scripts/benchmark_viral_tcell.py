@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Compare foreignness definitions on HLA-resolved viral T-cell assays.
 
-This is a hypothesis-generation benchmark, not a released WEIRDO predictor.
-Foreignness models are trained only on SwissProt organism labels. T-cell assay
-outcomes are used only for evaluation and for cross-validated conditional
-response models. SARS/coronavirus-labelled SwissProt proteins are held out.
+The discovery half of this script is hypothesis generation, not a released
+WEIRDO predictor. Foreignness models are trained only on SwissProt organism
+labels; T-cell assay outcomes are used only for evaluation and for
+cross-validated conditional response models. Coronavirus- and
+flavivirus-labelled SwissProt proteins are held out of training.
+
+The validation half tests one pre-registered score, direction, comparison and
+caliper (see ``PRIMARY_VALIDATION_*`` below) in cohorts that contributed
+nothing to the discovery analysis.
 """
 
 from __future__ import annotations
@@ -32,7 +37,77 @@ from weirdo.blosum import blosum62_dict
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PMIDS = ("36254196", "35484232", "33521695")
+
+# Cohorts, not raw PMIDs, are the unit of analysis: the two yellow fever
+# papers share one peptide panel and one laboratory, so they are merged and
+# deduplicated instead of being counted as independent replications.
+COHORTS = (
+    {
+        "cohort": "36254196",
+        "pmids": ("36254196",),
+        "role": "discovery",
+        "description": (
+            "SARS-CoV-2 direct ex-vivo tetramer screen in convalescent donors"
+        ),
+        "training_holds_out_source_virus_family": True,
+    },
+    {
+        "cohort": "35484232",
+        "pmids": ("35484232",),
+        "role": "discovery",
+        "description": (
+            "SARS-CoV-2 IFN-gamma responses after short-term restimulation in "
+            "infected and mRNA-vaccinated donors"
+        ),
+        "training_holds_out_source_virus_family": True,
+    },
+    {
+        "cohort": "33521695",
+        "pmids": ("33521695",),
+        "role": "discovery",
+        "description": (
+            "SARS-CoV-2 direct ex-vivo convalescent responses; positives only"
+        ),
+        "training_holds_out_source_virus_family": True,
+    },
+    {
+        "cohort": "yellow_fever_17d",
+        "pmids": ("28386132", "32983097"),
+        "role": "validation",
+        "description": (
+            "Yellow fever 17D direct ex-vivo multimer screens of predicted "
+            "binders in vaccinees; one shared panel from one laboratory"
+        ),
+        "training_holds_out_source_virus_family": True,
+    },
+    {
+        "cohort": "multivirus_concise_set",
+        "pmids": ("38608022",),
+        "role": "validation",
+        "description": (
+            "Twelve-virus pMHC binding and reactivity panel in unimmunized "
+            "healthy donors after short-term restimulation"
+        ),
+        # This paper reports two readouts per peptide/HLA pair: whether the
+        # pMHC multimer stains (qualitative binding, positive for 928 of 929
+        # pairs) and whether T cells activate. Only activation is a T-cell
+        # response, so the binding rows are excluded instead of being
+        # collapsed against it as contradictory outcomes.
+        "assay_methods": ("biological activity",),
+        "training_holds_out_source_virus_family": False,
+    },
+)
+COHORT_BY_PMID = {
+    pmid: cohort["cohort"] for cohort in COHORTS for pmid in cohort["pmids"]}
+ASSAY_METHODS_BY_COHORT = {
+    cohort["cohort"]: cohort.get("assay_methods") for cohort in COHORTS}
+ROLE_BY_COHORT = {cohort["cohort"]: cohort["role"] for cohort in COHORTS}
+DISCOVERY_COHORTS = tuple(
+    c["cohort"] for c in COHORTS if c["role"] == "discovery")
+VALIDATION_COHORTS = tuple(
+    c["cohort"] for c in COHORTS if c["role"] == "validation")
+PMIDS = tuple(COHORT_BY_PMID)
+
 AA = "ACDEFGHIKLMNPQRSTVWY"
 AA_INDEX = {aa: i for i, aa in enumerate(AA)}
 CATEGORIES = (
@@ -42,14 +117,41 @@ CATEGORIES = (
 SELF_CATEGORIES = frozenset(("human", "mammals", "rodents"))
 PATHOGEN_CATEGORIES = frozenset(("bacteria", "viruses"))
 HLA_I = re.compile(r"HLA-[ABC]\*\d{2}:\d{2}$")
+POSITIVE_MEASUREMENTS = frozenset((
+    "Positive", "Positive-High", "Positive-Intermediate", "Positive-Low"))
 # SwissProt coronavirus organism mnemonics include ``_CV...`` (for example,
 # ``SPIKE_CVH22``) plus named aliases such as MERS, PEDV, FIPV, and IBV. The
 # broad holdout prevents training on obvious coronavirus family members.
-HELD_OUT_VIRUS = re.compile(
-    r"SARS|MERS|COV|CORO|_CV|PEDV|FIPV|IBV", re.IGNORECASE)
+HELD_OUT_VIRUS_FAMILIES = {
+    "coronavirus": re.compile(
+        r"SARS|MERS|COV|CORO|_CV|PEDV|FIPV|IBV", re.IGNORECASE),
+    # Flaviviridae mnemonics, so the yellow fever validation cohort has no
+    # family-level relatives in the viral training sample. All of these are
+    # polyprotein entries; ``_GBV`` and ``_LIV`` are anchored because the bare
+    # strings also occur inside unrelated mnemonics.
+    "flavivirus": re.compile(
+        r"_YEFV|_DEN[1-4]|_DENV|_WNV|_ZIKV|_JAEV|_TBEV|_POWV|_MVEV|_USUV"
+        r"|_ILHV|_ROCV|_KOKV|_KUNJ|_KFDV|_OHFV|_ALKV|_BANV|_WSLV|_LANV"
+        r"|_LIV|_FLAV|_HCV|_GBV|_BVDV|_CSFV|_PEST", re.IGNORECASE),
+}
 MIN_LENGTH, MAX_LENGTH = 8, 14
 PRESENTATION_CALIPER = 0.1  # MHCflurry percentile-rank points.
 PRESENTATION_CALIPER_SENSITIVITY = (0.02, 0.05, 0.1, 0.25)
+
+# Pre-registration. The discovery analysis committed in 3c40e4d nominated the
+# anchor-masked nearest-human BLOSUM62 distance as the single least weak lead,
+# with higher distance predicting a T-cell response, and fixed the 0.1
+# percentile-point caliper before any validation cohort was fetched or scored.
+# Nothing below may be re-chosen after the validation numbers are seen.
+PRIMARY_VALIDATION_SCORE = "nearest_human_blosum62_tcr"
+PRIMARY_VALIDATION_DIRECTION = "higher score predicts Positive"
+PRIMARY_VALIDATION_COMPARISONS = ("within_hla_auc", "presentation_matched_auc")
+# Reported alongside the primary test, not used for the pass/fail decision.
+# Both also use human proteins only, so no viral training data can leak.
+SECONDARY_VALIDATION_SCORES = (
+    "human_tcr_3mer_surprisal", "human_tcr_4mer_surprisal")
+VALIDATION_ALPHA = 0.05
+N_PERMUTATIONS = 2000
 
 
 def file_sha256(path: Path) -> str:
@@ -87,10 +189,24 @@ def fetch_iedb(pmid: str, cache: Cache) -> list[dict]:
 def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
     """Retain exact-HLA class-I peptide assay outcomes and their provenance."""
     result = []
+    cohort = COHORT_BY_PMID.get(pmid, pmid)
+    allowed_methods = ASSAY_METHODS_BY_COHORT.get(cohort)
     for row in rows:
+        if (allowed_methods is not None
+                and row.get("assay__method") not in allowed_methods):
+            continue
         peptide = row.get("epitope__name")
         hla = row.get("mhc_restriction__name")
-        outcome = row.get("assay__qualitative_measurement")
+        measurement = row.get("assay__qualitative_measurement")
+        # IEDB grades tetramer and ICS positives; all grades are one Positive
+        # class here. The discovery papers report only ungraded outcomes, so
+        # this widening affects the validation cohorts alone.
+        if measurement in POSITIVE_MEASUREMENTS:
+            outcome = "Positive"
+        elif measurement == "Negative":
+            outcome = "Negative"
+        else:
+            continue
         if (
             row.get("host__name") != "Homo sapiens (human)"
             or row.get("mhc_restriction__class") != "I"
@@ -98,7 +214,6 @@ def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
             or not isinstance(peptide, str)
             or not MIN_LENGTH <= len(peptide) <= MAX_LENGTH
             or any(aa not in AA_INDEX for aa in peptide)
-            or outcome not in ("Positive", "Negative")
         ):
             continue
         first = row.get("first_in_vivo_process__process_type")
@@ -109,14 +224,23 @@ def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
             exposure = "infected_then_vaccinated"
         elif first == "Occurrence of infectious disease":
             exposure = "infected"
+        elif first == "Administration in vivo":
+            # Live attenuated vaccine administration in the yellow fever
+            # cohort; the same stratum as its prophylactic-vaccination rows.
+            exposure = "vaccinated"
+        elif first == "No immunization":
+            exposure = "natural_exposure"
         else:
             exposure = "other"
         result.append({
+            "cohort": cohort,
+            "role": ROLE_BY_COHORT.get(cohort, "discovery"),
             "pmid": pmid,
             "assay_id": row.get("assay_id"),
             "peptide": peptide,
             "hla": hla,
             "outcome": outcome,
+            "qualitative_measurement": measurement,
             "exposure": exposure,
             "assay_method": row.get("assay__method"),
             "culture_condition": row.get("effector_cell__culture_condition"),
@@ -128,10 +252,10 @@ def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
 
 
 def deduplicate_assays(records: list[dict]) -> tuple[list[dict], Counter]:
-    """Collapse repeat assays and exclude conflicting outcomes."""
+    """Collapse repeat assays within a cohort and exclude conflicting outcomes."""
     groups = defaultdict(list)
     for row in records:
-        key = (row["pmid"], row["exposure"], row["peptide"], row["hla"])
+        key = (row["cohort"], row["exposure"], row["peptide"], row["hla"])
         groups[key].append(row)
     deduped = []
     conflicts = Counter()
@@ -142,6 +266,8 @@ def deduplicate_assays(records: list[dict]) -> tuple[list[dict], Counter]:
             continue
         row = dict(members[0])
         row["n_assay_rows"] = len(members)
+        row["contributing_pmids"] = "|".join(
+            sorted({r["pmid"] for r in members}))
         deduped.append(row)
     return deduped, conflicts
 
@@ -163,9 +289,13 @@ def sample_protein_peptides(path: Path, per_category: int, seed: int):
             protein = row["sequence"]
             if cat not in reservoirs or len(protein) < MIN_LENGTH:
                 continue
-            if cat == "viruses" and HELD_OUT_VIRUS.search(row["identifier"]):
-                held_out["sars_or_coronavirus_mnemonic_proteins"] += 1
-                continue
+            if cat == "viruses":
+                family = next((
+                    name for name, pattern in HELD_OUT_VIRUS_FAMILIES.items()
+                    if pattern.search(row["identifier"])), None)
+                if family is not None:
+                    held_out[f"{family}_mnemonic_proteins"] += 1
+                    continue
             rng = rngs[cat]
             length = int(rng.integers(MIN_LENGTH, MAX_LENGTH + 1))
             if len(protein) < length:
@@ -291,19 +421,33 @@ def deterministic_human_reference(swissprot_path: Path) -> list[str]:
 def _nearest_human_blosum(
         human_reference_peptides: list[str],
         query_peptides: list[str]) -> np.ndarray:
-    """Minimum BLOSUM62 distance from each TCR face to a human face."""
-    human_by_length = defaultdict(list)
+    """Minimum BLOSUM62 distance from each TCR face to a human face.
+
+    BLOSUM62 scores are small integers, so the float32 position sums below are
+    exact and reproduce the equivalent pure-Python comparison value for value.
+    """
+    substitution = np.asarray(
+        [[blosum62_dict[a][b] for b in AA] for a in AA], dtype=np.float32)
+    reference_by_length = defaultdict(list)
     for peptide in human_reference_peptides:
-        human_by_length[len(peptide)].append(tcr_face(peptide))
+        face = tcr_face(peptide)
+        reference_by_length[len(face)].append([AA_INDEX[aa] for aa in face])
+    encoded = {
+        length: np.asarray(faces, dtype=np.int16)
+        for length, faces in reference_by_length.items()
+    }
     result = []
     for peptide in query_peptides:
         face = tcr_face(peptide)
+        reference = encoded.get(len(face))
+        if reference is None:
+            raise RuntimeError(
+                f"No human reference face of length {len(face)} for {peptide}")
+        similarity = np.zeros(len(reference), dtype=np.float32)
+        for position, aa in enumerate(face):
+            similarity += substitution[AA_INDEX[aa]][reference[:, position]]
         self_similarity = sum(blosum62_dict[aa][aa] for aa in face)
-        max_similarity = max(
-            sum(blosum62_dict[a][b] for a, b in zip(face, reference))
-            for reference in human_by_length[len(peptide)]
-        )
-        result.append((self_similarity - max_similarity) / len(face))
+        result.append((self_similarity - float(similarity.max())) / len(face))
     return np.asarray(result, dtype=float)
 
 
@@ -495,11 +639,12 @@ def add_presentation_predictions(rows: list[dict]):
 
 def within_hla_auc(
         rows: list[dict], score_column: str = "foreignness",
-        presentation_caliper: float | None = None) -> tuple[float | None, int]:
-    """Pair outcomes within HLA and optionally within presentation percentile."""
+        presentation_caliper: float | None = None,
+        group_fields: tuple[str, ...] = ("hla",)) -> tuple[float | None, int]:
+    """Pair outcomes within a stratum and optionally within presentation percentile."""
     by_hla = defaultdict(list)
     for row in rows:
-        by_hla[row["hla"]].append(row)
+        by_hla[tuple(row[field] for field in group_fields)].append(row)
     wins = 0.0
     n_pairs = 0
     for members in by_hla.values():
@@ -519,21 +664,94 @@ def within_hla_auc(
     return (wins / n_pairs if n_pairs else None), n_pairs
 
 
-def _subgroups(rows: list[dict]):
-    for pmid in PMIDS:
-        exposures = sorted({r["exposure"] for r in rows if r["pmid"] == pmid})
+def _pair_matrices(
+        members: list[dict], score_column: str, caliper: float | None):
+    """Win and caliper-eligibility matrices over all ordered row pairs."""
+    scores = np.asarray([r[score_column] for r in members], dtype=float)
+    difference = scores[:, None] - scores[None, :]
+    wins = np.where(difference > 0, 1.0, np.where(difference == 0, 0.5, 0.0))
+    if caliper is None:
+        eligible = np.ones_like(wins)
+    else:
+        percentile = np.asarray([
+            r["mhcflurry_presentation_percentile"] for r in members],
+            dtype=float)
+        eligible = (
+            np.abs(percentile[:, None] - percentile[None, :]) <= caliper
+        ).astype(float)
+    return wins * eligible, eligible
+
+
+def within_hla_permutation_p_value(
+        rows: list[dict], score_column: str = PRIMARY_VALIDATION_SCORE,
+        presentation_caliper: float | None = None,
+        n_permutations: int = N_PERMUTATIONS, seed: int = 0,
+        chunk: int = 250, group_fields: tuple[str, ...] = ("hla",)):
+    """One-sided p-value for the pooled stratified AUC under label permutation.
+
+    Outcomes are shuffled within each stratum, which holds the per-stratum
+    positive/negative counts fixed and lets presentation matching re-form under
+    every permutation, exactly as it does for the observed labels.
+    """
+    strata = []
+    by_hla = defaultdict(list)
+    for row in rows:
+        by_hla[tuple(row[field] for field in group_fields)].append(row)
+    for members in by_hla.values():
+        labels = np.asarray(
+            [r["outcome"] == "Positive" for r in members], dtype=float)
+        if not labels.any() or labels.all():
+            continue
+        wins, eligible = _pair_matrices(
+            members, score_column, presentation_caliper)
+        strata.append((labels, wins, eligible))
+    observed_wins = sum(
+        float(labels @ wins @ (1 - labels)) for labels, wins, _ in strata)
+    observed_pairs = sum(
+        float(labels @ eligible @ (1 - labels))
+        for labels, _, eligible in strata)
+    if not observed_pairs:
+        return None, None, 0
+    observed = observed_wins / observed_pairs
+    rng = np.random.default_rng(seed)
+    extreme = 0
+    for start in range(0, n_permutations, chunk):
+        size = min(chunk, n_permutations - start)
+        permuted_wins = np.zeros(size)
+        permuted_pairs = np.zeros(size)
+        for labels, wins, eligible in strata:
+            draws = np.stack([rng.permutation(labels) for _ in range(size)])
+            complement = 1 - draws
+            permuted_wins += np.einsum(
+                "pi,pi->p", draws @ wins, complement)
+            permuted_pairs += np.einsum(
+                "pi,pi->p", draws @ eligible, complement)
+        statistic = np.where(
+            permuted_pairs > 0,
+            permuted_wins / np.maximum(permuted_pairs, 1), -np.inf)
+        extreme += int(np.sum(statistic >= observed - 1e-12))
+    p_value = (1 + extreme) / (1 + n_permutations)
+    return float(p_value), observed, int(observed_pairs)
+
+
+def _subgroups(rows: list[dict], cohorts: tuple[str, ...]):
+    for cohort in cohorts:
+        exposures = sorted({
+            r["exposure"] for r in rows if r["cohort"] == cohort})
         for exposure in exposures:
-            yield pmid, exposure, [
+            yield cohort, exposure, [
                 r for r in rows
-                if r["pmid"] == pmid and r["exposure"] == exposure
+                if r["cohort"] == cohort and r["exposure"] == exposure
             ]
 
 
 def summarize_scores(
-        rows: list[dict], score_names: list[str], conflicts: Counter):
+        rows: list[dict], score_names: list[str], conflicts: Counter,
+        cohorts: tuple[str, ...], p_value_scores: tuple[str, ...] = (),
+        n_permutations: int = N_PERMUTATIONS, seed: int = 0):
     """Report unadjusted, within-HLA, and presentation-matched enrichment."""
     results = []
-    for pmid, exposure, subset in _subgroups(rows):
+    for cohort, exposure, subset in _subgroups(rows, cohorts):
         y = np.asarray([int(r["outcome"] == "Positive") for r in subset])
         n_positive = int(y.sum())
         n_negative = int(len(y) - y.sum())
@@ -551,13 +769,38 @@ def summarize_scores(
                     "auc": sensitivity_auc,
                     "n_pairs": sensitivity_pairs,
                 }
+            # Pairing within HLA alone still compares peptides from different
+            # viruses, so a per-virus composition difference could masquerade
+            # as foreignness. This stratum adds the source organism.
+            source_auc, n_source_pairs = within_hla_auc(
+                subset, score_name, PRESENTATION_CALIPER,
+                group_fields=("hla", "source_organism"))
+            p_values = {
+                "within_hla_p_value": None,
+                "presentation_matched_p_value": None,
+                "within_hla_and_source_organism_p_value": None,
+            }
+            if score_name in p_value_scores:
+                p_values["within_hla_p_value"] = within_hla_permutation_p_value(
+                    subset, score_name, None, n_permutations, seed)[0]
+                p_values["presentation_matched_p_value"] = (
+                    within_hla_permutation_p_value(
+                        subset, score_name, PRESENTATION_CALIPER,
+                        n_permutations, seed)[0])
+                p_values["within_hla_and_source_organism_p_value"] = (
+                    within_hla_permutation_p_value(
+                        subset, score_name, PRESENTATION_CALIPER,
+                        n_permutations, seed,
+                        group_fields=("hla", "source_organism"))[0])
             results.append({
-                "pmid": pmid,
+                "cohort": cohort,
+                "role": ROLE_BY_COHORT.get(cohort, "discovery"),
+                "pmids": sorted({r["pmid"] for r in subset}),
                 "exposure": exposure,
                 "score": score_name,
                 "n_positive": n_positive,
                 "n_negative": n_negative,
-                "n_conflicted_groups": conflicts[(pmid, exposure)],
+                "n_conflicted_groups": conflicts[(cohort, exposure)],
                 "mean_positive": float(values[y == 1].mean()) if n_positive else None,
                 "mean_negative": float(values[y == 0].mean()) if n_negative else None,
                 "auc": auc,
@@ -565,7 +808,10 @@ def summarize_scores(
                 "n_within_hla_pairs": n_hla_pairs,
                 "presentation_matched_auc": matched_auc,
                 "n_presentation_matched_pairs": n_matched_pairs,
+                "within_hla_and_source_organism_matched_auc": source_auc,
+                "n_within_hla_and_source_organism_pairs": n_source_pairs,
                 "presentation_caliper_sensitivity": sensitivity,
+                **p_values,
             })
     return results
 
@@ -589,10 +835,11 @@ def _oof_logistic_probabilities(
 
 
 def conditional_response_models(
-        rows: list[dict], score_names: list[str], seed: int):
+        rows: list[dict], score_names: list[str], seed: int,
+        cohorts: tuple[str, ...]):
     """Test incremental signal over presentation + HLA with peptide-grouped CV."""
     results = []
-    for pmid, exposure, subset in _subgroups(rows):
+    for cohort, exposure, subset in _subgroups(rows, cohorts):
         outcomes = np.asarray([
             int(r["outcome"] == "Positive") for r in subset], dtype=int)
         if outcomes.sum() < 10 or (1 - outcomes).sum() < 10:
@@ -625,7 +872,8 @@ def conditional_response_models(
             auc = float(roc_auc_score(outcomes, probability))
             loss = float(log_loss(outcomes, probability))
             results.append({
-                "pmid": pmid,
+                "cohort": cohort,
+                "role": ROLE_BY_COHORT.get(cohort, "discovery"),
                 "exposure": exposure,
                 "score": score_name,
                 "n_assays": len(subset),
@@ -646,6 +894,58 @@ def conditional_response_models(
     return results
 
 
+def primary_validation_outcome(
+        validation_rows: list[dict], n_permutations: int, seed: int) -> dict:
+    """Evaluate the pre-registered score against the pre-registered rule."""
+    cohorts = []
+    for cohort in VALIDATION_COHORTS:
+        subset = [r for r in validation_rows if r["cohort"] == cohort]
+        if not subset:
+            continue
+        tests = {}
+        for comparison, caliper in (
+            ("within_hla_auc", None),
+            ("presentation_matched_auc", PRESENTATION_CALIPER),
+        ):
+            p_value, auc, n_pairs = within_hla_permutation_p_value(
+                subset, PRIMARY_VALIDATION_SCORE, caliper,
+                n_permutations, seed)
+            tests[comparison] = {
+                "auc": auc,
+                "n_pairs": n_pairs,
+                "p_value": p_value,
+                "passes": bool(
+                    auc is not None and auc > 0.5
+                    and p_value is not None and p_value < VALIDATION_ALPHA),
+            }
+        source_p, source_auc, source_pairs = within_hla_permutation_p_value(
+            subset, PRIMARY_VALIDATION_SCORE, PRESENTATION_CALIPER,
+            n_permutations, seed, group_fields=("hla", "source_organism"))
+        cohorts.append({
+            "cohort": cohort,
+            # Post-hoc control, deliberately outside the decision rule.
+            "sensitivity_within_hla_and_source_organism": {
+                "auc": source_auc,
+                "n_pairs": source_pairs,
+                "p_value": source_p,
+                "part_of_decision_rule": False,
+            },
+            "exposures": sorted({r["exposure"] for r in subset}),
+            "n_assays": len(subset),
+            "n_positive": sum(r["outcome"] == "Positive" for r in subset),
+            "n_negative": sum(r["outcome"] == "Negative" for r in subset),
+            "n_hla_alleles": len({r["hla"] for r in subset}),
+            "tests": tests,
+            "passes": all(test["passes"] for test in tests.values()),
+        })
+    return {
+        "score": PRIMARY_VALIDATION_SCORE,
+        "direction": PRIMARY_VALIDATION_DIRECTION,
+        "cohorts": cohorts,
+        "validated": bool(cohorts) and all(c["passes"] for c in cohorts),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--swissprot-sequences", type=Path,
@@ -654,9 +954,13 @@ def main() -> None:
                         default=ROOT / "data/viral-tcell-benchmark")
     parser.add_argument("--per-category", type=int, default=1500)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--permutations", type=int, default=N_PERMUTATIONS,
+                        help="label permutations behind each reported p-value")
     args = parser.parse_args()
     if args.per_category < 20:
         parser.error("--per-category must be at least 20")
+    if args.permutations < 100:
+        parser.error("--permutations must be at least 100")
 
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
     records = []
@@ -666,6 +970,21 @@ def main() -> None:
         raw_counts[pmid] = len(rows)
         records.extend(prepare_assays(rows, pmid))
     deduped, conflicts = deduplicate_assays(records)
+
+    # Validation stays out of sample: a validation peptide that any discovery
+    # cohort already tested is dropped rather than scored twice.
+    discovery_peptides = {
+        row["peptide"] for row in deduped if row["role"] == "discovery"}
+    reused = [
+        row for row in deduped
+        if row["role"] == "validation"
+        and row["peptide"] in discovery_peptides
+    ]
+    deduped = [
+        row for row in deduped
+        if row["role"] == "discovery"
+        or row["peptide"] not in discovery_peptides
+    ]
     presentation_metadata = add_presentation_predictions(deduped)
 
     peptides, categories, seen, held_out = sample_protein_peptides(
@@ -700,12 +1019,25 @@ def main() -> None:
 
     # Presentation is a comparator, not a definition of foreignness.
     comparator_names = ["mhcflurry_presentation_score"]
-    results = summarize_scores(
-        deduped, comparator_names + score_names, conflicts)
-    conditional_results = conditional_response_models(
-        deduped, score_names, args.seed)
+    reported_names = comparator_names + score_names
+    discovery_rows = [r for r in deduped if r["role"] == "discovery"]
+    validation_rows = [r for r in deduped if r["role"] == "validation"]
+    discovery_results = summarize_scores(
+        discovery_rows, reported_names, conflicts, DISCOVERY_COHORTS)
+    discovery_conditional = conditional_response_models(
+        discovery_rows, score_names, args.seed, DISCOVERY_COHORTS)
+    p_value_scores = (
+        PRIMARY_VALIDATION_SCORE,) + SECONDARY_VALIDATION_SCORES
+    validation_results = summarize_scores(
+        validation_rows, reported_names, conflicts, VALIDATION_COHORTS,
+        p_value_scores, args.permutations, args.seed)
+    validation_conditional = conditional_response_models(
+        validation_rows, score_names, args.seed, VALIDATION_COHORTS)
+    validation_primary = primary_validation_outcome(
+        validation_rows, args.permutations, args.seed)
 
     args.cache_root.mkdir(parents=True, exist_ok=True)
+    deduped.sort(key=lambda row: (row["role"], row["cohort"], row["peptide"]))
     with (args.cache_root / "scored-assays.csv").open("w", newline="") as out:
         writer = csv.DictWriter(out, fieldnames=list(deduped[0]))
         writer.writeheader()
@@ -718,6 +1050,8 @@ def main() -> None:
         "eligible_proteins_by_category": seen,
         "held_out_virus_proteins": held_out,
         "exact_assay_peptides_removed_from_training": len(exact_overlap),
+        "cohorts": [dict(cohort) for cohort in COHORTS],
+        "validation_rows_dropped_for_discovery_peptide_reuse": len(reused),
         "deterministic_human_reference_peptides": len(human_reference),
         "training_split": (
             "80/20 stratified peptide split; one sampled peptide per source "
@@ -788,12 +1122,42 @@ def main() -> None:
                 "positive-control comparator; not foreignness"
             ),
         },
+        "validation_prespecification": {
+            "fixed_in_commit": "3c40e4d",
+            "fixed_before": (
+                "any validation cohort was fetched, scored, or inspected"
+            ),
+            "primary_score": PRIMARY_VALIDATION_SCORE,
+            "primary_direction": PRIMARY_VALIDATION_DIRECTION,
+            "primary_comparisons": list(PRIMARY_VALIDATION_COMPARISONS),
+            "caliper_percentile_points": PRESENTATION_CALIPER,
+            "alpha": VALIDATION_ALPHA,
+            "n_permutations": args.permutations,
+            "permutation_scheme": (
+                "outcomes shuffled within HLA, which holds per-allele "
+                "positive/negative counts fixed and re-forms presentation "
+                "matching under every permutation"
+            ),
+            "secondary_scores": list(SECONDARY_VALIDATION_SCORES),
+            "decision_rule": (
+                "the primary score counts as validated only if, in every "
+                "validation cohort, the within-HLA AUC and the "
+                "presentation-matched AUC both exceed 0.5 with a one-sided "
+                "permutation p-value below alpha"
+            ),
+            "secondary_role": (
+                "reported for context; cannot change the pass/fail decision"
+            ),
+        },
+        "validation_primary_outcome": validation_primary,
         "seed": args.seed,
         "raw_iedb_rows": raw_counts,
         "n_eligible_assay_rows": len(records),
         "n_deduplicated_assays": len(deduped),
-        "results": results,
-        "conditional_cv_results": conditional_results,
+        "discovery_results": discovery_results,
+        "discovery_conditional_cv_results": discovery_conditional,
+        "validation_results": validation_results,
+        "validation_conditional_cv_results": validation_conditional,
     }
     (args.cache_root / "report.json").write_text(
         json.dumps(report, indent=2) + "\n")
