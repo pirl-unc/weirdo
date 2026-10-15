@@ -34,6 +34,7 @@ nav:
   - API Reference: api.md
   - Development:
     - Contributing: contributing.md
+    - Viral T-cell benchmark: viral-tcell-benchmark.md
     - Changelog: changelog.md
 
 markdown_extensions:

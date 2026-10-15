@@ -51,6 +51,9 @@ docs = [
     "sphinx-rtd-theme>=1.0.0",
     "sphinx-autodoc-typehints>=1.0.0",
 ]
+benchmark = [
+    "datacache>=1.25.1",
+]
 
 [tool.ruff.lint]
 select = ["E", "F"]
