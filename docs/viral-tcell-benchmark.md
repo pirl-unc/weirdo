@@ -49,7 +49,8 @@ python -m pip install -e '.[benchmark]'
 mhcflurry-downloads fetch models_class1_presentation
 python scripts/benchmark_viral_tcell.py \
   --swissprot-sequences data/swissprot-sequences.csv \
-  --per-category 5000 --permutations 50000 --seed 42 --permutation-seed 1
+  --per-category 5000 --permutations 50000 --bootstrap 4000 \
+  --seed 42 --permutation-seed 1
 ```
 
 50,000 permutations keep the Monte-Carlo standard error near 0.001 at
@@ -128,15 +129,14 @@ examples at all, so no virus family can leak into them; the deterministic
 human reference holds 142,897 peptides, one window of every supported length
 per eligible human protein, and does not depend on the training seed.
 
-That reference is also the primary score's main weakness, and it is a sampling
+That reference is the primary score's obvious weakness, and it is a sampling
 limit rather than a bug. The human proteome in `data/swissprot-sequences.csv`
 holds about 11.2M windows per length, so one window per protein is roughly one
-in 550. "Minimum distance to a human peptide" is therefore a distance to the
-nearest member of a 0.18% sample, not to the nearest self peptide; a
-full-proteome or ligandome-restricted search would put almost every peptide
-much closer to self and could reorder the scores. The pre-registration was
-made against this definition and is reported as such, but a full-reference
-version is the first thing to try next ([#6](https://github.com/pirl-unc/weirdo/issues/6)).
+in 550: "minimum distance to a human peptide" is a distance to the nearest
+member of a 0.18% sample, not to the nearest self peptide. The pre-registration
+was made against that definition and is reported as such. The post-hoc section
+below replaces it with an exact search over every human window and shows that
+doing so does not rescue the score.
 
 ## Discovery result
 
@@ -218,14 +218,16 @@ is conjunctive across cohorts and yellow fever fails it decisively.
 The multi-virus signal is stable across calipers (matched AUC 0.556–0.561 from
 0.02 to 0.25 percentile points), so it is not an artifact of the matching
 threshold, but it falls to 0.531 (p = 0.27) once pairs must share both the
-allele and the source species. Part of that drop is lost power — the control
-keeps 813 of 7,547 pairs — yet the effect size shrinks along with the
-p-value, so the signal is at least as consistent with a between-virus
-composition difference as with foreignness. The human 3-mer surprisal clears
-both arms in that cohort and behaves the same way under the control
-(0.575 → 0.544, p = 0.20). With three leakage-free scores, two comparisons and
-two cohorts, nominal passes at 0.013–0.050 are weak evidence; nothing survives
-a Bonferroni correction over those twelve tests.
+allele and the source species. This control is a pairing rule, not a model: it
+keeps only 813 of 7,547 matched pairs, so the drop mixes a smaller effect with
+a much smaller sample and cannot say which. An earlier revision of this page
+read it as "at least as consistent with a between-virus composition difference
+as with foreignness". The all-rows models below, which adjust for species
+instead of discarding pairs, do not support that reading and it is withdrawn.
+The human 3-mer surprisal clears both pre-registered-style arms in that cohort
+(matched AUC 0.575, p = 0.020), but with four secondary and post-hoc scores,
+three comparisons and two cohorts (a family of 24 permutation tests) the
+smallest Bonferroni-adjusted p is 0.45.
 
 In the conditional response models, adding the primary score to presentation
 plus HLA moved cross-validated AUC by -0.007 in yellow fever and +0.004 in the
@@ -248,6 +250,139 @@ family-level leakage that the primary and secondary scores do not.
 
 Presentation remains the only strong, repeatable predictor in this benchmark:
 within-HLA AUC 0.809 in yellow fever and 0.605 in the multi-virus cohort.
+
+## Post-hoc analyses
+
+Everything in this section was added after the validation numbers were seen,
+to test what the pre-registered result did and did not establish. None of it
+enters the pre-registered decision, and the pre-registered numbers are
+bit-for-bit unchanged by it (checked by diffing `report.json` before and
+after). Fixed effects and cluster-robust standard errors replace random
+effects: with 25 alleles and 29 species, rare levels are pooled (fewer than 10
+rows) and clustered errors give the dependence-aware inference without a
+hierarchical fit.
+
+### Overlapping peptides are not independent
+
+Panels tile source proteins, so rows share residues. Single-linkage clustering
+on any shared 7-mer (which links nested peptides and terminal extensions)
+collapses the yellow fever panel from 250 peptides to 164 clusters and the
+multi-virus panel from 826 to 697. The label permutation above shuffles rows as
+if independent, so a peptide-cluster bootstrap (4,000 resamples of whole
+clusters) is reported beside it. Intervals are percentile intervals, `boot p`
+is the one-sided fraction of resampled AUCs at or below 0.5, and the minimum
+detectable AUC is the smallest true AUC a one-sided α = 0.05 test would detect
+with 80% power, using the bootstrap standard error.
+
+| Cohort | Pre-registered comparison | AUC [95% cluster CI] | Permutation p | Cluster-bootstrap p | Min. detectable AUC |
+| --- | --- | ---: | ---: | ---: | ---: |
+| yellow fever | within-HLA | 0.478 [0.370, 0.583] | 0.687 | 0.650 | 0.635 |
+| yellow fever | matched | 0.527 [0.388, 0.663] | 0.310 | 0.345 | 0.672 |
+| multi-virus | within-HLA | 0.564 [0.507, 0.623] | 0.013 | 0.016 | 0.574 |
+| multi-virus | matched | 0.561 [0.491, 0.634] | 0.0499 | 0.041 | 0.590 |
+
+The dependence-aware intervals change what the yellow fever null means. It is
+a clear failure of the pre-registered rule, but with this many effective
+peptides the cohort could only have detected a true AUC of roughly 0.64–0.67 or
+higher, so it excludes large effects, not the modest one the multi-virus panel
+hints at. In the multi-virus panel the matched interval includes 0.5 and the
+within-HLA interval only just excludes it.
+
+### An exact self reference does not rescue the score
+
+`nearest_human_full_blosum62_tcr` searches every human window of the face's
+length (about 11.2M per length, exact) and
+`soft_nearest_human_full_blosum62_tcr` replaces the maximum with
+`log(sum(exp(similarity)))` so near-ties count as competing self peptides,
+with the temperature fixed at 1 rather than tuned. A test pins both to a brute
+force search across chunk boundaries and protein edges.
+
+| Cohort | Score | Within-HLA AUC | Matched AUC [cluster CI] | Permutation p (Bonferroni) |
+| --- | --- | ---: | ---: | ---: |
+| yellow fever | sampled reference (pre-registered) | 0.478 | 0.527 [0.388, 0.663] | 0.310 |
+| yellow fever | exact, all windows | 0.468 | 0.498 [0.368, 0.624] | 0.517 (1.0) |
+| yellow fever | soft, all windows | 0.488 | 0.553 [0.423, 0.679] | 0.168 (1.0) |
+| multi-virus | sampled reference (pre-registered) | 0.564 | 0.561 [0.491, 0.634] | 0.0499 |
+| multi-virus | exact, all windows | 0.538 | 0.557 [0.486, 0.628] | 0.058 (1.0) |
+| multi-virus | soft, all windows | 0.546 | 0.576 [0.502, 0.649] | 0.019 (0.45) |
+
+The faithful implementation of "distance to the nearest self peptide" is
+weaker than the sampled one in the multi-virus panel and null in yellow fever.
+The 0.18% sample was not what held the pre-registered score back.
+
+### Composition baselines
+
+Foreignness has to beat properties that need no self proteome. Two transparent
+heuristics (mean Kyte-Doolittle hydropathy and the fraction of F/W/Y on the
+TCR face) and an out-of-sample composition model fitted to the other discovery
+cohorts' T-cell outcomes are scored the same way. They are heuristics, not a
+reimplementation of any published immunogenicity model.
+
+| Cohort | Baseline | Within-HLA AUC | Matched AUC [cluster CI] |
+| --- | --- | ---: | ---: |
+| yellow fever | hydropathy | 0.421 | 0.421 [0.300, 0.553] |
+| yellow fever | aromatic fraction | 0.569 | 0.585 [0.466, 0.696] |
+| yellow fever | discovery-trained composition | 0.522 | 0.514 [0.390, 0.645] |
+| multi-virus | hydropathy | 0.556 | 0.574 [0.502, 0.642] |
+| multi-virus | aromatic fraction | 0.556 | 0.565 [0.496, 0.636] |
+| multi-virus | discovery-trained composition | 0.545 | 0.529 [0.455, 0.605] |
+
+In the multi-virus panel two baselines that use no self reference are as strong
+as the pre-registered score (matched 0.561). Their direction is not stable
+either: hydropathy points the opposite way in yellow fever. The foreignness
+scores correlate only moderately with them (Spearman 0.33–0.44 with aromatic
+fraction, about -0.15 with hydropathy, 0.4–0.55 with one another), so they are
+related but not duplicates.
+
+### All rows, with allele, species and composition adjusted
+
+Logistic regression on every row, with the MHCflurry presentation logit,
+allele and source-species fixed effects, standard errors clustered on peptide
+clusters, and each score standardized (odds ratio per SD). The second variant
+adds the three baselines as covariates. `p` is one-sided for a positive effect;
+`Bonf.` scales it by the 14 scores tried in that model.
+
+| Cohort | Score | OR/SD, `p` (Bonf.) with species | OR/SD, `p` (Bonf.) plus baselines |
+| --- | --- | ---: | ---: |
+| multi-virus | sampled reference (pre-registered) | 1.25, 0.006 (0.079) | 1.21, 0.019 (0.27) |
+| multi-virus | human 3-mer surprisal | 1.27, 0.004 (0.057) | 1.23, 0.024 (0.34) |
+| multi-virus | virus-vs-human residue log odds | 1.32, 0.001 (0.018) | 1.26, 0.015 (0.21) |
+| multi-virus | exact, all windows | 1.10, 0.132 (1.0) | 1.06, 0.258 (1.0) |
+| multi-virus | soft, all windows | 1.12, 0.095 (1.0) | 1.08, 0.215 (1.0) |
+| yellow fever | sampled reference (pre-registered) | 1.19, 0.136 (1.0) | 0.94, 0.614 (1.0) |
+| yellow fever | exact, all windows | 1.22, 0.103 (1.0) | 1.03, 0.438 (1.0) |
+| yellow fever | soft, all windows | 1.33, 0.042 (0.59) | 1.11, 0.314 (1.0) |
+
+In the multi-virus model the aromatic fraction alone has OR 1.29 per SD
+(`p` = 0.001) and hydropathy 1.17 (`p` = 0.047); in yellow fever hydropathy is
+0.72 and aromatic fraction 1.26 (`p` = 0.067). The out-of-sample composition
+model contributes nothing in either cohort.
+
+### What the post-hoc analyses support
+
+- The pre-registered verdict stands: the score is not validated, because it
+  fails decisively in yellow fever.
+- That yellow fever null is weak in an important sense: it can only exclude
+  effects of roughly AUC 0.64 or more.
+- In the multi-virus panel there is a modest, real-looking association
+  (odds ratio about 1.2–1.3 per SD) that is *not* removed by species and allele
+  fixed effects or by the composition baselines. It does not survive
+  correction for the number of scores tried, and it does not replicate in yellow
+  fever. It is shared by several cheap human-proteome rarity scores, so it is
+  one finding repeated, not several.
+- The exact full-proteome distance, which is the definition the project
+  actually cares about, shows almost none of it. Whatever the association is, it
+  is not proximity to any particular self peptide.
+- An earlier statement that the multi-virus signal looked at least as
+  consistent with composition as with foreignness is withdrawn; the models above
+  neither confirm nor rule out a composition account, and an aromatic-residue
+  baseline is competitive with the pre-registered score.
+
+Not done, and worth doing next: restricting self to presented peptides (an
+immunopeptidome such as the HLA Ligand Atlas) rather than all ORFs; per-allele
+anchor masks instead of one P2/PΩ rule; a hierarchical fit with random
+effects; and within-pair designs (variant or neoantigen/wild-type pairs) that
+cancel virus, protein and allele confounds by construction.
 
 ## Leakage and independence controls
 

@@ -4,13 +4,23 @@ import numpy as np
 
 from weirdo.blosum import blosum62_dict
 
+import pytest
+
 from scripts.benchmark_viral_tcell import (
     HELD_OUT_VIRUS_FAMILIES,
     PRIMARY_VALIDATION_SCORE,
     _nearest_human_blosum,
+    adjusted_enrichment_models,
+    annotate_multiplicity,
     cached_permutation_test,
+    cluster_bootstrap_auc,
+    composition_baselines,
     deduplicate_assays,
+    full_human_blosum_scores,
+    human_proteome_stream,
     human_tcr_kmer_surprisal,
+    minimum_detectable_auc,
+    peptide_clusters,
     prepare_assays,
     primary_validation_outcome,
     stratified_permutation_test,
@@ -312,3 +322,155 @@ def test_benchmark_nearest_human_matches_the_shipped_similarity_metric():
         for query in queries
     ]
     assert np.allclose(_nearest_human_blosum(reference, queries), expected)
+
+
+def test_peptide_clusters_link_nested_and_overlapping_but_not_unrelated():
+    clusters = peptide_clusters([
+        "RPIDDRFGL",       # parent
+        "RPIDDRFGLA",      # C-terminal extension
+        "PIDDRFGL",        # nested substring
+        "SPRERLVLTL",      # unrelated
+    ])
+    assert len({clusters["RPIDDRFGL"], clusters["RPIDDRFGLA"],
+                clusters["PIDDRFGL"]}) == 1
+    assert clusters["SPRERLVLTL"] != clusters["RPIDDRFGL"]
+    # Reordering the input must not rename a cluster.
+    assert peptide_clusters(["SPRERLVLTL", "PIDDRFGL", "RPIDDRFGLA",
+                             "RPIDDRFGL"]) == clusters
+
+
+def _clustered_rows(duplicates, n_clusters=12, shift=0.0, seed=0):
+    rng = np.random.default_rng(seed)
+    rows = []
+    for c in range(n_clusters):
+        outcome = "Positive" if c % 2 == 0 else "Negative"
+        value = rng.normal(shift if outcome == "Positive" else 0.0)
+        for d in range(duplicates):
+            rows.append({
+                "peptide": f"PEP{c:02d}X{d}", "peptide_cluster": f"c{c}",
+                "assay_id": f"{c}-{d}", "hla": "HLA-A*02:01",
+                "outcome": outcome,
+                PRIMARY_VALIDATION_SCORE: value + rng.normal(0, 0.01),
+                "mhcflurry_presentation_percentile": 0.5,
+            })
+    return rows
+
+
+def test_cluster_bootstrap_widens_uncertainty_when_rows_are_not_independent():
+    independent = cluster_bootstrap_auc(
+        _clustered_rows(1, n_clusters=24), n_bootstrap=600, seed=1)
+    # Same evidence repeated five times per cluster: the point estimate is
+    # unchanged but the effective sample size is not.
+    repeated = cluster_bootstrap_auc(
+        _clustered_rows(5, n_clusters=24), n_bootstrap=600, seed=1)
+    assert independent["n_clusters"] == repeated["n_clusters"] == 24
+    assert repeated["standard_error"] > 0.5 * independent["standard_error"]
+    assert repeated["minimum_detectable_auc"] > 0.5
+
+    separated = cluster_bootstrap_auc(
+        _clustered_rows(3, n_clusters=24, shift=5.0), n_bootstrap=600, seed=1)
+    assert separated["auc"] > 0.95
+    assert separated["ci_low"] > 0.5
+    assert separated["p_value"] < 0.01
+    # Bit-for-bit reproducible at a fixed seed.
+    assert separated == cluster_bootstrap_auc(
+        _clustered_rows(3, n_clusters=24, shift=5.0), n_bootstrap=600, seed=1)
+
+
+def test_minimum_detectable_auc_grows_with_standard_error():
+    assert minimum_detectable_auc(0.0) == 0.5
+    assert minimum_detectable_auc(0.05) < minimum_detectable_auc(0.10)
+    assert minimum_detectable_auc(0.05) == pytest.approx(
+        0.5 + 2.4865 * 0.05, abs=1e-3)
+
+
+def test_full_human_search_matches_brute_force_across_chunk_boundaries(tmp_path):
+    swissprot = tmp_path / "swissprot.csv"
+    proteins = ["MKTAYIAKQRQISFVKSHFSRQ", "GGSSTTNNQQAAKLVTGGCYNVA",
+                "XXMKTAYXX"]  # ambiguous residues must never match
+    swissprot.write_text(
+        "identifier,sequence,category\n"
+        + "".join(f"h{i},{s},human\n" for i, s in enumerate(proteins))
+        + "v1,MQWERTYIPAAAAA,viruses\n")
+    queries = ["MKTAYIAKQ", "AAKLVSGGCYN", "MQWERTYIP", "GGSSTTNN"]
+    reference = {}
+    for length in {len(tcr_face(q)) for q in queries}:
+        reference[length] = [
+            protein[i:i + length] for protein in proteins
+            for i in range(len(protein) - length + 1)
+            if set(protein[i:i + length]) <= set("ACDEFGHIKLMNPQRSTVWY")]
+    stream = human_proteome_stream(swissprot)
+    for chunk in (3, 7, 1000):
+        scores = full_human_blosum_scores(
+            stream, queries, beta=1.0, chunk=chunk, query_batch=2)
+        for i, query in enumerate(queries):
+            face = tcr_face(query)
+            similarities = np.asarray([
+                sum(blosum62_dict[a][b] for a, b in zip(face, window))
+                for window in reference[len(face)]], dtype=float)
+            self_similarity = sum(blosum62_dict[a][a] for a in face)
+            assert scores["nearest_human_full_blosum62_tcr"][i] == (
+                pytest.approx((self_similarity - similarities.max())
+                              / len(face)))
+            soft = np.log(np.exp(similarities).sum())
+            assert scores["soft_nearest_human_full_blosum62_tcr"][i] == (
+                pytest.approx((self_similarity - soft) / len(face)))
+    # An exact human window has zero exact distance to self.
+    exact = full_human_blosum_scores(stream, ["AMKTAYIAKQRQ"])
+    assert exact["nearest_human_full_blosum62_tcr"][0] == pytest.approx(0.0)
+
+
+def test_composition_baselines_need_no_self_reference():
+    scores = composition_baselines(["AAFWYAAAL", "AAAAAAAAL"])
+    assert scores["tcr_face_aromatic_fraction"][0] > (
+        scores["tcr_face_aromatic_fraction"][1])
+    assert scores["tcr_face_hydrophobicity"].shape == (2,)
+
+
+def test_multiplicity_correction_scales_only_the_requested_scores():
+    def row(score, p):
+        return {"score": score, "permutation_tests": {
+            "a": {"p_value": p}, "b": {"p_value": None}}}
+    results = [row("kept", 0.01), row("kept", 0.2), row("ignored", 0.001)]
+    family = annotate_multiplicity(results, ("kept",))
+    assert family == 2
+    assert results[0]["permutation_tests"]["a"]["p_bonferroni"] == (
+        pytest.approx(0.02))
+    assert results[1]["permutation_tests"]["a"]["p_bonferroni"] == (
+        pytest.approx(0.4))
+    assert "p_bonferroni" not in results[2]["permutation_tests"]["a"]
+
+
+def test_adjusted_model_recovers_a_planted_effect_and_ignores_noise():
+    pytest.importorskip("statsmodels")
+    rng = np.random.default_rng(0)
+    rows = []
+    for i in range(240):
+        signal = rng.normal()
+        outcome = rng.random() < 1 / (1 + np.exp(-1.5 * signal))
+        rows.append({
+            "cohort": "c", "peptide": f"P{i:03d}",
+            "peptide_cluster": f"k{i // 2}", "hla": f"A{i % 3}",
+            "source_species": f"s{i % 4}",
+            "outcome": "Positive" if outcome else "Negative",
+            "mhcflurry_presentation_score": float(rng.uniform(0.05, 0.95)),
+            "signal": float(signal), "noise": float(rng.normal()),
+            "baseline": float(rng.normal()),
+        })
+    results = adjusted_enrichment_models(
+        rows, ["signal", "noise"], ("baseline",), ("c",))
+    by = {(r["variant"], r["score"]): r for r in results}
+    assert by[("presentation_hla_species", "signal")]["fit_ok"]
+    assert by[("presentation_hla_species", "signal")][
+        "one_sided_p_positive"] < 0.001
+    assert by[("presentation_hla_species", "signal")][
+        "odds_ratio_per_sd"] > 2
+    assert by[("plus_composition_baselines", "noise")][
+        "one_sided_p_positive"] > 0.01
+    assert ("presentation_hla_species", "baseline") not in by
+    # Baselines are reported on their own, and scores carry a multiplicity
+    # adjusted p scaled by the number of scores tried.
+    assert by[("plus_composition_baselines", "__baseline__baseline")]["fit_ok"]
+    signal = by[("presentation_hla_species", "signal")]
+    assert signal["p_bonferroni_across_scores"] == pytest.approx(
+        min(1.0, signal["one_sided_p_positive"] * 2))
