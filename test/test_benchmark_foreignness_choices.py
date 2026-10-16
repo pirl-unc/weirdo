@@ -174,7 +174,7 @@ def test_a_held_out_selection_is_required_before_the_holdout_runs():
     class Args:
         selection_is_committed = False
         cache_root = None
-    assert all(v is None for v in bench.SELECTED_CANDIDATES.values()) or True
+    # Without the acknowledgement flag the stage must refuse, selection or not.
     with pytest.raises(SystemExit):
         bench.run_holdout(Args())
 
@@ -196,3 +196,16 @@ def test_pooled_dummies_accept_integer_levels_alongside_pooled_ones():
     lengths = [9] * 40 + [10] * 40 + [14] * 3      # 14 is rare and pooled
     dummies = bench.pooled_dummies(lengths, minimum=30)
     assert dummies.shape == (83, 2)
+
+
+def test_a_domain_without_a_selection_is_never_loaded(monkeypatch):
+    loaded = []
+
+    def fake_fetch(spec, cache):
+        loaded.append(spec["cohort"])
+        return []
+    monkeypatch.setattr(bench, "fetch_cohort", fake_fetch)
+    bench.assemble_rows(("holdout",), cache=None, domains={"neoepitope"})
+    assert loaded and all(
+        bench.cohort_specs()[c]["domain"] == "neoepitope" for c in loaded)
+    assert "vaccinia_dryvax" not in loaded

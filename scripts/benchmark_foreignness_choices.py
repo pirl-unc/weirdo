@@ -98,8 +98,11 @@ CANDIDATES: dict[str, str] = {
     "dai": "mutation comparator",
 }
 # Filled in and committed between the stages. ``None`` blocks the holdout.
+# Viral: no candidate met the registered development gate, so none is selected.
+# Neoepitope: nn_full_whole, the largest development z among passing candidates
+# (see "Development results" in docs/foreignness-choices-protocol.md).
 SELECTED_CANDIDATES: dict[str, str | None] = {
-    "viral": None, "neoepitope": None}
+    "viral": None, "neoepitope": "nn_full_whole"}
 
 COND_PANEL = (
     "HLA-A*01:01", "HLA-A*02:01", "HLA-A*03:01", "HLA-A*11:01",
@@ -121,11 +124,18 @@ def file_sha256(path: Path) -> str:
 
 
 # ----------------------------------------------------------------- data --
-def assemble_rows(roles: tuple[str, ...], cache) -> tuple[list[dict], dict]:
-    """Prepared, deduplicated assays for cohorts with the given roles."""
+def assemble_rows(roles: tuple[str, ...], cache,
+                  domains: set | None = None) -> tuple[list[dict], dict]:
+    """Prepared, deduplicated assays for cohorts with the given roles.
+
+    ``domains`` limits which domains are even loaded, so a holdout whose domain
+    has no selection stays unopened.
+    """
     records, excluded, raw = [], Counter(), {}
     for cohort, spec in cohort_specs().items():
         if spec["role"] not in roles:
+            continue
+        if domains is not None and spec["domain"] not in domains:
             continue
         rows = fetch_cohort(spec, cache)
         raw[cohort] = len(rows)
@@ -785,8 +795,9 @@ def attach_baselines(rows: list[dict]) -> None:
             row[name] = float(baselines[name][index[row["peptide"]]])
 
 
-def prepare_rows(roles: tuple[str, ...], cache) -> tuple[list[dict], dict]:
-    rows, funnel = assemble_rows(roles, cache)
+def prepare_rows(roles: tuple[str, ...], cache,
+                 domains: set | None = None) -> tuple[list[dict], dict]:
+    rows, funnel = assemble_rows(roles, cache, domains)
     funnel["clusters"] = add_clusters(rows)
     funnel["presentation"] = add_presentation_predictions(rows)
     attach_baselines(rows)
@@ -878,31 +889,48 @@ def run_dev(args) -> None:
         json.dumps(report, indent=1, default=float) + "\n")
 
 
-def run_holdout(args) -> None:
+def run_holdout(args, dry_run: bool = False) -> None:
+    """Evaluate the committed selection once on the holdout.
+
+    ``dry_run`` points the identical code path at the development rows, with
+    the selection taken from the development report, and checks that it
+    reproduces the development estimate. It never reads a holdout row.
+    """
     from datacache import Cache
     import joblib
 
-    chosen = {d: c for d, c in SELECTED_CANDIDATES.items() if c}
-    if not chosen:
-        raise SystemExit(
-            "SELECTED_CANDIDATES is empty. Commit the development selection "
-            "before the holdout is evaluated.")
-    if not args.selection_is_committed:
-        raise SystemExit(
-            "Pass --selection-is-committed to confirm the selection was "
-            "committed before this run.")
+    if dry_run:
+        dev_report = json.loads((OUTPUT_ROOT / "dev-report.json").read_text())
+        chosen = {d: v["selection"]["selected"]
+                  for d, v in dev_report["domains"].items()
+                  if v["selection"]["selected"]}
+        evaluation_roles, reference_roles = ("dev",), ()
+    else:
+        chosen = {d: c for d, c in SELECTED_CANDIDATES.items() if c}
+        if not chosen:
+            raise SystemExit(
+                "SELECTED_CANDIDATES is empty. Commit the development "
+                "selection before the holdout is evaluated.")
+        if not args.selection_is_committed:
+            raise SystemExit(
+                "Pass --selection-is-committed to confirm the selection was "
+                "committed before this run.")
+        evaluation_roles, reference_roles = ("holdout",), ("dev",)
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
-    dev_rows, _ = assemble_rows(("dev",), cache)
-    rows, funnel = prepare_rows(("holdout",), cache)
+    opened = set(chosen)
+    dev_rows, _ = assemble_rows(reference_roles, cache, opened)
+    rows, funnel = prepare_rows(evaluation_roles, cache, opened)
+    funnel["domains_opened"] = sorted(opened)
     funnel["rows_before_dev_overlap_filter"] = len(rows)
     rows = drop_holdout_reusing_dev(rows, dev_rows)
     funnel["rows_after_dev_overlap_filter"] = len(rows)
-    add_clusters(rows)
+    funnel["clusters"] = add_clusters(rows)
     res = Resources(cache)
     conditional = None
     if any(c.startswith("cond_") for c in chosen.values()):
         conditional = joblib.load(OUTPUT_ROOT / "cond-models.joblib")
-    report = {"stage": "holdout", "selected": chosen, "data_funnel": funnel,
+    report = {"stage": "holdout-dry-run" if dry_run else "holdout",
+              "selected": chosen, "data_funnel": funnel,
               "registered_confirmation_rule": {
                   "alpha_one_sided": ALPHA_HOLDOUT,
                   "minimum_odds_ratio_per_sd": MIN_ODDS_RATIO_HOLDOUT},
@@ -912,31 +940,46 @@ def run_holdout(args) -> None:
         scores = compute_candidates(domain_rows, res, [candidate], conditional)
         nuisance = nuisance_matrix(domain_rows, domain, True)
         effect = pooled_effect(domain_rows, scores[candidate], nuisance)
-        protein_free = pooled_effect(
+        overlap_only = pooled_effect(
             domain_rows, scores[candidate], nuisance, "peptide_cluster")
         per_cohort = {}
         for cohort in sorted({r["cohort"] for r in domain_rows}):
-            index = [i for i, r in enumerate(domain_rows) if r["cohort"] == cohort]
+            index = [i for i, r in enumerate(domain_rows)
+                     if r["cohort"] == cohort]
             result = cohort_effect(
                 [domain_rows[i] for i in index], scores[candidate][index])
             if result:
                 per_cohort[cohort] = result
-        report["domains"][domain] = {
+        entry = {
             "candidate": candidate, "n_rows": len(domain_rows),
             "n_positive": sum(r["outcome"] == "Positive" for r in domain_rows),
-            "pooled": effect, "peptide_overlap_clusters_only": protein_free,
+            "pooled": effect, "peptide_overlap_clusters_only": overlap_only,
             "per_cohort": per_cohort,
             "verdict": holdout_verdict(effect)
             if effect and "beta" in effect else None}
+        if dry_run:
+            reference = next(
+                e for e in dev_report["domains"][domain]["ledger"]
+                if e["candidate"] == candidate)["stringent"]
+            entry["reproduces_dev_estimate"] = bool(
+                abs(effect["beta"] - reference["beta"]) < 1e-6
+                and abs(effect["se"] - reference["se"]) < 1e-6)
+            entry["dev_estimate"] = {k: reference[k] for k in ("beta", "se", "z")}
+        report["domains"][domain] = entry
         log(f"{domain}: {candidate} -> "
-            f"{(report['domains'][domain]['verdict'] or {}).get('reading')}")
-    (OUTPUT_ROOT / "holdout-report.json").write_text(
+            f"{(entry['verdict'] or {}).get('reading')}"
+            + (f" | reproduces dev: {entry['reproduces_dev_estimate']}"
+               if dry_run else ""))
+    name = "holdout-dryrun-report.json" if dry_run else "holdout-report.json"
+    (OUTPUT_ROOT / name).write_text(
         json.dumps(report, indent=1, default=float) + "\n")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stage", choices=("dev", "holdout"), default="dev")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="holdout code path on development rows only")
     parser.add_argument("--cache-root", type=Path, default=CACHE_ROOT)
     parser.add_argument("--candidates", nargs="*", default=None,
                         help="restrict the dev stage to some candidates")
@@ -945,7 +988,10 @@ def main() -> None:
     unknown = [c for c in args.candidates or [] if c not in CANDIDATES]
     if unknown:
         parser.error(f"unknown candidates: {unknown}")
-    (run_dev if args.stage == "dev" else run_holdout)(args)
+    if args.stage == "dev":
+        run_dev(args)
+    else:
+        run_holdout(args, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
