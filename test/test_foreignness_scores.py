@@ -150,3 +150,25 @@ def test_anchor_pairs_keep_the_pairs_the_predictor_prefers():
     assert tables["A*02:01"][AA_INDEX["L"] * 20 + AA_INDEX["V"]]
     assert tables["A*02:01"].sum() == 3
     assert readable["A*02:01"][0] == "L_V"
+
+
+def test_nearest_window_is_the_wild_type_of_a_point_mutant():
+    index = ProteomeIndex(PROTEINS)
+    wild_type = "MKTAYIAKQ"
+    mutant = "MKTAYLAKQ"        # I -> L at position 6, a TCR-facing change
+    result = nearest_self_distance(
+        index, [wild_type, mutant], positions="whole", matrix="hamming",
+        beta=None, return_windows=True)
+    assert result["window"][0] == wild_type
+    assert result["window"][1] == wild_type
+    assert result["nearest"][0] == pytest.approx(0.0, abs=1e-6)
+    assert result["nearest"][1] == pytest.approx(1 / 9, abs=1e-6)
+
+
+def test_sampled_windows_are_valid_and_reproducible():
+    from scripts.foreignness_scores import sample_windows
+    index = ProteomeIndex(PROTEINS)
+    first = sample_windows(index.stream, 9, 50, np.random.default_rng(3))
+    again = sample_windows(index.stream, 9, 50, np.random.default_rng(3))
+    assert first == again
+    assert set(first) <= set(_brute_windows(9))

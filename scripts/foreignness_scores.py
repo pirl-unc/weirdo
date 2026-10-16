@@ -186,14 +186,18 @@ def nearest_self_distance(
         reference, peptides: list[str], *, groups: list | None = None,
         positions: str = "face", matrix: str = "blosum62",
         beta: float | None = 1.0, allowed_pairs: dict | None = None,
-        query_batch: int = 256, chunk: int = 50_000) -> dict[str, np.ndarray]:
+        query_batch: int = 256, chunk: int = 50_000,
+        return_windows: bool = False) -> dict:
     """Exact and soft distance from each peptide to its nearest reference window.
 
     ``distance = (self_similarity - best_similarity) / n_positions``, so 0 means
     the compared positions occur verbatim in the reference. ``groups`` (one per
     peptide) selects a per-allele reference or anchor filter; ``allowed_pairs``
     maps a group to the boolean (P2, P-omega) table its windows must satisfy.
-    Peptides with no reference window of their length get NaN.
+    Peptides with no reference window of their length get NaN. With
+    ``return_windows`` the nearest window itself is also returned (``"window"``);
+    for a point-mutated peptide under the ``hamming`` matrix that is its
+    wild-type counterpart.
     """
     if positions not in POSITION_CHOICES:
         raise ValueError(f"positions must be one of {POSITION_CHOICES}")
@@ -201,6 +205,7 @@ def nearest_self_distance(
     n = len(peptides)
     nearest = np.full(n, np.nan)
     soft = np.full(n, np.nan)
+    windows: list = [None] * n
     by_key = defaultdict(list)
     for i, peptide in enumerate(peptides):
         by_key[(len(peptide), None if groups is None else groups[i])].append(i)
@@ -219,6 +224,7 @@ def nearest_self_distance(
                 similarity[encoded[:, slot]])
         self_similarity = similarity[encoded, encoded].sum(axis=1)
         best = np.full(len(members), -np.inf, dtype=np.float64)
+        best_block = [None] * len(members)
         log_sum = np.full(len(members), -np.inf)
         offsets = np.arange(len(columns)) * N_AA
         filter_pairs = (
@@ -236,6 +242,10 @@ def nearest_self_distance(
                 part = slice(first, first + query_batch)
                 sims = scoring[part] @ hot.T
                 top = sims.max(axis=1).astype(np.float64)
+                if return_windows:
+                    which = sims.argmax(axis=1)
+                    for slot in np.flatnonzero(top > best[part]):
+                        best_block[first + slot] = block[which[slot]]
                 best[part] = np.maximum(best[part], top)
                 if beta is not None:
                     shifted = np.exp(beta * (sims - top[:, None]))
@@ -247,10 +257,30 @@ def nearest_self_distance(
             continue
         for slot, i in enumerate(members):
             nearest[i] = (self_similarity[slot] - best[slot]) / len(columns)
+            if return_windows and best_block[slot] is not None:
+                windows[i] = "".join(AA[a] for a in best_block[slot])
             if beta is not None:
                 soft[i] = (self_similarity[slot] - log_sum[slot] / beta
                            ) / len(columns)
-    return {"nearest": nearest, "soft": soft}
+    result = {"nearest": nearest, "soft": soft}
+    if return_windows:
+        result["window"] = windows
+    return result
+
+
+def sample_windows(stream: np.ndarray, length: int, n: int,
+                   rng: np.random.Generator) -> list[str]:
+    """Uniformly random valid windows, by rejection, without indexing them all."""
+    result: list[str] = []
+    high = len(stream) - length
+    offsets = np.arange(length)
+    while len(result) < n:
+        starts = rng.integers(0, high, size=max(2 * (n - len(result)), 64))
+        block = stream[starts[:, None] + offsets]
+        good = block[~(block == SEPARATOR).any(axis=1)]
+        result.extend(
+            "".join(AA[a] for a in row) for row in good[:n - len(result)])
+    return result
 
 
 def _kmer_codes(stream: np.ndarray, k: int) -> np.ndarray:
