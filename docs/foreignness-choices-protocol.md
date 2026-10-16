@@ -14,6 +14,23 @@ choose it? The previous benchmark
 with weak power and one cheap composition-like association. This protocol widens
 the evidence and tests a larger set of choices under one fixed procedure.
 
+## Status
+
+Updated after the third generation. **Nothing has been confirmed on sealed data,
+for foreignness or for composition.**
+
+| Hypothesis | Development result | Sealed result |
+| --- | --- | --- |
+| Any of 26 foreignness definitions, viral | none passes the gate (best z +1.68) | not opened |
+| `nn_full_whole`, neoepitope | OR 1.21 per SD, z +2.70 | first holdout 0.90 (0.67-1.19); second set 1.09 (0.85-1.40); pooled 1.00 (0.83-1.21) |
+| Whole-peptide "novelty" (two or more mismatches), neoepitope | explained by cohort mix; OR 1.11, fails the gate | not opened |
+| TCR-face aromatic share, viral | OR 1.26 (1.16-1.38), z +5.5 | 1.01 (0.82-1.24), effectively vaccinia only |
+| TCR-face aromatic share, neoepitope | OR 1.24 (1.09-1.40), z +3.3 | 0.99 (0.83-1.19) |
+
+Predicted MHC presentation remains the only reliable predictor in these data. Each
+sealed set can be used for a confirmatory test only a limited number of times;
+further candidates need new data.
+
 ## Domains
 
 | Domain | Peptides | Why |
@@ -529,6 +546,47 @@ to a presentation-based ranking for pathogen epitopes, and a confirmed neoepitop
 result would support it for neoepitopes. Neither would say anything about
 foreignness, and neither would be an implementation.
 
+## Third generation result: the aromatic share is not confirmed
+
+Run once, at 23:58 on 2026-10-15 after the registration commit `3af60fe`, with
+`--stage confirm3 --selection-is-committed`. Each analysis adjusts for the other
+composition baseline (hydropathy), never for itself.
+
+| Domain | Sealed data | Cohorts | Pairs (positive) | Odds ratio per SD (95% CI) | z | Needed | Reading |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| viral | Vaccinia Dryvax and the hashed holdout cohorts | 7 | 21,300 (243) | 1.01 (0.82-1.24) | +0.09 | 1.96 | inconclusive |
+| neoepitope | First holdout and second sealed set | 17 | 2,588 (258) | 0.99 (0.83-1.19) | -0.07 | 2.24 | inconclusive |
+
+The inclusive sensitivity analyses agree (viral 1.01, 0.82-1.24; neoepitope 0.98,
+0.83-1.16). **Neither domain confirms.** The point estimates sit at 1.0, and the
+80%-power detectable odds ratios were about 1.34 (viral) and 1.30 (neoepitope).
+
+**The viral test is effectively a test on one study.** After the overlap filter
+dropped 1,063 rows, the vaccinia screen supplies 20,935 of the 21,300 pairs and 118
+of the 243 positives, with a coefficient of +0.04 (standard error 0.13). So the viral
+confirmation speaks mainly to a predicted-binder library screened by ELISPOT with
+peptide pools and undetermined restriction, not to the donor-response cohorts that
+dominate development.
+
+**Development and sealed estimates disagree.** They differ by z = 2.0 (viral) and
+1.9 (neoepitope), roughly p = 0.05 in each, in the direction of an over-estimate in
+development. This is not nothing and not decisive: the sealed intervals still
+include 1.2.
+
+**What the development data say about why (exploratory, development only).** The
+development effect is not an artefact of one cohort, one virus or reused peptides:
+leave-one-cohort-out odds ratios stay between 1.25 and 1.30; 15 of 18 reported viral
+cohorts are positive (random-effects odds ratio 1.28); it is present in
+non-coronavirus viral cohorts (odds ratio 1.37, z = +4.9, 18 cohorts) as in
+coronavirus ones (1.21, z = +3.6); and for peptides tested in exactly one cohort it
+is 1.30 (z = +4.1). So it is consistent *within* development. Candidate explanations
+for the failure to appear in sealed data, all hypotheses and none a finding: the
+effect depends on study design (donor responses against natural proteins versus
+predicted-binder library screens); the development estimate was inflated by the
+feature having been singled out after it was seen as a covariate in the first
+benchmark; or between-study heterogeneity larger than the development cohorts
+suggest.
+
 ## Deviations
 
 Logged in the order they happened; none changes a registered rule.
@@ -557,3 +615,7 @@ Logged in the order they happened; none changes a registered rule.
    a third hypothesis (the aromatic share) was registered above and the same sets
    were reserved for it at a halved alpha. The viral holdout is used for the first
    time.
+8. After the third-generation result, development-only diagnostics (leave-one-cohort-
+   out, a coronavirus split, and a split by peptide reuse) and a descriptive
+   per-cohort view of the sealed sets were computed. They are exploratory, they did
+   not alter either verdict, and the sealed sets are now spent for this hypothesis.
