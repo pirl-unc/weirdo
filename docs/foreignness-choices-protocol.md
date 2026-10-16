@@ -423,6 +423,48 @@ cluster-robust z exceeds 1.96 and the odds ratio is at least 1.10 per SD, exactl
 for the first holdout. A confirmed result would justify considering a score
 feature for neoepitope ranking and nothing more.
 
+## Second sealed set: not confirmed
+
+Run once, at 23:53 on 2026-10-15 after the selection commit `74c249c`, with
+`--stage confirm2 --selection-is-committed`. Only the neoepitope domain was opened;
+22 of 1,511 pairs were dropped for sharing a 7-mer with a development peptide.
+
+| Analysis | Cohorts | Pairs (positive) | Odds ratio per SD (95% CI) | z (one-sided) | Reading |
+| --- | ---: | ---: | ---: | ---: | --- |
+| **Primary**: at least 5 of each outcome | 15 | 984 (197) | 1.09 (0.85-1.40) | +0.67 | inconclusive |
+| Inclusive sensitivity: at least 1 of each | 34 | 1,489 (335) | 1.14 (0.92-1.41) | +1.18 | inconclusive |
+
+`nn_full_whole` is **not confirmed**: z is far below 1.96. The point estimates are
+positive but small and the intervals include both no effect and the minimum effect
+of interest. The odds ratio detectable with 80% power was about 1.43, so only a
+large effect could have been confirmed. Only 3 cohorts had enough rows to be
+reported alone, which is why per-cohort sign consistency is not informative here.
+
+### Synthesis of the confirmatory evidence (post hoc)
+
+An inverse-variance pool of the two independent confirmatory results, which
+neither chose the candidate nor were seen before the selection:
+
+| Evidence | Odds ratio per SD (95% CI) | z |
+| --- | ---: | ---: |
+| Development, 13 cohorts (best of 26 chosen here, so optimistic) | 1.21 (1.05-1.40) | +2.70 |
+| First holdout, TESLA + 31511069 | 0.90 (0.67-1.19) | -0.75 |
+| Second sealed set, primary | 1.09 (0.85-1.40) | +0.67 |
+| **Pool of the two confirmatory results, primary** | **1.00 (0.83-1.21)** | +0.01 |
+| Pool of the two confirmatory results, inclusive | 1.05 (0.88-1.24) | +0.50 |
+
+The development estimate differs from the confirmatory pool by z = 1.6. So the
+confirmatory data are consistent with no effect and exclude, at 95%, anything above
+about 1.2 per SD, and the development estimate sits at the very edge of that range,
+as expected when the best of many candidates is reported.
+
+**What this means.** For neoepitopes, an exact distance from the whole peptide to
+its nearest human window does not add detectable information beyond predicted
+presentation and TCR-face composition in these data. A small effect (up to about
+1.2 per SD) is not excluded. No candidate is validated in either domain. Both
+neoepitope sealed sets are now spent for this candidate. The viral holdout, including
+the 21,419-pair vaccinia screen, is still sealed.
+
 ## Deviations
 
 Logged in the order they happened; none changes a registered rule.
@@ -444,3 +486,6 @@ Logged in the order they happened; none changes a registered rule.
    re-examined stratified by cohort. It showed the raw novelty table was a
    cohort-composition artefact, and the exploratory statements that relied on it
    were withdrawn in the same commit that records the second selection.
+6. The second confirmation set was analysed once and the confirmatory evidence
+   pooled (section above). The pooling is a post-hoc description, not a registered
+   test, and the registered verdict for each set stands on its own.
