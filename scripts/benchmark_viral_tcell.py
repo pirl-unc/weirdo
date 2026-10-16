@@ -32,6 +32,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from weirdo.amino_acid_alphabet import canonical_amino_acid_letters
 from weirdo.blosum import blosum62_dict
 
 
@@ -107,7 +108,9 @@ VALIDATION_COHORTS = tuple(
     c["cohort"] for c in COHORTS if c["role"] == "validation")
 PMIDS = tuple(COHORT_BY_PMID)
 
-AA = "ACDEFGHIKLMNPQRSTVWY"
+# Sorted canonical letters; sorting makes the index order explicit here
+# rather than inherited from the package's declaration order.
+AA = "".join(sorted(canonical_amino_acid_letters))
 AA_INDEX = {aa: i for i, aa in enumerate(AA)}
 CATEGORIES = (
     "archaea", "bacteria", "fungi", "human", "invertebrates",
@@ -144,13 +147,26 @@ PRESENTATION_CALIPER_SENSITIVITY = (0.02, 0.05, 0.1, 0.25)
 # Nothing below may be re-chosen after the validation numbers are seen.
 PRIMARY_VALIDATION_SCORE = "nearest_human_blosum62_tcr"
 PRIMARY_VALIDATION_DIRECTION = "higher score predicts Positive"
+# name -> (presentation caliper, pairing strata). The decision loop reads the
+# pre-registered names out of this registry, so the published rule and the
+# executed rule cannot drift apart. The source-species row is a post-hoc
+# control and is deliberately absent from PRIMARY_VALIDATION_COMPARISONS.
+PERMUTATION_COMPARISONS = {
+    "within_hla_auc": (None, ("hla",)),
+    "presentation_matched_auc": (PRESENTATION_CALIPER, ("hla",)),
+    "within_hla_and_source_species_matched_auc": (
+        PRESENTATION_CALIPER, ("hla", "source_species")),
+}
 PRIMARY_VALIDATION_COMPARISONS = ("within_hla_auc", "presentation_matched_auc")
 # Reported alongside the primary test, not used for the pass/fail decision.
 # Both also use human proteins only, so no viral training data can leak.
 SECONDARY_VALIDATION_SCORES = (
     "human_tcr_3mer_surprisal", "human_tcr_4mer_surprisal")
 VALIDATION_ALPHA = 0.05
-N_PERMUTATIONS = 2000
+# The pre-registered comparison sits near alpha, so the permutation count has
+# to make Monte-Carlo error small relative to that distance: 50,000 draws give
+# a standard error near 0.001 on a p-value of 0.05, against 0.005 at 2,000.
+N_PERMUTATIONS = 50_000
 
 
 def file_sha256(path: Path) -> str:
@@ -185,14 +201,21 @@ def fetch_iedb(pmid: str, cache) -> list[dict]:
     return rows
 
 
-def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
-    """Retain exact-HLA class-I peptide assay outcomes and their provenance."""
+def prepare_assays(
+        rows: list[dict], pmid: str) -> tuple[list[dict], Counter]:
+    """Retain exact-HLA class-I peptide assay outcomes and their provenance.
+
+    Returns the eligible rows and a count of why the rest were excluded, so
+    the funnel from raw export to analysis set stays auditable.
+    """
     result = []
+    excluded = Counter()
     cohort = COHORT_BY_PMID.get(pmid, pmid)
     allowed_methods = ASSAY_METHODS_BY_COHORT.get(cohort)
     for row in rows:
         if (allowed_methods is not None
                 and row.get("assay__method") not in allowed_methods):
+            excluded["readout_not_a_t_cell_response"] += 1
             continue
         peptide = row.get("epitope__name")
         hla = row.get("mhc_restriction__name")
@@ -205,6 +228,7 @@ def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
         elif measurement == "Negative":
             outcome = "Negative"
         else:
+            excluded["outcome_not_positive_or_negative"] += 1
             continue
         if (
             row.get("host__name") != "Homo sapiens (human)"
@@ -214,6 +238,14 @@ def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
             or not MIN_LENGTH <= len(peptide) <= MAX_LENGTH
             or any(aa not in AA_INDEX for aa in peptide)
         ):
+            excluded["not_an_exact_hla_class_i_canonical_peptide"] += 1
+            continue
+        species = row.get("epitope__species")
+        if not isinstance(species, str) or not species.strip():
+            # The source-species control stratifies on this field, so a row
+            # without it would become a singleton stratum and silently leave
+            # that comparison while staying in the other two.
+            excluded["missing_source_species"] += 1
             continue
         first = row.get("first_in_vivo_process__process_type")
         second = row.get("second_in_vivo_process__process_type")
@@ -246,27 +278,45 @@ def prepare_assays(rows: list[dict], pmid: str) -> list[dict]:
             "restriction_evidence": row.get("mhc_restriction__evidence_code"),
             "source_protein": row.get("epitope__source_molecule"),
             "source_organism": row.get("epitope__source_organism"),
+            "source_species": species.strip(),
         })
-    return result
+    return result, excluded
+
+
+# Fields that identify or stratify an assay group: members must agree.
+AGREEMENT_FIELDS = ("outcome", "source_species")
+# Provenance that may legitimately differ between repeat assays of one pair.
+# Every distinct value is kept, so nothing depends on which row arrived first.
+MULTI_VALUE_FIELDS = (
+    "pmid", "assay_id", "qualitative_measurement", "assay_method",
+    "culture_condition", "restriction_evidence", "source_protein",
+    "source_organism",
+)
 
 
 def deduplicate_assays(records: list[dict]) -> tuple[list[dict], Counter]:
-    """Collapse repeat assays within a cohort and exclude conflicting outcomes."""
+    """Collapse repeat assays within a cohort and exclude conflicting ones."""
     groups = defaultdict(list)
     for row in records:
         key = (row["cohort"], row["exposure"], row["peptide"], row["hla"])
         groups[key].append(row)
     deduped = []
     conflicts = Counter()
-    for key, members in groups.items():
-        outcomes = {r["outcome"] for r in members}
-        if len(outcomes) != 1:
+    for key in sorted(groups):
+        members = sorted(
+            groups[key], key=lambda r: (r["pmid"], str(r["assay_id"])))
+        disagreement = next((
+            field for field in AGREEMENT_FIELDS
+            if len({r[field] for r in members}) != 1), None)
+        if disagreement is not None:
             conflicts[(key[0], key[1])] += 1
             continue
         row = dict(members[0])
+        for field in MULTI_VALUE_FIELDS:
+            row[field] = "|".join(sorted({
+                str(r[field]) for r in members if r[field] is not None}))
         row["n_assay_rows"] = len(members)
-        row["contributing_pmids"] = "|".join(
-            sorted({r["pmid"] for r in members}))
+        row["contributing_pmids"] = row["pmid"]
         deduped.append(row)
     return deduped, conflicts
 
@@ -637,7 +687,7 @@ def add_presentation_predictions(rows: list[dict]):
 
 
 def within_hla_auc(
-        rows: list[dict], score_column: str = "foreignness",
+        rows: list[dict], score_column: str = PRIMARY_VALIDATION_SCORE,
         presentation_caliper: float | None = None,
         group_fields: tuple[str, ...] = ("hla",)) -> tuple[float | None, int]:
     """Pair outcomes within a stratum and optionally within presentation percentile."""
@@ -665,72 +715,131 @@ def within_hla_auc(
 
 def _pair_matrices(
         members: list[dict], score_column: str, caliper: float | None):
-    """Win and caliper-eligibility matrices over all ordered row pairs."""
+    """Win matrix over ordered row pairs, plus caliper eligibility if any.
+
+    ``None`` eligibility means every positive/negative pair counts, in which
+    case the pair total is ``n_positive * n_negative`` and needs no matrix.
+    """
     scores = np.asarray([r[score_column] for r in members], dtype=float)
     difference = scores[:, None] - scores[None, :]
     wins = np.where(difference > 0, 1.0, np.where(difference == 0, 0.5, 0.0))
     if caliper is None:
-        eligible = np.ones_like(wins)
-    else:
-        percentile = np.asarray([
-            r["mhcflurry_presentation_percentile"] for r in members],
-            dtype=float)
-        eligible = (
-            np.abs(percentile[:, None] - percentile[None, :]) <= caliper
-        ).astype(float)
+        return wins, None
+    percentile = np.asarray([
+        r["mhcflurry_presentation_percentile"] for r in members], dtype=float)
+    eligible = (
+        np.abs(percentile[:, None] - percentile[None, :]) <= caliper
+    ).astype(float)
     return wins * eligible, eligible
 
 
-def within_hla_permutation_p_value(
+def _stratum_rng(key: tuple, seed: int) -> np.random.Generator:
+    """Give each stratum its own stream, keyed by its identity.
+
+    One shared generator would make the drawn permutations depend on how many
+    were batched per call and on the order the strata happened to be built in,
+    which would let a memory knob or an upstream row order move a
+    pre-registered p-value.
+    """
+    digest = hashlib.sha256("|".join(map(str, key)).encode()).digest()
+    return np.random.default_rng(
+        np.random.SeedSequence([seed, int.from_bytes(digest[:8], "big")]))
+
+
+def stratified_permutation_test(
         rows: list[dict], score_column: str = PRIMARY_VALIDATION_SCORE,
         presentation_caliper: float | None = None,
         n_permutations: int = N_PERMUTATIONS, seed: int = 0,
-        chunk: int = 250, group_fields: tuple[str, ...] = ("hla",)):
+        chunk: int = 500, group_fields: tuple[str, ...] = ("hla",),
+        alpha: float = VALIDATION_ALPHA) -> dict:
     """One-sided p-value for the pooled stratified AUC under label permutation.
 
     Outcomes are shuffled within each stratum, which holds the per-stratum
     positive/negative counts fixed and lets presentation matching re-form under
     every permutation, exactly as it does for the observed labels.
+
+    Rows are sorted inside each stratum and each stratum draws from its own
+    seeded stream, so the result depends only on the data, the score, the
+    stratification, ``n_permutations`` and ``seed`` -- not on input row order
+    or on ``chunk``, which only bounds memory. The returned Monte-Carlo
+    standard error says whether a comparison against ``alpha`` is resolved at
+    this number of permutations.
     """
     strata = []
     by_stratum = defaultdict(list)
     for row in rows:
         by_stratum[tuple(row[field] for field in group_fields)].append(row)
-    for members in by_stratum.values():
+    for key in sorted(by_stratum):
+        members = sorted(
+            by_stratum[key],
+            key=lambda r: (r["peptide"], r["hla"], str(r["assay_id"])))
         labels = np.asarray(
             [r["outcome"] == "Positive" for r in members], dtype=float)
         if not labels.any() or labels.all():
             continue
         wins, eligible = _pair_matrices(
             members, score_column, presentation_caliper)
-        strata.append((labels, wins, eligible))
-    observed_wins = sum(
-        float(labels @ wins @ (1 - labels)) for labels, wins, _ in strata)
-    observed_pairs = sum(
-        float(labels @ eligible @ (1 - labels))
-        for labels, _, eligible in strata)
+        strata.append((key, labels, wins, eligible))
+
+    def statistic(draws: np.ndarray, labels, wins, eligible):
+        """Pooled win and pair totals for a batch of label vectors."""
+        complement = 1 - draws
+        batch_wins = np.einsum("pi,pi->p", draws @ wins, complement)
+        if eligible is None:
+            batch_pairs = draws.sum(axis=1) * complement.sum(axis=1)
+        else:
+            batch_pairs = np.einsum("pi,pi->p", draws @ eligible, complement)
+        return batch_wins, batch_pairs
+
+    observed_wins = 0.0
+    observed_pairs = 0.0
+    for _, labels, wins, eligible in strata:
+        batch_wins, batch_pairs = statistic(
+            labels[None, :], labels, wins, eligible)
+        observed_wins += float(batch_wins[0])
+        observed_pairs += float(batch_pairs[0])
     if not observed_pairs:
-        return None, None, 0
+        return {
+            "auc": None, "n_pairs": 0, "p_value": None,
+            "p_value_standard_error": None,
+            "n_permutations": 0, "n_undefined_permutations": 0,
+            "resolved_at_alpha": False,
+        }
     observed = observed_wins / observed_pairs
-    rng = np.random.default_rng(seed)
+    rngs = {key: _stratum_rng(key, seed) for key, _, _, _ in strata}
     extreme = 0
+    undefined = 0
     for start in range(0, n_permutations, chunk):
         size = min(chunk, n_permutations - start)
         permuted_wins = np.zeros(size)
         permuted_pairs = np.zeros(size)
-        for labels, wins, eligible in strata:
+        for key, labels, wins, eligible in strata:
+            rng = rngs[key]
             draws = np.stack([rng.permutation(labels) for _ in range(size)])
-            complement = 1 - draws
-            permuted_wins += np.einsum(
-                "pi,pi->p", draws @ wins, complement)
-            permuted_pairs += np.einsum(
-                "pi,pi->p", draws @ eligible, complement)
-        statistic = np.where(
-            permuted_pairs > 0,
-            permuted_wins / np.maximum(permuted_pairs, 1), -np.inf)
-        extreme += int(np.sum(statistic >= observed - 1e-12))
-    p_value = (1 + extreme) / (1 + n_permutations)
-    return float(p_value), observed, int(observed_pairs)
+            batch_wins, batch_pairs = statistic(draws, labels, wins, eligible)
+            permuted_wins += batch_wins
+            permuted_pairs += batch_pairs
+        # A permutation that leaves no eligible pair has no statistic at all;
+        # scoring it as non-extreme while keeping it in the denominator would
+        # bias the p-value downwards, so it leaves the reference distribution.
+        defined = permuted_pairs > 0
+        undefined += int(np.sum(~defined))
+        ratio = permuted_wins[defined] / permuted_pairs[defined]
+        extreme += int(np.sum(ratio >= observed - 1e-12))
+    effective = n_permutations - undefined
+    p_value = (1 + extreme) / (1 + effective)
+    standard_error = float(
+        np.sqrt(max(p_value * (1 - p_value), 0.0) / max(effective, 1)))
+    return {
+        "auc": observed,
+        "n_pairs": int(observed_pairs),
+        "p_value": float(p_value),
+        "p_value_standard_error": standard_error,
+        "n_permutations": int(effective),
+        "n_undefined_permutations": undefined,
+        "resolved_at_alpha": bool(
+            abs(p_value - alpha) > 2 * standard_error),
+    }
 
 
 def _subgroups(rows: list[dict], cohorts: tuple[str, ...]):
@@ -744,11 +853,30 @@ def _subgroups(rows: list[dict], cohorts: tuple[str, ...]):
             ]
 
 
+def cached_permutation_test():
+    """Memoize permutation runs so one comparison is never computed twice."""
+    store: dict = {}
+
+    def run(rows: list[dict], score_column: str, comparison: str,
+            stratum_key: tuple, n_permutations: int, seed: int) -> dict:
+        key = (stratum_key, score_column, comparison, n_permutations, seed)
+        if key not in store:
+            caliper, group_fields = PERMUTATION_COMPARISONS[comparison]
+            store[key] = stratified_permutation_test(
+                rows, score_column, caliper, n_permutations, seed,
+                group_fields=group_fields)
+        return store[key]
+
+    return run
+
+
 def summarize_scores(
         rows: list[dict], score_names: list[str], conflicts: Counter,
         cohorts: tuple[str, ...], p_value_scores: tuple[str, ...] = (),
-        n_permutations: int = N_PERMUTATIONS, seed: int = 0):
+        n_permutations: int = N_PERMUTATIONS, seed: int = 0,
+        permutation_test=None):
     """Report unadjusted, within-HLA, and presentation-matched enrichment."""
+    permutation_test = permutation_test or cached_permutation_test()
     results = []
     for cohort, exposure, subset in _subgroups(rows, cohorts):
         y = np.asarray([int(r["outcome"] == "Positive") for r in subset])
@@ -762,35 +890,29 @@ def summarize_scores(
                 subset, score_name, PRESENTATION_CALIPER)
             sensitivity = {}
             for caliper in PRESENTATION_CALIPER_SENSITIVITY:
-                sensitivity_auc, sensitivity_pairs = within_hla_auc(
-                    subset, score_name, caliper)
+                if caliper == PRESENTATION_CALIPER:
+                    sensitivity_auc, sensitivity_pairs = (
+                        matched_auc, n_matched_pairs)
+                else:
+                    sensitivity_auc, sensitivity_pairs = within_hla_auc(
+                        subset, score_name, caliper)
                 sensitivity[str(caliper)] = {
                     "auc": sensitivity_auc,
                     "n_pairs": sensitivity_pairs,
                 }
-            # Pairing within HLA alone still compares peptides from different
-            # viruses, so a per-virus composition difference could masquerade
-            # as foreignness. This stratum adds the source organism.
+            # Pairing within HLA alone still compares peptides from
+            # different viruses, so a per-virus composition difference could
+            # masquerade as foreignness. The third comparison adds the source
+            # species.
             source_auc, n_source_pairs = within_hla_auc(
                 subset, score_name, PRESENTATION_CALIPER,
-                group_fields=("hla", "source_organism"))
-            p_values = {
-                "within_hla_p_value": None,
-                "presentation_matched_p_value": None,
-                "within_hla_and_source_organism_p_value": None,
-            }
+                group_fields=("hla", "source_species"))
+            permutation_tests = {}
             if score_name in p_value_scores:
-                p_values["within_hla_p_value"] = within_hla_permutation_p_value(
-                    subset, score_name, None, n_permutations, seed)[0]
-                p_values["presentation_matched_p_value"] = (
-                    within_hla_permutation_p_value(
-                        subset, score_name, PRESENTATION_CALIPER,
-                        n_permutations, seed)[0])
-                p_values["within_hla_and_source_organism_p_value"] = (
-                    within_hla_permutation_p_value(
-                        subset, score_name, PRESENTATION_CALIPER,
-                        n_permutations, seed,
-                        group_fields=("hla", "source_organism"))[0])
+                for comparison in PERMUTATION_COMPARISONS:
+                    permutation_tests[comparison] = permutation_test(
+                        subset, score_name, comparison,
+                        (cohort, exposure), n_permutations, seed)
             results.append({
                 "cohort": cohort,
                 "role": ROLE_BY_COHORT.get(cohort, "discovery"),
@@ -807,16 +929,16 @@ def summarize_scores(
                 "n_within_hla_pairs": n_hla_pairs,
                 "presentation_matched_auc": matched_auc,
                 "n_presentation_matched_pairs": n_matched_pairs,
-                "within_hla_and_source_organism_matched_auc": source_auc,
-                "n_within_hla_and_source_organism_pairs": n_source_pairs,
+                "within_hla_and_source_species_matched_auc": source_auc,
+                "n_within_hla_and_source_species_pairs": n_source_pairs,
                 "presentation_caliper_sensitivity": sensitivity,
-                **p_values,
+                "permutation_tests": permutation_tests,
             })
     return results
 
 
 def _oof_logistic_probabilities(
-        matrix: np.ndarray, outcomes: np.ndarray, groups: np.ndarray,
+        matrix: np.ndarray, outcomes: np.ndarray,
         splits: list[tuple[np.ndarray, np.ndarray]], seed: int):
     result = np.full(len(outcomes), np.nan)
     last_feature_coefficients = []
@@ -859,7 +981,7 @@ def conditional_response_models(
             n_splits=5, shuffle=True, random_state=seed)
         splits = list(splitter.split(baseline_matrix, outcomes, groups))
         baseline_probability, _ = _oof_logistic_probabilities(
-            baseline_matrix, outcomes, groups, splits, seed)
+            baseline_matrix, outcomes, splits, seed)
         baseline_auc = float(roc_auc_score(outcomes, baseline_probability))
         baseline_log_loss = float(log_loss(outcomes, baseline_probability))
         for score_name in score_names:
@@ -867,7 +989,7 @@ def conditional_response_models(
                 r[score_name] for r in subset], dtype=float)[:, None]
             probability, coefficients = _oof_logistic_probabilities(
                 np.hstack([baseline_matrix, foreignness]), outcomes,
-                groups, splits, seed)
+                splits, seed)
             auc = float(roc_auc_score(outcomes, probability))
             loss = float(log_loss(outcomes, probability))
             results.append({
@@ -894,54 +1016,69 @@ def conditional_response_models(
 
 
 def primary_validation_outcome(
-        validation_rows: list[dict], n_permutations: int, seed: int) -> dict:
+        validation_rows: list[dict], results: list[dict],
+        n_permutations: int, seed: int, permutation_test) -> dict:
     """Evaluate the pre-registered score against the pre-registered rule."""
+    exposures_by_cohort = defaultdict(set)
+    for row in validation_rows:
+        exposures_by_cohort[row["cohort"]].add(row["exposure"])
     cohorts = []
     for cohort in VALIDATION_COHORTS:
         subset = [r for r in validation_rows if r["cohort"] == cohort]
         if not subset:
-            continue
+            # Silently dropping a cohort would let an "every cohort" rule be
+            # declared satisfied after testing a subset of it.
+            raise RuntimeError(
+                f"pre-registered validation cohort {cohort!r} contributed no "
+                "eligible assays, so the conjunctive rule cannot be evaluated")
+        exposures = sorted(exposures_by_cohort[cohort])
         tests = {}
-        for comparison, caliper in (
-            ("within_hla_auc", None),
-            ("presentation_matched_auc", PRESENTATION_CALIPER),
+        for comparison in (
+            PRIMARY_VALIDATION_COMPARISONS
+            + ("within_hla_and_source_species_matched_auc",)
         ):
-            p_value, auc, n_pairs = within_hla_permutation_p_value(
-                subset, PRIMARY_VALIDATION_SCORE, caliper,
+            # One exposure stratum means the summary row already covers the
+            # whole cohort, so the cached run is reused rather than repeated.
+            stratum_key = (
+                (cohort, exposures[0]) if len(exposures) == 1
+                else (cohort, "all_exposures"))
+            test = permutation_test(
+                subset, PRIMARY_VALIDATION_SCORE, comparison, stratum_key,
                 n_permutations, seed)
+            decisive = comparison in PRIMARY_VALIDATION_COMPARISONS
             tests[comparison] = {
-                "auc": auc,
-                "n_pairs": n_pairs,
-                "p_value": p_value,
+                **test,
+                "part_of_decision_rule": decisive,
                 "passes": bool(
-                    auc is not None and auc > 0.5
-                    and p_value is not None and p_value < VALIDATION_ALPHA),
+                    decisive and test["auc"] is not None
+                    and test["auc"] > 0.5
+                    and test["p_value"] is not None
+                    and test["p_value"] < VALIDATION_ALPHA),
             }
-        source_p, source_auc, source_pairs = within_hla_permutation_p_value(
-            subset, PRIMARY_VALIDATION_SCORE, PRESENTATION_CALIPER,
-            n_permutations, seed, group_fields=("hla", "source_organism"))
+        decisive_tests = [
+            tests[comparison] for comparison in PRIMARY_VALIDATION_COMPARISONS]
         cohorts.append({
             "cohort": cohort,
-            # Post-hoc control, deliberately outside the decision rule.
-            "sensitivity_within_hla_and_source_organism": {
-                "auc": source_auc,
-                "n_pairs": source_pairs,
-                "p_value": source_p,
-                "part_of_decision_rule": False,
-            },
-            "exposures": sorted({r["exposure"] for r in subset}),
+            "exposures": exposures,
             "n_assays": len(subset),
             "n_positive": sum(r["outcome"] == "Positive" for r in subset),
             "n_negative": sum(r["outcome"] == "Negative" for r in subset),
             "n_hla_alleles": len({r["hla"] for r in subset}),
+            "n_source_species": len({r["source_species"] for r in subset}),
             "tests": tests,
-            "passes": all(test["passes"] for test in tests.values()),
+            "passes": all(test["passes"] for test in decisive_tests),
+            "all_decisions_resolved_at_alpha": all(
+                test["resolved_at_alpha"] for test in decisive_tests),
         })
+    unresolved = [
+        c["cohort"] for c in cohorts
+        if not c["all_decisions_resolved_at_alpha"]]
     return {
         "score": PRIMARY_VALIDATION_SCORE,
         "direction": PRIMARY_VALIDATION_DIRECTION,
         "cohorts": cohorts,
         "validated": bool(cohorts) and all(c["passes"] for c in cohorts),
+        "cohorts_with_a_p_value_within_monte_carlo_error_of_alpha": unresolved,
     }
 
 
@@ -955,11 +1092,19 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--permutations", type=int, default=N_PERMUTATIONS,
                         help="label permutations behind each reported p-value")
+    parser.add_argument("--permutation-seed", type=int, default=1,
+                        help="seed for label permutations only, kept separate "
+                             "from the training-sample seed so either can be "
+                             "varied without disturbing the other")
     args = parser.parse_args()
     if args.per_category < 20:
         parser.error("--per-category must be at least 20")
     if args.permutations < 100:
         parser.error("--permutations must be at least 100")
+    if not args.swissprot_sequences.is_file():
+        # Checked before the IEDB fetch and the MHCflurry run, which together
+        # take minutes, so a mistyped path fails in the first second.
+        parser.error(f"--swissprot-sequences not found: {args.swissprot_sequences}")
 
     # datacache and mhcflurry are benchmark-only extras, imported where they
     # are used so the module stays importable with the core dependencies.
@@ -968,26 +1113,33 @@ def main() -> None:
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
     records = []
     raw_counts = {}
+    excluded_rows = Counter()
     for pmid in PMIDS:
         rows = fetch_iedb(pmid, cache)
         raw_counts[pmid] = len(rows)
-        records.extend(prepare_assays(rows, pmid))
+        eligible, excluded = prepare_assays(rows, pmid)
+        records.extend(eligible)
+        excluded_rows.update(excluded)
     deduped, conflicts = deduplicate_assays(records)
 
     # Validation stays out of sample: a validation peptide that any discovery
     # cohort already tested is dropped rather than scored twice.
     discovery_peptides = {
         row["peptide"] for row in deduped if row["role"] == "discovery"}
-    reused = [
-        row for row in deduped
+    reused = sum(
+        1 for row in deduped
         if row["role"] == "validation"
         and row["peptide"] in discovery_peptides
-    ]
+    )
     deduped = [
         row for row in deduped
         if row["role"] == "discovery"
         or row["peptide"] not in discovery_peptides
     ]
+    if not deduped:
+        raise RuntimeError(
+            "no eligible assays survived selection and deduplication; check "
+            "the IEDB export fields before trusting an empty report")
     presentation_metadata = add_presentation_predictions(deduped)
 
     peptides, categories, seen, held_out = sample_protein_peptides(
@@ -998,14 +1150,12 @@ def main() -> None:
         (peptide, category) for peptide, category in zip(peptides, categories)
         if peptide in assay_peptide_set
     ]
-    if exact_overlap:
-        retained = [
-            (peptide, category)
-            for peptide, category in zip(peptides, categories)
-            if peptide not in assay_peptide_set
-        ]
-        peptides = [peptide for peptide, _ in retained]
-        categories = [category for _, category in retained]
+    retained = [
+        (peptide, category) for peptide, category in zip(peptides, categories)
+        if peptide not in assay_peptide_set
+    ]
+    peptides = [peptide for peptide, _ in retained]
+    categories = [category for _, category in retained]
     score_arrays, model_metadata = train_foreignness_models(
         peptides, categories, unique_assay_peptides, args.seed)
     human_reference = deterministic_human_reference(args.swissprot_sequences)
@@ -1031,13 +1181,16 @@ def main() -> None:
         discovery_rows, score_names, args.seed, DISCOVERY_COHORTS)
     p_value_scores = (
         PRIMARY_VALIDATION_SCORE,) + SECONDARY_VALIDATION_SCORES
+    permutation_test = cached_permutation_test()
     validation_results = summarize_scores(
         validation_rows, reported_names, conflicts, VALIDATION_COHORTS,
-        p_value_scores, args.permutations, args.seed)
+        p_value_scores, args.permutations, args.permutation_seed,
+        permutation_test)
     validation_conditional = conditional_response_models(
         validation_rows, score_names, args.seed, VALIDATION_COHORTS)
     validation_primary = primary_validation_outcome(
-        validation_rows, args.permutations, args.seed)
+        validation_rows, validation_results, args.permutations,
+        args.permutation_seed, permutation_test)
 
     args.cache_root.mkdir(parents=True, exist_ok=True)
     deduped.sort(key=lambda row: (row["role"], row["cohort"], row["peptide"]))
@@ -1054,7 +1207,8 @@ def main() -> None:
         "held_out_virus_proteins": held_out,
         "exact_assay_peptides_removed_from_training": len(exact_overlap),
         "cohorts": [dict(cohort) for cohort in COHORTS],
-        "validation_rows_dropped_for_discovery_peptide_reuse": len(reused),
+        "validation_rows_dropped_for_discovery_peptide_reuse": reused,
+        "excluded_iedb_rows_by_reason": dict(excluded_rows),
         "deterministic_human_reference_peptides": len(human_reference),
         "training_split": (
             "80/20 stratified peptide split; one sampled peptide per source "
@@ -1136,6 +1290,7 @@ def main() -> None:
             "caliper_percentile_points": PRESENTATION_CALIPER,
             "alpha": VALIDATION_ALPHA,
             "n_permutations": args.permutations,
+            "permutation_seed": args.permutation_seed,
             "permutation_scheme": (
                 "outcomes shuffled within HLA, which holds per-allele "
                 "positive/negative counts fixed and re-forms presentation "
@@ -1154,6 +1309,7 @@ def main() -> None:
         },
         "validation_primary_outcome": validation_primary,
         "seed": args.seed,
+        "permutation_seed": args.permutation_seed,
         "raw_iedb_rows": raw_counts,
         "n_eligible_assay_rows": len(records),
         "n_deduplicated_assays": len(deduped),
