@@ -1,0 +1,452 @@
+# Viral T-cell response benchmark
+
+`scripts/benchmark_viral_tcell.py` compares several definitions of peptide
+foreignness on exact-HLA viral T-cell assays. It has two halves that must not
+be read as one analysis:
+
+- a **discovery** half over three SARS-CoV-2 studies, which is hypothesis
+  generation and was free to look at every definition; and
+- a **validation** half over two cohorts that contributed nothing to
+  discovery, which tests one score, one direction, two comparisons and one
+  caliper nominated in commit `3c40e4d` before any validation export was
+  fetched, under a decision rule written afterwards (see
+  [Timeline and deviations](#timeline-and-deviations)).
+
+Neither half produced a usable foreignness predictor. The pre-registered score
+did not validate; the details are below.
+
+The foreignness scores themselves are allele-independent. Presentation and
+antigen identity enter the evaluation only through the comparisons:
+
+1. each peptide/HLA pair receives an MHCflurry presentation score;
+2. positives and negatives are compared within the same HLA, within an
+   MHCflurry presentation-percentile caliper, and in a sensitivity analysis
+   within the same HLA *and* the same source organism;
+3. a five-fold, peptide-grouped response model tests whether each foreignness
+   score adds information beyond MHCflurry presentation and HLA fixed effects;
+   and
+4. a one-sided label-permutation test (outcomes shuffled within stratum, so
+   per-stratum counts stay fixed and presentation matching re-forms under every
+   permutation) gives a p-value for the pre-registered comparisons.
+
+Each stratum draws from its own seeded stream and its rows are sorted before
+permutation, so a reported p-value depends only on the data, the score, the
+stratification, the permutation count and the permutation seed -- not on
+upstream row order or on the batch size used to bound memory. Permutations
+that leave no comparable pair have no statistic and leave the reference
+distribution rather than counting as non-extreme. Every p-value is reported
+with its Monte-Carlo standard error, and the training-sample seed
+(`--seed`) and permutation seed (`--permutation-seed`) are separate so either
+can be varied alone.
+
+Keeping these concepts separate is intentional. A WEIRDO score should describe
+a peptide's relationship to self. A downstream immunogenicity model can combine
+that score with presentation.
+
+## Reproduce the analysis
+
+```bash
+python -m pip install -e '.[benchmark]'
+mhcflurry-downloads fetch models_class1_presentation
+python scripts/benchmark_viral_tcell.py \
+  --swissprot-sequences data/swissprot-sequences.csv \
+  --per-category 5000 --permutations 50000 --bootstrap 4000 \
+  --seed 42 --permutation-seed 1
+```
+
+50,000 permutations keep the Monte-Carlo standard error near 0.001 at
+p = 0.05. At 2,000 draws it is about 0.005, which is the same scale as the
+distance between the pre-registered comparison and alpha, so the pass/fail
+flag would have been decided by the permutation seed rather than by the data.
+
+IEDB exports are downloaded through
+[datacache](https://github.com/openvax/datacache). Query URLs, checksums, and
+fetch dates remain in datacache provenance receipts. The script writes the
+ignored files `data/viral-tcell-benchmark/report.json` and
+`data/viral-tcell-benchmark/scored-assays.csv`.
+
+The report records the SwissProt input SHA-256, random seed, model validation
+metrics, MHCflurry version/provenance, the pre-registration block, all
+assay-level scores, and every enrichment result, including the count of raw
+IEDB rows excluded at each eligibility step. The run described below used
+MHCflurry 2.3.14 with the local 2.3.0 presentation weights, and covers 2,042
+deduplicated assays, 1,597 unique peptides and 51 alleles.
+
+## Cohorts
+
+Cohorts, not PMIDs, are the unit of analysis: the two yellow fever papers share
+one peptide panel and one laboratory, so they are merged and deduplicated
+rather than counted as independent replications.
+
+| Cohort | Role | Design | Assays (pos/neg) |
+| --- | --- | --- | ---: |
+| [36254196](https://pmc.ncbi.nlm.nih.gov/articles/PMC9568370/) | discovery | SARS-CoV-2 direct ex-vivo tetramers in convalescent donors | 93 (49/44) |
+| [35484232](https://pmc.ncbi.nlm.nih.gov/articles/PMC9064790/) | discovery | SARS-CoV-2 IFN-γ after short-term restimulation, infected and mRNA-vaccinated | 152 (66/86) |
+| [33521695](https://pmc.ncbi.nlm.nih.gov/articles/PMC7837622/) | discovery | SARS-CoV-2 direct ex-vivo convalescent responses; positives only | 523 (523/0) |
+| yellow fever 17D ([28386132](https://pubmed.ncbi.nlm.nih.gov/28386132/), [32983097](https://pubmed.ncbi.nlm.nih.gov/32983097/)) | validation | Direct ex-vivo multimer screen of predicted binders in YF-17D vaccinees, 43 alleles | 363 (131/232) |
+| multi-virus concise set ([38608022](https://pubmed.ncbi.nlm.nih.gov/38608022/)) | validation | T-cell activation against a curated multi-virus epitope panel in unimmunized healthy donors, 25 alleles, 29 IEDB source species | 911 (254/657) |
+
+PMID 33521695 cannot support an AUC and only contributes positive coverage.
+In PMID 38608022 each peptide/HLA pair carries two readouts, pMHC multimer
+staining (positive for 928 of 929 pairs) and T-cell activation; only activation
+is a T-cell response, so the binding rows are excluded instead of being
+collapsed against it as contradictory outcomes. IEDB grades some positives
+(`Positive-High/Intermediate/Low`); all grades are one positive class, which
+affects the validation cohorts only because the discovery papers report
+ungraded outcomes. Repeat assays of the same peptide/HLA pair within a cohort
+are collapsed, and pairs that disagree on outcome or on source species are
+dropped: one in the yellow fever cohort, where the two papers disagree on the
+outcome, and one in the infected stratum of PMID 35484232. Collapsing keeps
+every distinct provenance value (assay id, method, culture condition,
+restriction evidence, source protein and organism) rather than the first row's,
+so no annotation depends on IEDB fetch order. The source-virus control
+stratifies on IEDB's species field, which maps "Yellow fever virus 17D" and
+"Yellow fever virus" onto one species; a row with no species annotation is
+excluded rather than becoming a stratum of its own, which cost one row here.
+
+## Foreignness definitions
+
+The benchmark trains on one randomly sampled 8–14mer per SwissProt source
+protein. It uses an 80/20 organism-stratified split and never trains on T-cell
+outcomes. The TCR-face view uses P3 through the penultimate residue, excluding
+the common class-I P2 and C-terminal anchors, aligned into fixed positional
+bins plus composition and peptide length.
+
+| Definition | Representation | Training objective |
+| --- | --- | --- |
+| Multiclass MLP posterior | Whole peptide | Ten SwissProt organism categories, converted to `1 - P(human)`, pathogen-vs-self, or virus-vs-human scores |
+| Logistic regression | Whole peptide or TCR face | Bacteria/virus versus human/mammal/rodent |
+| Small MLP | TCR face | Bacteria/virus versus human/mammal/rodent |
+| Constrained Extra Trees | TCR face | Bacteria/virus versus human/mammal/rodent |
+| Logistic regression | TCR face | Virus versus human |
+| Nearest-human distance | TCR face | Minimum normalized BLOSUM62 distance to a deterministic, length-matched human reference |
+| Residue log odds | TCR face | Smoothed virus-versus-human amino-acid log odds |
+| Human 3-mer/4-mer surprisal | TCR face | Rarity under every human SwissProt protein; no viral training data |
+
+The binary SwissProt validation AUCs were 0.591–0.619; ten-category MLP
+accuracy was 0.133. These deliberately small models are weak organism
+classifiers. The nearest-human and human-surprisal scores use no viral training
+examples at all, so no virus family can leak into them; the deterministic
+human reference holds 142,897 peptides, one window of every supported length
+per eligible human protein, and does not depend on the training seed.
+
+That reference is the primary score's obvious weakness, and it is a sampling
+limit rather than a bug. The human proteome in `data/swissprot-sequences.csv`
+holds about 11.2M windows per length, so one window per protein is roughly one
+in 550: "minimum distance to a human peptide" is a distance to the nearest
+member of a 0.18% sample, not to the nearest self peptide. The pre-registration
+was made against that definition and is reported as such. The post-hoc section
+below replaces it with an exact search over every human window and shows that
+doing so does not rescue the score.
+
+## Discovery result
+
+No definition showed repeatable enrichment after conditioning on presentation.
+The nearest-human BLOSUM62 TCR-face distance was the only weak
+infection-specific lead: within-HLA AUC 0.591 and 0.620 in the two infected
+cohorts, near null after presentation matching in the direct ex-vivo study,
+large in the smaller restimulation study, and reversed in mRNA-vaccinated
+donors.
+
+| Cohort | MHCflurry presentation AUC | Nearest-human AUC | Within-HLA AUC | Matched AUC (0.1) | Matched AUC (0.05) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 36254196, infected | 0.699 | 0.537 | 0.591 | 0.533 (167 pairs) | 0.518 (110 pairs) |
+| 35484232, infected | 0.637 | 0.619 | 0.620 | 0.821 (56 pairs) | 0.903 (31 pairs) |
+| 35484232, vaccinated | 0.432 | 0.475 | 0.357 | 0.348 (56 pairs) | 0.520 (25 pairs) |
+
+The 0.903 value comes from 31 non-independent pairs in a short-term
+restimulation study, while the stronger direct ex-vivo study is near null after
+matching, so it was never confirmatory. Adding the nearest-human score to
+presentation plus HLA changed cross-validated AUC by -0.009, +0.006 and -0.005
+in those three rows. The full-proteome surprisal scores, which cannot memorize
+viruses, were also null, and the learned taxonomy classifiers were mostly
+*below* 0.5 in the infected cohorts, which is a reverse association rather than
+enrichment.
+
+On that evidence the nearest-human TCR-face distance was nominated as the
+single least weak candidate in commit `3c40e4d`, with its formula, direction,
+caliper and the two comparisons. The significance test and decision rule below
+were added afterwards.
+
+## Pre-registered validation
+
+The rule recorded in `report.json` under `validation_prespecification`:
+
+- **score** `nearest_human_blosum62_tcr`, **direction** higher distance
+  predicts a positive response;
+- **comparisons** within-HLA AUC and presentation-matched AUC at the 0.1
+  percentile-point caliper;
+- **inference** one-sided within-stratum label permutation, 50,000 draws,
+  α = 0.05;
+- **decision** validated only if *both* comparisons exceed 0.5 with p < α in
+  *every* validation cohort. The two human-surprisal scores are reported as
+  secondary context and cannot change the decision.
+
+### Timeline and deviations
+
+"Pre-registered" here means committed before the relevant numbers existed, not
+filed with an external registry, and the pre-registration was staged rather
+than complete:
+
+| Stage | What was fixed | When |
+| --- | --- | --- |
+| Nominated | Score and TCR-face definition, direction, 0.1 caliper, within-HLA and presentation-matched AUC | Commit `3c40e4d`, 14:58 on 2026-10-15, mirrored in an issue #8 comment a minute later; the first validation export was fetched at 15:00 |
+| Written before any validation score, after inspecting cohort sizes, alleles and overlap | α = 0.05, the one-sided permutation test, the every-cohort conjunction, merging the two yellow fever papers, excluding binding-only readouts | Same session as the first validation run |
+| Changed after validation results were visible | Permutation draws raised from 2,000 to 50,000 and per-stratum random streams introduced | After a code review showed the 2,000-draw p-value near α depended on the permutation seed and a batching parameter |
+
+The last row is a real deviation. It does not change what is estimated, and the
+verdict does not depend on it (yellow fever fails both comparisons at any
+draw count), but a procedure that was changed after seeing results should not
+be described as fixed in advance. The same `provenance` block is written into
+`report.json`.
+
+### Outcome: not validated
+
+| Cohort | Score | Within-HLA AUC (p) | Matched AUC (p) | Same HLA **and** species (p) |
+| --- | --- | ---: | ---: | ---: |
+| yellow fever 17D | MHCflurry presentation | 0.809 | 0.677 | 0.677 |
+| yellow fever 17D | **nearest-human (primary)** | 0.478 (0.687) | 0.527 (0.310) | 0.527 (0.310) |
+| yellow fever 17D | human 3-mer surprisal | 0.498 (0.517) | 0.444 (0.845) | 0.444 (0.848) |
+| yellow fever 17D | human 4-mer surprisal | 0.483 (0.644) | 0.449 (0.820) | 0.449 (0.823) |
+| multi-virus set | MHCflurry presentation | 0.604 | 0.508 | 0.478 |
+| multi-virus set | **nearest-human (primary)** | 0.564 (0.013) | 0.561 (0.050) | 0.531 (0.274) |
+| multi-virus set | human 3-mer surprisal | 0.557 (0.023) | 0.575 (0.020) | 0.544 (0.199) |
+| multi-virus set | human 4-mer surprisal | 0.545 (0.059) | 0.564 (0.041) | 0.551 (0.161) |
+
+All p-values carry a Monte-Carlo standard error of 0.0005–0.0021 at 50,000
+draws. Pair counts: 1,420 within-HLA and 405 matched in yellow fever; 38,261
+within-HLA, 7,547 matched and 813 matched within HLA and source species in the
+multi-virus set. The yellow fever cohort maps to a single source species, so
+its species-stratified column is identical to the matched column by
+construction, which is a useful check that the extra stratum behaves as
+intended.
+
+The primary score is clearly null in the yellow fever cohort: both
+pre-registered comparisons sit well above alpha and both are resolved at this
+permutation count. In the multi-virus cohort it clears the unmatched
+comparison (AUC 0.564, p = 0.013) and lands exactly on the threshold in the
+matched one (AUC 0.561, **p = 0.0499 ± 0.0010**). The rule says `p < alpha`, so
+that arm is recorded as a pass and the cohort's `passes` flag is `true`, but a
+p-value one ten-thousandth below alpha is a tie, not a result:
+`resolved_at_alpha` is `false` for it and the cohort is listed under
+`cohorts_with_a_p_value_within_monte_carlo_error_of_alpha`. More permutations
+sharpen the estimate of p; they cannot move p itself away from alpha.
+
+`validation_primary_outcome.validated` is therefore `false`, because the rule
+is conjunctive across cohorts and yellow fever fails it decisively.
+
+The multi-virus signal is stable across calipers (matched AUC 0.556–0.561 from
+0.02 to 0.25 percentile points), so it is not an artifact of the matching
+threshold, but it falls to 0.531 (p = 0.27) once pairs must share both the
+allele and the source species. This control is a pairing rule, not a model: it
+keeps only 813 of 7,547 matched pairs, so the drop mixes a smaller effect with
+a much smaller sample and cannot say which. An earlier revision of this page
+read it as "at least as consistent with a between-virus composition difference
+as with foreignness". The all-rows models below, which adjust for species
+instead of discarding pairs, do not support that reading and it is withdrawn.
+The human 3-mer surprisal clears both pre-registered-style arms in that cohort
+(matched AUC 0.575, p = 0.020), but with four secondary and post-hoc scores,
+three comparisons and two cohorts (a family of 24 permutation tests) the
+smallest Bonferroni-adjusted p is 0.45.
+
+In the conditional response models, adding the primary score to presentation
+plus HLA moved cross-validated AUC by -0.007 in yellow fever and +0.004 in the
+multi-virus cohort. Nine of the twelve definitions had a positive coefficient
+in all five multi-virus folds with deltas from +0.001 to +0.010; the three
+multiclass-posterior scores did not (deltas -0.003 to +0.001, with two of them
+positive in only three of five folds). So the increment is small, confined to
+the cohort where peptides were pre-selected for stable pMHC binding, and
+limited to the distance- and surprisal-style definitions rather than being
+uniform across all of them.
+
+The learned taxonomy classifiers reached matched AUC 0.607 (Extra Trees) and
+0.630 (virus-versus-human logistic) in yellow fever, with flaviviruses held out
+of training. Those definitions were *below* 0.5 in both infected discovery
+cohorts, so this is a direction flip between cohorts, not a replication, and
+they were not pre-registered. The multi-virus cohort cannot test them cleanly:
+its influenza, herpesvirus, papillomavirus, poxvirus and retrovirus source
+organisms are not excluded from the viral training corpus, so those rows carry
+family-level leakage that the primary and secondary scores do not.
+
+Presentation remains the only strong, repeatable predictor in this benchmark:
+within-HLA AUC 0.809 in yellow fever and 0.605 in the multi-virus cohort.
+
+## Post-hoc analyses
+
+Everything in this section was added after the validation numbers were seen,
+to test what the pre-registered result did and did not establish. None of it
+enters the pre-registered decision, and the pre-registered numbers are
+bit-for-bit unchanged by it (checked by diffing `report.json` before and
+after). Fixed effects and cluster-robust standard errors replace random
+effects: with 25 alleles and 29 species, rare levels are pooled (fewer than 10
+rows) and clustered errors give the dependence-aware inference without a
+hierarchical fit.
+
+### Overlapping peptides are not independent
+
+Panels tile source proteins, so rows share residues. Single-linkage clustering
+on any shared 7-mer (which links nested peptides and terminal extensions)
+collapses the yellow fever panel from 250 peptides to 164 clusters and the
+multi-virus panel from 826 to 697. The label permutation above shuffles rows as
+if independent, so a peptide-cluster bootstrap (4,000 resamples of whole
+clusters) is reported beside it. Intervals are percentile intervals, `boot p`
+is the one-sided fraction of resampled AUCs at or below 0.5, and the minimum
+detectable AUC is the smallest true AUC a one-sided α = 0.05 test would detect
+with 80% power, using the bootstrap standard error.
+
+| Cohort | Pre-registered comparison | AUC [95% cluster CI] | Permutation p | Cluster-bootstrap p | Min. detectable AUC |
+| --- | --- | ---: | ---: | ---: | ---: |
+| yellow fever | within-HLA | 0.478 [0.370, 0.583] | 0.687 | 0.650 | 0.635 |
+| yellow fever | matched | 0.527 [0.388, 0.663] | 0.310 | 0.345 | 0.672 |
+| multi-virus | within-HLA | 0.564 [0.507, 0.623] | 0.013 | 0.016 | 0.574 |
+| multi-virus | matched | 0.561 [0.491, 0.634] | 0.0499 | 0.041 | 0.590 |
+
+The dependence-aware intervals change what the yellow fever null means. It is
+a clear failure of the pre-registered rule, but with this many effective
+peptides the cohort could only have detected a true AUC of roughly 0.64–0.67 or
+higher, so it excludes large effects, not the modest one the multi-virus panel
+hints at. In the multi-virus panel the matched interval includes 0.5 and the
+within-HLA interval only just excludes it.
+
+### An exact self reference does not rescue the score
+
+`nearest_human_full_blosum62_tcr` searches every human window of the face's
+length (about 11.2M per length, exact) and
+`soft_nearest_human_full_blosum62_tcr` replaces the maximum with
+`log(sum(exp(similarity)))` so near-ties count as competing self peptides,
+with the temperature fixed at 1 rather than tuned. A test pins both to a brute
+force search across chunk boundaries and protein edges.
+
+| Cohort | Score | Within-HLA AUC | Matched AUC [cluster CI] | Permutation p (Bonferroni) |
+| --- | --- | ---: | ---: | ---: |
+| yellow fever | sampled reference (pre-registered) | 0.478 | 0.527 [0.388, 0.663] | 0.310 |
+| yellow fever | exact, all windows | 0.468 | 0.498 [0.368, 0.624] | 0.517 (1.0) |
+| yellow fever | soft, all windows | 0.488 | 0.553 [0.423, 0.679] | 0.168 (1.0) |
+| multi-virus | sampled reference (pre-registered) | 0.564 | 0.561 [0.491, 0.634] | 0.0499 |
+| multi-virus | exact, all windows | 0.538 | 0.557 [0.486, 0.628] | 0.058 (1.0) |
+| multi-virus | soft, all windows | 0.546 | 0.576 [0.502, 0.649] | 0.019 (0.45) |
+
+The faithful implementation of "distance to the nearest self peptide" is
+weaker than the sampled one in the multi-virus panel and null in yellow fever.
+The 0.18% sample was not what held the pre-registered score back.
+
+### Composition baselines
+
+Foreignness has to beat properties that need no self proteome. Two transparent
+heuristics (mean Kyte-Doolittle hydropathy and the fraction of F/W/Y on the
+TCR face) and an out-of-sample composition model fitted to the other discovery
+cohorts' T-cell outcomes are scored the same way. They are heuristics, not a
+reimplementation of any published immunogenicity model.
+
+| Cohort | Baseline | Within-HLA AUC | Matched AUC [cluster CI] |
+| --- | --- | ---: | ---: |
+| yellow fever | hydropathy | 0.421 | 0.421 [0.300, 0.553] |
+| yellow fever | aromatic fraction | 0.569 | 0.585 [0.466, 0.696] |
+| yellow fever | discovery-trained composition | 0.522 | 0.514 [0.390, 0.645] |
+| multi-virus | hydropathy | 0.556 | 0.574 [0.502, 0.642] |
+| multi-virus | aromatic fraction | 0.556 | 0.565 [0.496, 0.636] |
+| multi-virus | discovery-trained composition | 0.545 | 0.529 [0.455, 0.605] |
+
+In the multi-virus panel two baselines that use no self reference are as strong
+as the pre-registered score (matched 0.561). Their direction is not stable
+either: hydropathy points the opposite way in yellow fever. The foreignness
+scores correlate only moderately with them (Spearman 0.33–0.44 with aromatic
+fraction, about -0.15 with hydropathy, 0.4–0.55 with one another), so they are
+related but not duplicates.
+
+### All rows, with allele, species and composition adjusted
+
+Logistic regression on every row, with the MHCflurry presentation logit,
+allele and source-species fixed effects, standard errors clustered on peptide
+clusters, and each score standardized (odds ratio per SD). The second variant
+adds the three baselines as covariates. `p` is one-sided for a positive effect;
+`Bonf.` scales it by the 14 scores tried in that model.
+
+| Cohort | Score | OR/SD, `p` (Bonf.) with species | OR/SD, `p` (Bonf.) plus baselines |
+| --- | --- | ---: | ---: |
+| multi-virus | sampled reference (pre-registered) | 1.25, 0.006 (0.079) | 1.21, 0.019 (0.27) |
+| multi-virus | human 3-mer surprisal | 1.27, 0.004 (0.057) | 1.23, 0.024 (0.34) |
+| multi-virus | virus-vs-human residue log odds | 1.32, 0.001 (0.018) | 1.26, 0.015 (0.21) |
+| multi-virus | exact, all windows | 1.10, 0.132 (1.0) | 1.06, 0.258 (1.0) |
+| multi-virus | soft, all windows | 1.12, 0.095 (1.0) | 1.08, 0.215 (1.0) |
+| yellow fever | sampled reference (pre-registered) | 1.19, 0.136 (1.0) | 0.94, 0.614 (1.0) |
+| yellow fever | exact, all windows | 1.22, 0.103 (1.0) | 1.03, 0.438 (1.0) |
+| yellow fever | soft, all windows | 1.33, 0.042 (0.59) | 1.11, 0.314 (1.0) |
+
+In the multi-virus model the aromatic fraction alone has OR 1.29 per SD
+(`p` = 0.001) and hydropathy 1.17 (`p` = 0.047); in yellow fever hydropathy is
+0.72 and aromatic fraction 1.26 (`p` = 0.067). The out-of-sample composition
+model contributes nothing in either cohort.
+
+### What the post-hoc analyses support
+
+- The pre-registered verdict stands: the score is not validated, because it
+  fails decisively in yellow fever.
+- That yellow fever null is weak in an important sense: it can only exclude
+  effects of roughly AUC 0.64 or more.
+- In the multi-virus panel there is a modest, real-looking association
+  (odds ratio about 1.2–1.3 per SD) that is *not* removed by species and allele
+  fixed effects or by the composition baselines. It does not survive
+  correction for the number of scores tried, and it does not replicate in yellow
+  fever. It is shared by several cheap human-proteome rarity scores, so it is
+  one finding repeated, not several.
+- The exact full-proteome distance, which is the definition the project
+  actually cares about, shows almost none of it. Whatever the association is, it
+  is not proximity to any particular self peptide.
+- An earlier statement that the multi-virus signal looked at least as
+  consistent with composition as with foreignness is withdrawn; the models above
+  neither confirm nor rule out a composition account, and an aromatic-residue
+  baseline is competitive with the pre-registered score.
+
+Not done, and worth doing next: restricting self to presented peptides (an
+immunopeptidome such as the HLA Ligand Atlas) rather than all ORFs; per-allele
+anchor masks instead of one P2/PΩ rule; a hierarchical fit with random
+effects; and within-pair designs (variant or neoantigen/wild-type pairs) that
+cancel virus, protein and allele confounds by construction.
+
+## Leakage and independence controls
+
+- 418 coronavirus-mnemonic and 126 flavivirus-mnemonic SwissProt proteins are
+  excluded from the viral training sample, covering the discovery virus and the
+  yellow fever validation virus at family level. This is still not a
+  homology-clustered split of the full corpus; that work is tracked in
+  [weirdo #6](https://github.com/pirl-unc/weirdo/issues/6).
+- One of the 1,598 unique assay peptides also appeared in the sampled training
+  peptides and was removed before training.
+- 13 validation rows whose peptide had already been tested in a discovery
+  cohort were dropped, so validation is genuinely out of sample.
+- Foreignness models never see assay outcomes; assay outcomes are only used for
+  evaluation and for the cross-validated conditional models.
+- Random streams are seeded per organism category, so changing a viral
+  exclusion cannot perturb the human reference sample.
+- The eligibility funnel is published, not implied: of 5,447 raw IEDB rows
+  across the six PMIDs, 2,253 were excluded as not exact-HLA class-I canonical
+  8–14mers with a positive/negative outcome, 929 as binding-only readouts and
+  one for a missing source species, leaving 2,264 eligible rows that collapse
+  to 2,042 analysed assays after repeat-assay deduplication, two conflicting
+  pairs and the 13 discovery-peptide reuses. The counts are in the report
+  under `excluded_iedb_rows_by_reason`.
+
+## Interpretation limits
+
+MHCflurry presentation combines exact-HLA affinity with peptide-only
+processing, because reliable source-protein flanks are not available for all
+selected IEDB rows; this is weaker than a flank-aware natural-presentation
+analysis.
+
+These studies establish T-cell recognition of supplied peptide/HLA complexes,
+or responses after peptide restimulation. They do not prove that infected cells
+naturally process and present every peptide. Tetramer and multimer candidates
+were selected partly for predicted or measured HLA binding, which creates
+ascertainment bias, and the two validation cohorts differ in what their
+negatives mean: yellow fever negatives are predicted binders that were never
+recognized, whereas multi-virus negatives are peptides with confirmed stable
+pMHC that were still not recognized. Neither cohort's negatives rule out a
+response below assay detection in the donors tested. Restriction evidence, assay method,
+readout, exposure and source annotations stay in the scored assay file.
+
+The remaining implementation and validation gaps are tracked in
+[weirdo #4](https://github.com/pirl-unc/weirdo/issues/4),
+[#5](https://github.com/pirl-unc/weirdo/issues/5),
+[#7](https://github.com/pirl-unc/weirdo/issues/7), and
+[#8](https://github.com/pirl-unc/weirdo/issues/8).

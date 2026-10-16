@@ -34,6 +34,8 @@ nav:
   - API Reference: api.md
   - Development:
     - Contributing: contributing.md
+    - Viral T-cell benchmark: viral-tcell-benchmark.md
+    - Foreignness-choice protocol: foreignness-choices-protocol.md
     - Changelog: changelog.md
 
 markdown_extensions:
