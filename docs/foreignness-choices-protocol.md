@@ -346,10 +346,14 @@ is independent *data*.
 
 **Data.** A title search of IEDB for neoantigen, neoepitope, frameshift, mutanome,
 mutated, mutant, somatic and fusion terms found 269 publications outside the
-registry. After reading titles alone, 116 are included as tumour-mutation studies
+registry. 140 of them have at least 12 positive or negative class-I rows; the other
+129 were not considered because they cannot reach the inclusion threshold. Of the
+140, reading titles alone, 116 are included as tumour-mutation studies
 (`CONFIRM2_NEOEPITOPE_PMIDS`) and 24 are excluded with a stated reason in
 `CONFIRM2_EXCLUDED_PMIDS` (viral or viral-mutant antigens, unmutated peptides,
-post-translational or residue-modified peptides, mixed antigen classes). The set
+post-translational or residue-modified peptides, mixed antigen classes). Titles
+that do not contain those terms are not in the search at all, so the set is
+title-matched, not exhaustive. The set
 has role `confirm2` and was never scored or analysed before this registration;
 only marginal counts and the distribution of mismatches to the nearest human window
 (never cross-tabulated with an outcome) were inspected, in order to state the power
