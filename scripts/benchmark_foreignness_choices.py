@@ -64,6 +64,7 @@ MIN_ODDS_RATIO_HOLDOUT = 1.10
 DEV_Z_GATE = 1.645
 DEV_SIGN_FRACTION = 0.60
 MIN_COVERAGE = 0.90
+MIN_PRIMARY = 5   # outcomes per cohort for the primary analysis
 RARE_LEVEL_ROWS = 15
 SEED = 7
 
@@ -97,12 +98,26 @@ CANDIDATES: dict[str, str] = {
     "mismatch_face": "mutation comparator",
     "dai": "mutation comparator",
 }
+# Second generation, defined after the first holdout was spent. The development
+# signal for a whole-peptide distance came from peptides with two or more
+# mismatches to the nearest human window, so these candidates ask that question
+# directly. They are post hoc: their development numbers are exploratory, and
+# only the sealed second confirmation set can test them.
+G2_NEW_CANDIDATES: dict[str, str] = {
+    "novel_2plus": "novelty (post hoc)",
+    "novel_log": "novelty (post hoc)",
+}
+G2_EVALUATED = ("nn_full_whole", "mismatch_whole", "novel_2plus", "novel_log")
+ALL_CANDIDATES: dict[str, str] = {**CANDIDATES, **G2_NEW_CANDIDATES}
+
 # Filled in and committed between the stages. ``None`` blocks the holdout.
 # Viral: no candidate met the registered development gate, so none is selected.
 # Neoepitope: nn_full_whole, the largest development z among passing candidates
 # (see "Development results" in docs/foreignness-choices-protocol.md).
 SELECTED_CANDIDATES: dict[str, str | None] = {
     "viral": None, "neoepitope": "nn_full_whole"}
+# Filled in and committed after the second-generation development stage.
+SELECTED_CONFIRM2: dict[str, str | None] = {"neoepitope": None}
 
 COND_PANEL = (
     "HLA-A*01:01", "HLA-A*02:01", "HLA-A*03:01", "HLA-A*11:01",
@@ -125,7 +140,8 @@ def file_sha256(path: Path) -> str:
 
 # ----------------------------------------------------------------- data --
 def assemble_rows(roles: tuple[str, ...], cache,
-                  domains: set | None = None) -> tuple[list[dict], dict]:
+                  domains: set | None = None,
+                  minimum: int | None = None) -> tuple[list[dict], dict]:
     """Prepared, deduplicated assays for cohorts with the given roles.
 
     ``domains`` limits which domains are even loaded, so a holdout whose domain
@@ -143,7 +159,7 @@ def assemble_rows(roles: tuple[str, ...], cache,
         records.extend(prepared)
         excluded.update(dropped)
     deduped, mixed = deduplicate(records)
-    audit = eligibility_audit(deduped)
+    audit = eligibility_audit(deduped, minimum)
     included = {a["cohort"] for a in audit if a["included"]}
     rows = [r for r in deduped if r["cohort"] in included]
     return rows, {
@@ -427,12 +443,16 @@ def compute_candidates(rows: list[dict], res: Resources, wanted: list[str],
         pep_scores["nn_full_hamming"] = out["nearest"]
         pep_scores["mismatch_face"] = out["nearest"] * np.array(
             [len(p) - 3 for p in peptides])
-    if want & {"mismatch_whole", "dai"}:
+    if want & {"mismatch_whole", "dai", "novel_2plus", "novel_log"}:
         out = timed("hamming whole + windows", lambda: nearest_self_distance(
             res.proteome, peptides, positions="whole", matrix="hamming",
             beta=None, return_windows=True))
-        pep_scores["mismatch_whole"] = out["nearest"] * np.array(
-            [len(p) for p in peptides])
+        mismatches = np.rint(out["nearest"] * np.array(
+            [len(p) for p in peptides]))
+        pep_scores["mismatch_whole"] = mismatches
+        pep_scores["novel_2plus"] = np.where(
+            np.isnan(mismatches), np.nan, (mismatches >= 2).astype(float))
+        pep_scores["novel_log"] = np.log1p(mismatches)
         if "dai" in want:
             wild_type = out["window"]
             scores = np.full(len(pairs), np.nan)
@@ -708,7 +728,7 @@ def evaluate_candidates(rows: list[dict], scores: dict[str, np.ndarray],
     for name, values in scores.items():
         log(f"  {domain}: {name}")
         coverage = float(np.isfinite(values).mean())
-        entry = {"candidate": name, "family": CANDIDATES[name],
+        entry = {"candidate": name, "family": ALL_CANDIDATES[name],
                  "coverage": coverage}
         entry["stringent"] = pooled_effect(rows, values, stringent)
         entry["structure_only"] = pooled_effect(rows, values, plain)
@@ -755,7 +775,7 @@ def select_candidate(ledger: list[dict]) -> dict:
         entry["fails"] = reasons
         if not reasons:
             eligible.append(entry)
-    order = list(CANDIDATES)
+    order = list(ALL_CANDIDATES)
     eligible.sort(key=lambda e: (-round(e["stringent"]["z"], 9),
                                  order.index(e["candidate"])))
     return {"selected": eligible[0]["candidate"] if eligible else None,
@@ -795,9 +815,9 @@ def attach_baselines(rows: list[dict]) -> None:
             row[name] = float(baselines[name][index[row["peptide"]]])
 
 
-def prepare_rows(roles: tuple[str, ...], cache,
-                 domains: set | None = None) -> tuple[list[dict], dict]:
-    rows, funnel = assemble_rows(roles, cache, domains)
+def prepare_rows(roles: tuple[str, ...], cache, domains: set | None = None,
+                 minimum: int | None = None) -> tuple[list[dict], dict]:
+    rows, funnel = assemble_rows(roles, cache, domains, minimum)
     funnel["clusters"] = add_clusters(rows)
     funnel["presentation"] = add_presentation_predictions(rows)
     attach_baselines(rows)
@@ -838,28 +858,31 @@ def write_rows(rows: list[dict], path: Path) -> None:
         writer.writerows(rows)
 
 
-def run_dev(args) -> None:
+def run_dev(args, wanted: list[str] | None = None,
+            domains: set | None = None, tag: str = "dev") -> None:
     from datacache import Cache
     import joblib
 
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
-    rows, funnel = prepare_rows(("dev",), cache)
+    rows, funnel = prepare_rows(("dev",), cache, domains)
     log(f"development rows: {len(rows)} in "
         f"{len({r['cohort'] for r in rows})} cohorts")
     res = Resources(cache)
-    wanted = args.candidates or list(CANDIDATES)
+    wanted = wanted or args.candidates or list(CANDIDATES)
     conditional, conditional_metadata = None, None
     if any(name.startswith("cond_") for name in wanted):
         conditional, conditional_metadata = train_conditional_classifiers(res)
-        joblib.dump(conditional, OUTPUT_ROOT / "cond-models.joblib")
+        if tag == "dev":
+            joblib.dump(conditional, OUTPUT_ROOT / "cond-models.joblib")
     scores = compute_candidates(rows, res, wanted, conditional)
     for name, values in scores.items():
         for row, value in zip(rows, values):
             row[name] = float(value)
     report = {
-        "stage": "dev", "protocol": "docs/foreignness-choices-protocol.md",
-        "data_funnel": funnel, "candidates": CANDIDATES,
+        "stage": tag, "protocol": "docs/foreignness-choices-protocol.md",
+        "data_funnel": funnel,
+        "candidates": {n: ALL_CANDIDATES[n] for n in wanted},
         "conditional_classifier": conditional_metadata,
         "atlas": res.atlas_metadata,
         "anchor_pairs_example": {
@@ -880,21 +903,23 @@ def run_dev(args) -> None:
             "n_positive": sum(r["outcome"] == "Positive" for r in domain_rows),
             "n_cohorts": len({r["cohort"] for r in domain_rows}),
             "ledger": ledger, "selection": selection}
-        (OUTPUT_ROOT / f"dev-ledger-{domain}.md").write_text(
+        (OUTPUT_ROOT / f"{tag}-ledger-{domain}.md").write_text(
             ledger_markdown(ledger) + "\n")
         log(f"{domain}: selected {selection['selected']} "
             f"({selection['n_passing']} passing)")
-    write_rows(rows, OUTPUT_ROOT / "dev-scored-assays.csv")
-    (OUTPUT_ROOT / "dev-report.json").write_text(
+    write_rows(rows, OUTPUT_ROOT / f"{tag}-scored-assays.csv")
+    (OUTPUT_ROOT / f"{tag}-report.json").write_text(
         json.dumps(report, indent=1, default=float) + "\n")
 
 
-def run_holdout(args, dry_run: bool = False) -> None:
-    """Evaluate the committed selection once on the holdout.
+def run_holdout(args, dry_run: bool = False, confirm2: bool = False) -> None:
+    """Evaluate the committed selection once on a sealed set.
 
     ``dry_run`` points the identical code path at the development rows, with
     the selection taken from the development report, and checks that it
-    reproduces the development estimate. It never reads a holdout row.
+    reproduces the development estimate. It never reads a sealed row.
+    ``confirm2`` evaluates the second-generation selection on the second
+    confirmation set instead of the first holdout.
     """
     from datacache import Cache
     import joblib
@@ -906,38 +931,61 @@ def run_holdout(args, dry_run: bool = False) -> None:
                   if v["selection"]["selected"]}
         evaluation_roles, reference_roles = ("dev",), ()
     else:
-        chosen = {d: c for d, c in SELECTED_CANDIDATES.items() if c}
+        committed = SELECTED_CONFIRM2 if confirm2 else SELECTED_CANDIDATES
+        chosen = {d: c for d, c in committed.items() if c}
         if not chosen:
             raise SystemExit(
-                "SELECTED_CANDIDATES is empty. Commit the development "
-                "selection before the holdout is evaluated.")
+                "The selection for this stage is empty. Commit the "
+                "development selection before the sealed set is evaluated.")
         if not args.selection_is_committed:
             raise SystemExit(
                 "Pass --selection-is-committed to confirm the selection was "
                 "committed before this run.")
-        evaluation_roles, reference_roles = ("holdout",), ("dev",)
+        evaluation_roles = ("confirm2",) if confirm2 else ("holdout",)
+        reference_roles = ("dev",)
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
     opened = set(chosen)
     dev_rows, _ = assemble_rows(reference_roles, cache, opened)
-    rows, funnel = prepare_rows(evaluation_roles, cache, opened)
+    # The second confirmation set is loaded inclusively (one of each outcome) so
+    # the registered sensitivity analysis can use it; the primary analysis keeps
+    # only cohorts meeting the usual threshold of five of each.
+    rows, funnel = prepare_rows(
+        evaluation_roles, cache, opened, 1 if confirm2 else None)
     funnel["domains_opened"] = sorted(opened)
     funnel["rows_before_dev_overlap_filter"] = len(rows)
     rows = drop_holdout_reusing_dev(rows, dev_rows)
     funnel["rows_after_dev_overlap_filter"] = len(rows)
     funnel["clusters"] = add_clusters(rows)
+    primary_cohorts = None
+    if confirm2:
+        tally = defaultdict(lambda: [0, 0])
+        for row in rows:
+            tally[row["cohort"]][row["outcome"] == "Positive"] += 1
+        primary_cohorts = {
+            c for c, (neg, pos) in tally.items()
+            if pos >= MIN_PRIMARY and neg >= MIN_PRIMARY}
     res = Resources(cache)
     conditional = None
     if any(c.startswith("cond_") for c in chosen.values()):
         conditional = joblib.load(OUTPUT_ROOT / "cond-models.joblib")
-    report = {"stage": "holdout-dry-run" if dry_run else "holdout",
+    stage_name = ("holdout-dry-run" if dry_run
+                  else "confirm2" if confirm2 else "holdout")
+    report = {"stage": stage_name,
               "selected": chosen, "data_funnel": funnel,
               "registered_confirmation_rule": {
                   "alpha_one_sided": ALPHA_HOLDOUT,
                   "minimum_odds_ratio_per_sd": MIN_ODDS_RATIO_HOLDOUT},
               "domains": {}}
     for domain, candidate in chosen.items():
-        domain_rows = [r for r in rows if r["domain"] == domain]
-        scores = compute_candidates(domain_rows, res, [candidate], conditional)
+        all_rows = [r for r in rows if r["domain"] == domain]
+        all_scores = compute_candidates(all_rows, res, [candidate], conditional)
+        if primary_cohorts is None:
+            domain_rows, scores = all_rows, all_scores
+        else:
+            keep = [i for i, r in enumerate(all_rows)
+                    if r["cohort"] in primary_cohorts]
+            domain_rows = [all_rows[i] for i in keep]
+            scores = {candidate: all_scores[candidate][keep]}
         nuisance = nuisance_matrix(domain_rows, domain, True)
         effect = pooled_effect(domain_rows, scores[candidate], nuisance)
         overlap_only = pooled_effect(
@@ -957,6 +1005,19 @@ def run_holdout(args, dry_run: bool = False) -> None:
             "per_cohort": per_cohort,
             "verdict": holdout_verdict(effect)
             if effect and "beta" in effect else None}
+        if confirm2:
+            inclusive = pooled_effect(
+                all_rows, all_scores[candidate],
+                nuisance_matrix(all_rows, domain, True))
+            entry["inclusive_sensitivity"] = {
+                "description": "cohorts with at least one of each outcome",
+                "n_rows": len(all_rows),
+                "n_positive": sum(r["outcome"] == "Positive" for r in all_rows),
+                "n_cohorts": len({r["cohort"] for r in all_rows}),
+                "pooled": inclusive,
+                "verdict": holdout_verdict(inclusive)
+                if inclusive and "beta" in inclusive else None}
+            entry["n_primary_cohorts"] = len(primary_cohorts)
         if dry_run:
             reference = next(
                 e for e in dev_report["domains"][domain]["ledger"]
@@ -970,14 +1031,74 @@ def run_holdout(args, dry_run: bool = False) -> None:
             f"{(entry['verdict'] or {}).get('reading')}"
             + (f" | reproduces dev: {entry['reproduces_dev_estimate']}"
                if dry_run else ""))
-    name = "holdout-dryrun-report.json" if dry_run else "holdout-report.json"
+    name = {"holdout-dry-run": "holdout-dryrun-report.json",
+            "confirm2": "confirm2-report.json",
+            "holdout": "holdout-report.json"}[stage_name]
     (OUTPUT_ROOT / name).write_text(
         json.dumps(report, indent=1, default=float) + "\n")
 
 
+def describe_confirm2(args) -> None:
+    """What the second confirmation set contains, without any association.
+
+    Prints marginal counts and the distribution of the score's input (mismatches
+    to the nearest human window) so the protocol can state its power honestly.
+    It never cross-tabulates an input with an outcome.
+    """
+    from datacache import Cache
+
+    cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
+    dev_rows, _ = assemble_rows(("dev",), cache, {"neoepitope"})
+    rows, funnel = assemble_rows(("confirm2",), cache, {"neoepitope"})
+    funnel["rows_before_dev_overlap_filter"] = len(rows)
+    rows = drop_holdout_reusing_dev(rows, dev_rows)
+    res = Resources(cache)
+    scores = compute_candidates(rows, res, ["mismatch_whole"], None)
+    mismatches = scores["mismatch_whole"]
+    strata = defaultdict(lambda: [0, 0])
+    for row in rows:
+        strata[f"{row['cohort']}|{row['exposure']}"][
+            row["outcome"] == "Positive"] += 1
+    information = sum(
+        (neg + pos) * (pos / (neg + pos)) * (neg / (neg + pos))
+        for neg, pos in strata.values() if neg + pos)
+    power = {}
+    for loss in (0.0, 0.25):
+        for odds_ratio in (1.1, 1.2, 1.3, 1.5):
+            standard_error = 1 / np.sqrt(information * (1 - loss))
+            z = np.log(odds_ratio) / standard_error
+            power[f"OR={odds_ratio}, info_loss={loss}"] = float(
+                NormalDist().cdf(z - NormalDist().inv_cdf(1 - ALPHA_HOLDOUT)))
+    summary = {
+        "n_cohorts_included": len({r["cohort"] for r in rows}),
+        "n_rows_after_dev_overlap_filter": len(rows),
+        "n_positive": sum(r["outcome"] == "Positive" for r in rows),
+        "n_strata_with_both_outcomes": sum(
+            1 for neg, pos in strata.values() if neg and pos),
+        "share_of_rows_by_mismatches_to_nearest_human_window": {
+            "0": float(np.mean(mismatches == 0)),
+            "1": float(np.mean(mismatches == 1)),
+            "2_or_more": float(np.mean(mismatches >= 2))},
+        "n_rows_with_2_or_more_mismatches": int(np.sum(mismatches >= 2)),
+        "fisher_information_within_strata": float(information),
+        "approximate_power_one_sided_alpha_0.025": power,
+        "excluded_cohorts": [
+            a for a in funnel["audit"] if not a["included"]],
+        "data_funnel": {k: v for k, v in funnel.items() if k != "audit"},
+    }
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT_ROOT / "confirm2-inputs.json").write_text(
+        json.dumps(summary, indent=1, default=float) + "\n")
+    log(json.dumps({k: v for k, v in summary.items()
+                    if k not in ("excluded_cohorts", "data_funnel")},
+                   indent=1, default=float))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stage", choices=("dev", "holdout"), default="dev")
+    parser.add_argument(
+        "--stage", default="dev",
+        choices=("dev", "dev2", "holdout", "confirm2", "describe-confirm2"))
     parser.add_argument("--dry-run", action="store_true",
                         help="holdout code path on development rows only")
     parser.add_argument("--cache-root", type=Path, default=CACHE_ROOT)
@@ -985,13 +1106,19 @@ def main() -> None:
                         help="restrict the dev stage to some candidates")
     parser.add_argument("--selection-is-committed", action="store_true")
     args = parser.parse_args()
-    unknown = [c for c in args.candidates or [] if c not in CANDIDATES]
+    unknown = [c for c in args.candidates or [] if c not in ALL_CANDIDATES]
     if unknown:
         parser.error(f"unknown candidates: {unknown}")
     if args.stage == "dev":
         run_dev(args)
+    elif args.stage == "dev2":
+        run_dev(args, wanted=list(G2_EVALUATED), domains={"neoepitope"},
+                tag="dev2")
+    elif args.stage == "describe-confirm2":
+        describe_confirm2(args)
     else:
-        run_holdout(args, dry_run=args.dry_run)
+        run_holdout(args, dry_run=args.dry_run,
+                    confirm2=args.stage == "confirm2")
 
 
 if __name__ == "__main__":

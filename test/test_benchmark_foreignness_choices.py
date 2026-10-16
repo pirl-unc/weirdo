@@ -209,3 +209,40 @@ def test_a_domain_without_a_selection_is_never_loaded(monkeypatch):
     assert loaded and all(
         bench.cohort_specs()[c]["domain"] == "neoepitope" for c in loaded)
     assert "vaccinia_dryvax" not in loaded
+
+
+def test_novelty_candidates_count_mismatches_to_the_nearest_human_window():
+    from scripts.foreignness_scores import ProteomeIndex
+    res = bench.Resources(cache=None)
+    res._proteome = ProteomeIndex([
+        "MKTAYIAKQRQISFVKSHFSRQ", "GGSSTTNNQQAAKLVTGGCYNVA"])
+    peptides = ["MKTAYIAKQ",     # present verbatim
+                "MKTAYLAKQ",     # one substitution
+                "MKTAWLAKQ",     # two substitutions
+                "MKTWWLAKQ"]     # three
+    rows = [{"peptide": p, "hla": "HLA-A*02:01"} for p in peptides]
+    scores = bench.compute_candidates(
+        rows, res, ["mismatch_whole", "novel_2plus", "novel_log"], None)
+    assert scores["mismatch_whole"].tolist() == [0, 1, 2, 3]
+    assert scores["novel_2plus"].tolist() == [0, 0, 1, 1]
+    assert scores["novel_log"] == pytest.approx(np.log1p([0, 1, 2, 3]))
+
+
+def test_second_generation_candidates_are_registered_after_the_first():
+    assert set(bench.G2_NEW_CANDIDATES).isdisjoint(bench.CANDIDATES)
+    assert list(bench.ALL_CANDIDATES)[:len(bench.CANDIDATES)] == list(
+        bench.CANDIDATES)
+    assert set(bench.G2_EVALUATED) <= set(bench.ALL_CANDIDATES)
+
+
+def test_the_second_confirmation_stage_refuses_without_a_committed_selection():
+    class Args:
+        selection_is_committed = True
+        cache_root = None
+    saved = dict(bench.SELECTED_CONFIRM2)
+    try:
+        bench.SELECTED_CONFIRM2["neoepitope"] = None
+        with pytest.raises(SystemExit):
+            bench.run_holdout(Args(), confirm2=True)
+    finally:
+        bench.SELECTED_CONFIRM2.update(saved)

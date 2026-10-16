@@ -59,6 +59,47 @@ NEOEPITOPE_PMIDS = (
     "33038342", "33665637", "34244308", "35665491", "35727629", "37586771",
     "38244726", "39753970", "39840067", "40273911",
 )
+# Second sealed confirmation set (role ``confirm2``): tumour-mutation studies
+# found by a title search for neoantigen-related terms after the first holdout
+# was spent. Chosen by title and counts alone. Nothing in it has been loaded,
+# scored or analysed. The exclusions are listed so that the choice can be audited.
+CONFIRM2_NEOEPITOPE_PMIDS = (
+    "11325844", "11391614", "15128789", "16247014", "22912393", "22926105",
+    "23644516", "24323902", "24979674", "24987109", "26060019", "26389673",
+    "26516200", "26681737", "26808500", "26901407", "26945006", "27312342",
+    "27827318", "27869121", "27959684", "28031159", "28423700", "28619968",
+    "29203539", "29296522", "29563135", "29731959", "29895573", "30256815",
+    "30640174", "30714987", "30880120", "30906664", "31011208", "31069153",
+    "31164343", "31221207", "31243155", "31266769", "31351799", "31685621",
+    "31857430", "31921104", "32226429", "32793190", "32807968", "32831296",
+    "33016924", "33257508", "33259803", "33262074", "33262196", "33329543",
+    "33479501", "33689574", "33811047", "33879241", "33928024", "34185709",
+    "34236583", "34266885", "34321276", "34518289", "34696226", "34771556",
+    "34782741", "34813506", "34903219", "35122353", "35379963", "35410325",
+    "35413271", "35413272", "35636066", "35648703", "35661819", "35970920",
+    "36088370", "36593398", "36792124", "36831375", "36890230", "37076248",
+    "37280206", "37359417", "37731488", "37756564", "37939617", "38241630",
+    "38349410", "38416845", "38633261", "38740147", "38782542", "38832948",
+    "39394480", "39559350", "39720721", "39725148", "39748060", "39832892",
+    "39972144", "40205806", "40280722", "40443655", "40554954", "40645179",
+    "40681176", "40687378", "41056506", "41136363", "41312368", "41528883",
+    "41839756", "42458705",
+)
+# Title-matched publications deliberately left out, with the reason.
+CONFIRM2_EXCLUDED_PMIDS = {
+    **{p: "viral or viral-mutant antigen" for p in (
+        "11024156", "12667209", "15591521", "24759101", "31736946", "33658348",
+        "34222571", "32157447", "40078724", "41280906")},
+    **{p: "not a mutated peptide" for p in ("30115740", "38920720")},
+    **{p: "post-translational modification, not a sequence change" for p in (
+        "28314751", "37353482")},
+    **{p: "anchor- or residue-modified peptide, not a natural variant" for p in (
+        "35959968", "35720289", "35704596")},
+    **{p: "mixed or unclear antigen classes" for p in (
+        "14973499", "31624377", "31427818", "30556813", "32582212", "35468205",
+        "35484264")},
+}
+
 # Cohorts that are not a single publication, or that need a stated rule.
 SPECIAL_COHORTS = {
     # Two papers on one yellow fever panel from one laboratory.
@@ -82,13 +123,14 @@ FORCED_DEV = frozenset((
 # (the TESLA consortium paper, with its tested negatives). Designated before any
 # foreignness score was computed on either.
 FORCED_HOLDOUT = frozenset(("vaccinia_dryvax", "33038342"))
+FORCED_CONFIRM2 = frozenset(CONFIRM2_NEOEPITOPE_PMIDS)
 
 
 def cohort_specs() -> dict[str, dict]:
     specs = {}
     for pmid in VIRAL_PMIDS:
         specs[pmid] = {"domain": "viral", "filters": [("pmid", pmid)]}
-    for pmid in NEOEPITOPE_PMIDS:
+    for pmid in NEOEPITOPE_PMIDS + CONFIRM2_NEOEPITOPE_PMIDS:
         specs[pmid] = {"domain": "neoepitope", "filters": [("pmid", pmid)]}
     for cohort, spec in SPECIAL_COHORTS.items():
         specs[cohort] = dict(spec)
@@ -99,6 +141,8 @@ def cohort_specs() -> dict[str, dict]:
 
 
 def assign_role(cohort: str) -> str:
+    if cohort in FORCED_CONFIRM2:
+        return "confirm2"
     if cohort in FORCED_DEV:
         return "dev"
     if cohort in FORCED_HOLDOUT:
@@ -274,8 +318,14 @@ def deduplicate(records: list[dict]) -> tuple[list[dict], Counter]:
     return result, mixed
 
 
-def eligibility_audit(rows: list[dict]) -> list[dict]:
-    """Per-cohort counts after preparation, applying the inclusion thresholds."""
+def eligibility_audit(rows: list[dict],
+                      minimum: int | None = None) -> list[dict]:
+    """Per-cohort counts after preparation, applying the inclusion thresholds.
+
+    ``minimum`` overrides the pooled-inclusion threshold (default 5 of each
+    outcome); the stricter threshold for reporting a cohort alone is unchanged.
+    """
+    minimum = MIN_POSITIVES if minimum is None else minimum
     by = defaultdict(list)
     for row in rows:
         by[row["cohort"]].append(row)
@@ -284,7 +334,7 @@ def eligibility_audit(rows: list[dict]) -> list[dict]:
         positives = sum(r["outcome"] == "Positive" for r in members)
         negatives = len(members) - positives
         peptides = {r["peptide"] for r in members}
-        included = positives >= MIN_POSITIVES and negatives >= MIN_NEGATIVES
+        included = positives >= minimum and negatives >= minimum
         reported = (positives >= MIN_POSITIVES_REPORTED
                     and negatives >= MIN_NEGATIVES_REPORTED)
         audit.append({
@@ -296,7 +346,7 @@ def eligibility_audit(rows: list[dict]) -> list[dict]:
             "included": included,
             "reported_alone": reported,
             "reason": None if included else (
-                f"fewer than {MIN_POSITIVES} positives or "
-                f"{MIN_NEGATIVES} negatives after preparation"),
+                f"fewer than {minimum} positives or "
+                f"{minimum} negatives after preparation"),
         })
     return audit

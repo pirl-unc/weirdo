@@ -331,6 +331,71 @@ refined candidate would not be an independent confirmation. The viral holdout,
 including the 21,419-pair vaccinia screen, is sealed and available to any future
 viral candidate that clears development.
 
+## Second generation: a sealed set for the novelty hypothesis
+
+Registered on 2026-10-15, after the first neoepitope holdout was spent and
+before any outcome in the set below was analysed.
+
+**Why.** The first holdout was inconclusive and 94% point mutants, so it could not
+test what the development data suggested: that peptides with two or more
+mismatches to the nearest human window are more often recognized than point
+mutants, at equal predicted presentation. Testing that needs fresh tumour-mutation
+data. None of it is independent of the *idea* (the idea came from the development
+data and from learning that the first holdout lacked such peptides), but all of it
+is independent *data*.
+
+**Data.** A title search of IEDB for neoantigen, neoepitope, frameshift, mutanome,
+mutated, mutant, somatic and fusion terms found 269 publications outside the
+registry. After reading titles alone, 116 are included as tumour-mutation studies
+(`CONFIRM2_NEOEPITOPE_PMIDS`) and 24 are excluded with a stated reason in
+`CONFIRM2_EXCLUDED_PMIDS` (viral or viral-mutant antigens, unmutated peptides,
+post-translational or residue-modified peptides, mixed antigen classes). The set
+has role `confirm2` and was never scored or analysed before this registration;
+only marginal counts and the distribution of mismatches to the nearest human window
+(never cross-tabulated with an outcome) were inspected, in order to state the power
+below.
+
+Under the usual preparation rules most of these studies drop out: 33 report only
+positives, 19 have both outcomes but fewer than five of one, and a large share of
+rows are class II or lack an exact class-I allele. The primary analysis keeps
+cohorts with at least five of each outcome, as in development: **15
+cohorts, 984 pairs, 197 positive**, after dropping 14 rows whose peptide
+shares a 7-mer with a development peptide. Of these, 19% match a human window
+exactly, 73% differ at one position and 8.4%
+(83 pairs) differ at two or more. A registered *sensitivity* analysis keeps cohorts with
+at least one of each outcome (34 cohorts, about 1,500 pairs, about 340 positive). It
+is reported but cannot decide the verdict.
+
+**Power of the primary analysis** (one-sided alpha 0.025, standardized score, 0-25%
+of the information lost to adjustment):
+
+| True odds ratio per SD | 1.1 | 1.2 | 1.3 | 1.5 |
+| --- | ---: | ---: | ---: | ---: |
+| Power | 12%-14% | 32%-40% | 57%-69% | 91%-97% |
+
+The development data imply roughly 1.4-1.5 per SD for a two-or-more-mismatch
+indicator before any shrinkage, which this set could confirm; a more modest true
+effect would often go unconfirmed, and the report will state which effect sizes it
+can exclude.
+
+**Candidates** (`G2_EVALUATED`), scored on the development neoepitope cohorts only:
+`nn_full_whole` (the first-generation winner, as a reference), `mismatch_whole`
+(count of mismatches to the nearest human window), `novel_2plus` (one if two or
+more mismatches) and `novel_log` (log of one plus the count). The last two are
+post hoc, so their development numbers are exploratory.
+
+**Selection.** The identical rule: positive pooled coefficient, positive in at
+least 60% of cohorts reported alone, pooled z of at least 1.645, 90% coverage; the
+largest z wins and ties go to the earlier candidate (`nn_full_whole`, then
+`mismatch_whole`, then the two new ones). If none qualifies, the sealed set is not
+opened.
+
+**Confirmation.** The selected candidate is committed before the stage runs, then
+evaluated once with `--stage confirm2`. Confirmed only if the one-sided
+cluster-robust z exceeds 1.96 and the odds ratio is at least 1.10 per SD, exactly as
+for the first holdout. A confirmed result would justify considering a score
+feature for neoepitope ranking and nothing more.
+
 ## Deviations
 
 Logged in the order they happened; none changes a registered rule.
@@ -344,3 +409,7 @@ Logged in the order they happened; none changes a registered rule.
    score spread were computed from sequences alone, with no outcome read, to
    explain why the test was inconclusive. It is a post-hoc description, not part
    of the registered test, and it did not alter the result or the selection.
+4. After the first neoepitope holdout was spent, a second sealed confirmation set,
+   the novelty candidates and the inclusive sensitivity analysis were registered
+   (section above) before the new candidates were ranked and before any
+   outcome in the set was analysed.

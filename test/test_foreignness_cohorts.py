@@ -45,7 +45,8 @@ def test_roles_are_deterministic_and_forced_cohorts_keep_their_side():
 def test_every_registered_cohort_has_exactly_one_domain_and_role():
     specs = cohort_specs()
     assert {s["domain"] for s in specs.values()} == {"viral", "neoepitope"}
-    assert {s["role"] for s in specs.values()} == {"dev", "holdout"}
+    assert {s["role"] for s in specs.values()} == {
+        "dev", "holdout", "confirm2"}
     assert specs["33038342"]["role"] == "holdout"
     assert specs["vaccinia_dryvax"]["role"] == "holdout"
     assert specs["38608022"]["assay_methods"] == ("biological activity",)
@@ -137,3 +138,30 @@ def test_eligibility_thresholds_separate_pooled_from_reported_cohorts():
     assert audit["small"]["included"] and not audit["small"]["reported_alone"]
     assert not audit["onesided"]["included"]
     assert audit["onesided"]["reason"]
+
+
+def test_the_second_confirmation_set_is_disjoint_from_everything_already_used():
+    from scripts.foreignness_cohorts import (
+        CONFIRM2_EXCLUDED_PMIDS,
+        CONFIRM2_NEOEPITOPE_PMIDS,
+        NEOEPITOPE_PMIDS,
+        VIRAL_PMIDS,
+    )
+    confirm2 = set(CONFIRM2_NEOEPITOPE_PMIDS)
+    assert len(confirm2) == len(CONFIRM2_NEOEPITOPE_PMIDS)       # no repeats
+    assert not confirm2 & set(NEOEPITOPE_PMIDS) | confirm2 & set(VIRAL_PMIDS)
+    assert not confirm2 & {"28386132", "32983097"}
+    assert not confirm2 & set(CONFIRM2_EXCLUDED_PMIDS)
+    specs = cohort_specs()
+    assert {c for c, s in specs.items() if s["role"] == "confirm2"} == confirm2
+    assert all(specs[c]["domain"] == "neoepitope" for c in confirm2)
+
+
+def test_the_pooled_inclusion_threshold_can_be_loosened_without_touching_reporting():
+    rows = [{"cohort": "c", "domain": "viral", "role": "dev",
+             "outcome": "Positive" if i < 2 else "Negative",
+             "peptide": f"P{i}", "hla": "HLA-A*02:01"} for i in range(12)]
+    strict = eligibility_audit(rows)[0]
+    loose = eligibility_audit(rows, minimum=1)[0]
+    assert not strict["included"] and loose["included"]
+    assert not loose["reported_alone"]           # still too small to stand alone
