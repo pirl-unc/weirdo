@@ -142,13 +142,44 @@ MIN_LENGTH, MAX_LENGTH = 8, 14
 PRESENTATION_CALIPER = 0.1  # MHCflurry percentile-rank points.
 PRESENTATION_CALIPER_SENSITIVITY = (0.02, 0.05, 0.1, 0.25)
 
-# Pre-registration. The discovery analysis committed in 3c40e4d nominated the
-# anchor-masked nearest-human BLOSUM62 distance as the single least weak lead,
-# with higher distance predicting a T-cell response, and fixed the 0.1
-# percentile-point caliper before any validation cohort was fetched or scored.
-# Nothing below may be re-chosen after the validation numbers are seen.
+# Pre-registration, with its real timeline (see ``VALIDATION_PROVENANCE``).
+# Commit 3c40e4d (and the matching issue #8 comment) nominated the
+# anchor-masked nearest-human BLOSUM62 distance as the single least weak lead
+# before the first validation export was fetched, with the 0.1 percentile-point
+# caliper and the within-HLA and presentation-matched comparisons. The alpha,
+# the permutation test and the every-cohort conjunction were written later,
+# before any validation score was computed but after cohort sizes, alleles and
+# peptide overlap had been inspected. Nothing below may be re-chosen after the
+# validation numbers are seen.
 PRIMARY_VALIDATION_SCORE = "nearest_human_blosum62_tcr"
 PRIMARY_VALIDATION_DIRECTION = "higher score predicts Positive"
+VALIDATION_PROVENANCE = {
+    "nominated_before_any_validation_data_were_fetched": {
+        "commit": "3c40e4d",
+        "committed": "2026-10-15T14:58:42-04:00",
+        "first_validation_export_fetched": "2026-10-15T15:00:27-04:00",
+        "fixed_there": [
+            "the score and its TCR-face definition",
+            "the 0.1 percentile-point presentation caliper",
+            "within-HLA and presentation-matched AUC as the two comparisons",
+            "higher distance predicting a response (the AUC > 0.5 convention)",
+        ],
+    },
+    "written_after_cohort_structure_was_inspected_but_before_any_score": [
+        "alpha = 0.05 and the one-sided label-permutation test",
+        "the rule that both comparisons must pass in every validation cohort",
+        "merging the two yellow fever papers into one cohort",
+        "excluding binding-only readouts and mapping 'Administration in vivo' "
+        "to the vaccinated stratum",
+    ],
+    "changed_after_validation_results_were_visible": [
+        "permutation draws raised from 2,000 to 50,000 and per-stratum random "
+        "streams introduced, because the 2,000-draw p-value near alpha "
+        "depended on the permutation seed and on a batching parameter "
+        "(Monte-Carlo standard error about 0.005); the estimand is unchanged "
+        "but the procedure was not fixed in advance",
+    ],
+}
 # name -> (presentation caliper, pairing strata). The decision loop reads the
 # pre-registered names out of this registry, so the published rule and the
 # executed rule cannot drift apart. The source-species row is a post-hoc
@@ -1834,10 +1865,7 @@ def main() -> None:
             ),
         },
         "validation_prespecification": {
-            "fixed_in_commit": "3c40e4d",
-            "fixed_before": (
-                "any validation cohort was fetched, scored, or inspected"
-            ),
+            "provenance": VALIDATION_PROVENANCE,
             "primary_score": PRIMARY_VALIDATION_SCORE,
             "primary_direction": PRIMARY_VALIDATION_DIRECTION,
             "primary_comparisons": list(PRIMARY_VALIDATION_COMPARISONS),

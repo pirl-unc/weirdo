@@ -7,9 +7,10 @@ be read as one analysis:
 - a **discovery** half over three SARS-CoV-2 studies, which is hypothesis
   generation and was free to look at every definition; and
 - a **validation** half over two cohorts that contributed nothing to
-  discovery, which tests one score, one direction, one comparison and one
-  caliper, all fixed in commit `3c40e4d` before the validation data were
-  fetched.
+  discovery, which tests one score, one direction, two comparisons and one
+  caliper nominated in commit `3c40e4d` before any validation export was
+  fetched, under a decision rule written afterwards (see
+  [Timeline and deviations](#timeline-and-deviations)).
 
 Neither half produced a usable foreignness predictor. The pre-registered score
 did not validate; the details are below.
@@ -163,8 +164,9 @@ viruses, were also null, and the learned taxonomy classifiers were mostly
 enrichment.
 
 On that evidence the nearest-human TCR-face distance was nominated as the
-single least weak candidate, and its formula, direction, comparison and caliper
-were frozen in commit `3c40e4d`.
+single least weak candidate in commit `3c40e4d`, with its formula, direction,
+caliper and the two comparisons. The significance test and decision rule below
+were added afterwards.
 
 ## Pre-registered validation
 
@@ -179,6 +181,24 @@ The rule recorded in `report.json` under `validation_prespecification`:
 - **decision** validated only if *both* comparisons exceed 0.5 with p < α in
   *every* validation cohort. The two human-surprisal scores are reported as
   secondary context and cannot change the decision.
+
+### Timeline and deviations
+
+"Pre-registered" here means committed before the relevant numbers existed, not
+filed with an external registry, and the pre-registration was staged rather
+than complete:
+
+| Stage | What was fixed | When |
+| --- | --- | --- |
+| Nominated | Score and TCR-face definition, direction, 0.1 caliper, within-HLA and presentation-matched AUC | Commit `3c40e4d`, 14:58 on 2026-10-15, mirrored in an issue #8 comment a minute later; the first validation export was fetched at 15:00 |
+| Written before any validation score, after inspecting cohort sizes, alleles and overlap | α = 0.05, the one-sided permutation test, the every-cohort conjunction, merging the two yellow fever papers, excluding binding-only readouts | Same session as the first validation run |
+| Changed after validation results were visible | Permutation draws raised from 2,000 to 50,000 and per-stratum random streams introduced | After a code review showed the 2,000-draw p-value near α depended on the permutation seed and a batching parameter |
+
+The last row is a real deviation. It does not change what is estimated, and the
+verdict does not depend on it (yellow fever fails both comparisons at any
+draw count), but a procedure that was changed after seeing results should not
+be described as fixed in advance. The same `provenance` block is written into
+`report.json`.
 
 ### Outcome: not validated
 
