@@ -246,3 +246,31 @@ def test_the_second_confirmation_stage_refuses_without_a_committed_selection():
             bench.run_holdout(Args(), confirm2=True)
     finally:
         bench.SELECTED_CONFIRM2.update(saved)
+
+
+def test_composition_candidates_are_adjusted_for_the_other_baseline_only():
+    assert set(bench.G3_NEW_CANDIDATES) == set(bench.BASELINES)
+    rows, _ = _synthetic_rows(effect=0.0, n=300)
+    plain = bench.nuisance_matrix(rows, "viral", False)
+    both = bench.nuisance_matrix(rows, "viral", True)
+    one = bench.nuisance_matrix(
+        rows, "viral", True, ("tcr_face_hydrophobicity",))
+    assert both.shape[1] == plain.shape[1] + 2
+    assert one.shape[1] == plain.shape[1] + 1
+
+
+def test_verdict_threshold_follows_the_alpha_it_is_given():
+    effect = {"beta": 0.25, "se": 0.115, "z": 0.25 / 0.115,   # z = 2.17
+              "odds_ratio": float(np.exp(0.25))}
+    assert bench.holdout_verdict(effect, alpha=0.025)["confirmed"]
+    stricter = bench.holdout_verdict(effect, alpha=0.0125)
+    assert not stricter["confirmed"]
+    assert stricter["critical_z"] == pytest.approx(2.2414, abs=1e-3)
+
+
+def test_third_generation_refuses_without_an_acknowledged_selection():
+    class Args:
+        selection_is_committed = False
+        cache_root = None
+    with pytest.raises(SystemExit):
+        bench.run_confirm3(Args())

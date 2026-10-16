@@ -108,7 +108,16 @@ G2_NEW_CANDIDATES: dict[str, str] = {
     "novel_log": "novelty (post hoc)",
 }
 G2_EVALUATED = ("nn_full_whole", "mismatch_whole", "novel_2plus", "novel_log")
-ALL_CANDIDATES: dict[str, str] = {**CANDIDATES, **G2_NEW_CANDIDATES}
+# Third generation: not foreignness at all. TCR-face composition features that
+# the first benchmark carried as covariates turned out, on development data, to
+# be stronger and more consistent than any foreignness definition.
+G3_NEW_CANDIDATES: dict[str, str] = {
+    "tcr_face_aromatic_fraction": "composition (TCR face)",
+    "tcr_face_hydrophobicity": "composition (TCR face)",
+}
+G3_EVALUATED = tuple(G3_NEW_CANDIDATES)
+ALL_CANDIDATES: dict[str, str] = {
+    **CANDIDATES, **G2_NEW_CANDIDATES, **G3_NEW_CANDIDATES}
 
 # Filled in and committed between the stages. ``None`` blocks the holdout.
 # Viral: no candidate met the registered development gate, so none is selected.
@@ -120,6 +129,15 @@ SELECTED_CANDIDATES: dict[str, str | None] = {
 # Neoepitope: the registered rule again picks nn_full_whole; the novelty
 # candidates did not qualify (see "Second-generation development ranking").
 SELECTED_CONFIRM2: dict[str, str | None] = {"neoepitope": "nn_full_whole"}
+# Third generation: filled in and committed after the dev3 ranking. The sealed
+# sets differ by domain; the neoepitope ones were used once already for a
+# different hypothesis, so their threshold is halved to pay for the reuse.
+# Both domains: the registered rule selects the aromatic share (dev3 ranking).
+SELECTED_CONFIRM3: dict[str, str | None] = {
+    "viral": "tcr_face_aromatic_fraction",
+    "neoepitope": "tcr_face_aromatic_fraction"}
+CONFIRM3_ROLES = {"viral": ("holdout",), "neoepitope": ("holdout", "confirm2")}
+CONFIRM3_ALPHA = {"viral": 0.025, "neoepitope": 0.0125}
 
 COND_PANEL = (
     "HLA-A*01:01", "HLA-A*02:01", "HLA-A*03:01", "HLA-A*11:01",
@@ -499,6 +517,9 @@ def compute_candidates(rows: list[dict], res: Resources, wanted: list[str],
             matrix="blosum62", beta=1.0))
         pair_scores["nn_atlas_allele"] = out["nearest"]
         pair_scores["soft_atlas_allele"] = out["soft"]
+    for name in G3_NEW_CANDIDATES:
+        if name in want:
+            pep_scores[name] = composition_baselines(peptides)[name]
     if want & {n for n in CANDIDATES if n.startswith("cond_")}:
         models = conditional
         matrix = vectorize(peptides, "tcr_face")
@@ -585,8 +606,14 @@ def standardize_within(values: np.ndarray, strata: list) -> np.ndarray:
     return result
 
 
-def nuisance_matrix(rows: list[dict], domain: str, stringent: bool) -> np.ndarray:
-    """Everything except the score: strata, presentation, allele, species, ..."""
+def nuisance_matrix(rows: list[dict], domain: str, stringent: bool,
+                    covariates: tuple | None = None) -> np.ndarray:
+    """Everything except the score: strata, presentation, allele, species, ...
+
+    ``covariates`` names the composition baselines to adjust for; by default the
+    stringent model adjusts for both, and a composition candidate must be tested
+    without itself.
+    """
     strata = [f"{r['cohort']}|{r['exposure']}" for r in rows]
     presentation = np.clip(np.asarray(
         [r["mhcflurry_presentation_score"] for r in rows]), 1e-6, 1 - 1e-6)
@@ -608,10 +635,10 @@ def nuisance_matrix(rows: list[dict], domain: str, stringent: bool) -> np.ndarra
     if domain == "viral":
         blocks.append(pooled_dummies(
             [r["source_species"] for r in rows], RARE_LEVEL_ROWS))
-    if stringent:
-        for name in BASELINES:
-            blocks.append(standardize_within(
-                np.asarray([r[name] for r in rows]), strata)[:, None])
+    names = BASELINES if (stringent and covariates is None) else (covariates or ())
+    for name in names:
+        blocks.append(standardize_within(
+            np.asarray([r[name] for r in rows]), strata)[:, None])
     return np.hstack(blocks)
 
 
@@ -662,7 +689,8 @@ def pooled_effect(rows: list[dict], scores: np.ndarray, nuisance: np.ndarray,
             "n_clusters": int(len(set(groups)))}
 
 
-def cohort_effect(rows: list[dict], scores: np.ndarray) -> dict | None:
+def cohort_effect(rows: list[dict], scores: np.ndarray,
+                  covariates: tuple = BASELINES) -> dict | None:
     """One cohort alone: presentation, allele, baselines and assay counts."""
     strata = [f"{r['cohort']}|{r['exposure']}" for r in rows]
     z = standardize_within(scores, strata)
@@ -680,7 +708,7 @@ def cohort_effect(rows: list[dict], scores: np.ndarray) -> dict | None:
         np.log([r["n_assay_rows"] for r in sub])[:, None],
     ]
     substrata = [f"{r['cohort']}|{r['exposure']}" for r in sub]
-    for name in BASELINES:
+    for name in covariates:
         blocks.append(standardize_within(
             np.asarray([r[name] for r in sub]), substrata)[:, None])
     groups = np.unique(
@@ -718,6 +746,7 @@ def evaluate_candidates(rows: list[dict], scores: dict[str, np.ndarray],
     """Ledger of every candidate in one domain under the registered model."""
     stringent = nuisance_matrix(rows, domain, True)
     plain = nuisance_matrix(rows, domain, False)
+    adjusted_for_others = {}
     by_cohort = defaultdict(list)
     for i, row in enumerate(rows):
         by_cohort[row["cohort"]].append(i)
@@ -732,13 +761,23 @@ def evaluate_candidates(rows: list[dict], scores: dict[str, np.ndarray],
         coverage = float(np.isfinite(values).mean())
         entry = {"candidate": name, "family": ALL_CANDIDATES[name],
                  "coverage": coverage}
-        entry["stringent"] = pooled_effect(rows, values, stringent)
+        covariates = tuple(b for b in BASELINES if b != name)
+        if covariates == BASELINES:
+            model = stringent
+        else:   # a composition candidate is adjusted for the other baseline
+            if covariates not in adjusted_for_others:
+                adjusted_for_others[covariates] = nuisance_matrix(
+                    rows, domain, True, covariates)
+            model = adjusted_for_others[covariates]
+        entry["covariates"] = list(covariates)
+        entry["stringent"] = pooled_effect(rows, values, model)
         entry["structure_only"] = pooled_effect(rows, values, plain)
         entry["protein_free_clusters"] = pooled_effect(
-            rows, values, stringent, "peptide_cluster")
+            rows, values, model, "peptide_cluster")
         per_cohort = {}
         for cohort, index in reported:
-            result = cohort_effect([rows[i] for i in index], values[index])
+            result = cohort_effect(
+                [rows[i] for i in index], values[index], covariates)
             if result:
                 per_cohort[cohort] = result
         entry["per_cohort"] = per_cohort
@@ -785,13 +824,17 @@ def select_candidate(ledger: list[dict]) -> dict:
             "passing": [e["candidate"] for e in eligible]}
 
 
-def holdout_verdict(effect: dict) -> dict:
-    """Apply the registered confirmation rule to the holdout estimate."""
+def holdout_verdict(effect: dict, alpha: float = ALPHA_HOLDOUT) -> dict:
+    """Apply the registered confirmation rule to a sealed-set estimate."""
     se = effect["se"]
     upper = float(np.exp(effect["beta"] + 1.96 * se))
-    confirmed = effect["z"] > 1.96 and effect["odds_ratio"] >= MIN_ODDS_RATIO_HOLDOUT
+    critical = NormalDist().inv_cdf(1 - alpha)
+    confirmed = (effect["z"] > critical
+                 and effect["odds_ratio"] >= MIN_ODDS_RATIO_HOLDOUT)
     return {
         "confirmed": bool(confirmed),
+        "alpha_one_sided": alpha,
+        "critical_z": critical,
         "one_sided_z": effect["z"],
         "odds_ratio_per_sd": effect["odds_ratio"],
         "upper_95_odds_ratio": upper,
@@ -1040,6 +1083,100 @@ def run_holdout(args, dry_run: bool = False, confirm2: bool = False) -> None:
         json.dumps(report, indent=1, default=float) + "\n")
 
 
+def run_confirm3(args, dry_run: bool = False) -> None:
+    """Test the committed composition candidate once on each domain's sealed sets.
+
+    The candidate is adjusted for the *other* composition baseline, never for
+    itself. ``dry_run`` points the identical code at the development rows and
+    checks that it reproduces the dev3 estimate; it reads no sealed row.
+    """
+    from datacache import Cache
+
+    if dry_run:
+        dev3 = json.loads((OUTPUT_ROOT / "dev3-report.json").read_text())
+        chosen = {d: v["selection"]["selected"]
+                  for d, v in dev3["domains"].items()
+                  if v["selection"]["selected"]}
+    else:
+        chosen = {d: c for d, c in SELECTED_CONFIRM3.items() if c}
+        if not chosen:
+            raise SystemExit(
+                "SELECTED_CONFIRM3 is empty. Commit the third-generation "
+                "selection before the sealed sets are evaluated.")
+        if not args.selection_is_committed:
+            raise SystemExit(
+                "Pass --selection-is-committed to confirm the selection was "
+                "committed before this run.")
+    cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
+    report = {"stage": "confirm3-dry-run" if dry_run else "confirm3",
+              "selected": chosen, "domains": {}}
+    for domain, candidate in chosen.items():
+        roles = ("dev",) if dry_run else CONFIRM3_ROLES[domain]
+        alpha = CONFIRM3_ALPHA[domain]
+        dev_rows, _ = assemble_rows(() if dry_run else ("dev",), cache, {domain})
+        # Loaded inclusively so the sensitivity analysis can use it; the primary
+        # analysis keeps cohorts with at least five of each outcome.
+        rows, funnel = prepare_rows(roles, cache, {domain}, 1)
+        funnel["rows_before_dev_overlap_filter"] = len(rows)
+        rows = drop_holdout_reusing_dev(rows, dev_rows)
+        funnel["clusters"] = add_clusters(rows)
+        tally = defaultdict(lambda: [0, 0])
+        for row in rows:
+            tally[row["cohort"]][row["outcome"] == "Positive"] += 1
+        primary_cohorts = {c for c, (neg, pos) in tally.items()
+                           if pos >= MIN_PRIMARY and neg >= MIN_PRIMARY}
+        covariates = tuple(b for b in BASELINES if b != candidate)
+        values = np.asarray([r[candidate] for r in rows])
+
+        def analyse(keep_cohorts):
+            index = [i for i, r in enumerate(rows)
+                     if keep_cohorts is None or r["cohort"] in keep_cohorts]
+            subset = [rows[i] for i in index]
+            nuisance = nuisance_matrix(subset, domain, True, covariates)
+            effect = pooled_effect(subset, values[index], nuisance)
+            per_cohort = {}
+            for cohort in sorted({r["cohort"] for r in subset}):
+                members = [i for i, r in enumerate(subset)
+                           if r["cohort"] == cohort]
+                result = cohort_effect(
+                    [subset[i] for i in members], values[index][members],
+                    covariates)
+                if result:
+                    per_cohort[cohort] = result
+            return {
+                "n_rows": len(subset),
+                "n_positive": sum(r["outcome"] == "Positive" for r in subset),
+                "n_cohorts": len({r["cohort"] for r in subset}),
+                "pooled": effect, "per_cohort": per_cohort,
+                "n_cohorts_reported_alone": len(per_cohort),
+                "n_cohorts_positive": sum(
+                    v["beta"] > 0 for v in per_cohort.values()),
+                "verdict": holdout_verdict(effect, alpha)
+                if effect and "beta" in effect else None}
+
+        entry = {"candidate": candidate, "alpha_one_sided": alpha,
+                 "covariates": list(covariates), "data_funnel": {
+                     k: v for k, v in funnel.items() if k != "audit"},
+                 "primary": analyse(primary_cohorts),
+                 "inclusive_sensitivity": analyse(None)}
+        if dry_run:
+            reference = next(
+                e for e in dev3["domains"][domain]["ledger"]
+                if e["candidate"] == candidate)["stringent"]
+            pooled = entry["primary"]["pooled"]
+            entry["reproduces_dev_estimate"] = bool(
+                abs(pooled["beta"] - reference["beta"]) < 1e-6
+                and abs(pooled["se"] - reference["se"]) < 1e-6)
+        report["domains"][domain] = entry
+        verdict = entry["primary"]["verdict"] or {}
+        log(f"{domain}: {candidate} -> {verdict.get('reading')}"
+            + (f" | reproduces dev: {entry['reproduces_dev_estimate']}"
+               if dry_run else ""))
+    name = "confirm3-dryrun-report.json" if dry_run else "confirm3-report.json"
+    (OUTPUT_ROOT / name).write_text(
+        json.dumps(report, indent=1, default=float) + "\n")
+
+
 def describe_confirm2(args) -> None:
     """What the second confirmation set contains, without any association.
 
@@ -1100,7 +1237,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--stage", default="dev",
-        choices=("dev", "dev2", "holdout", "confirm2", "describe-confirm2"))
+        choices=("dev", "dev2", "dev3", "holdout", "confirm2", "confirm3",
+                 "describe-confirm2"))
     parser.add_argument("--dry-run", action="store_true",
                         help="holdout code path on development rows only")
     parser.add_argument("--cache-root", type=Path, default=CACHE_ROOT)
@@ -1116,6 +1254,10 @@ def main() -> None:
     elif args.stage == "dev2":
         run_dev(args, wanted=list(G2_EVALUATED), domains={"neoepitope"},
                 tag="dev2")
+    elif args.stage == "dev3":
+        run_dev(args, wanted=list(G3_EVALUATED), tag="dev3")
+    elif args.stage == "confirm3":
+        run_confirm3(args, dry_run=args.dry_run)
     elif args.stage == "describe-confirm2":
         describe_confirm2(args)
     else:

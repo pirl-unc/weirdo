@@ -465,6 +465,70 @@ presentation and TCR-face composition in these data. A small effect (up to about
 neoepitope sealed sets are now spent for this candidate. The viral holdout, including
 the 21,419-pair vaccinia screen, is still sealed.
 
+## Third generation: a composition feature, not foreignness
+
+Registered on 2026-10-15 after both neoepitope sets were analysed and before any
+sealed set was touched for this hypothesis.
+
+**What and why.** The first benchmark carried two TCR-face composition measures as
+covariates: the mean hydropathy of residues P3 to P-omega-minus-one, and the share of
+F, W and Y among them (`tcr_face_aromatic_fraction`). Tested on their own, under the
+same adjusted model but each adjusted for the *other* instead of itself, the
+aromatic share was stronger and more consistent on development data than any of
+the 26 foreignness definitions, in both domains. It is not a measure of foreignness
+and nothing here is evidence about foreignness. It is evidence about what a ranking
+model should contain. Large aromatic residues at TCR-contact positions have been
+reported to enrich for immunogenicity (for example Calis et al., PLoS Comput Biol
+2013), so this is a replication on new data rather than a new idea.
+
+**Development ranking** (the identical registered rule, 2 candidates; the
+development numbers are optimistic because this feature was chosen after they were
+seen as covariates):
+
+| Domain | Candidate | OR/SD (95% CI) | z | Cohorts + |
+| --- | --- | ---: | ---: | ---: |
+| viral | aromatic share | 1.26 (1.16-1.38) | +5.48 | 83% (18) |
+| viral | hydropathy | 1.07 (1.00-1.15) | +2.03 | 61% (18) |
+| neoepitope | aromatic share | 1.24 (1.09-1.40) | +3.34 | 100% (6) |
+| neoepitope | hydropathy | 1.09 (0.95-1.24) | +1.19 | 43% (7) |
+
+The rule selects the aromatic share in both domains.
+
+**Test.** One pre-specified hypothesis per domain: the aromatic share has an odds
+ratio above 1 per SD beyond predicted presentation, stratum, allele, species,
+length, assay counts and hydropathy, with peptide- and protein-cluster-robust
+errors. It is evaluated once on sealed data that did not choose it:
+
+- *viral*: the viral holdout (the vaccinia Dryvax screen and eight hashed cohorts),
+  never opened. Rows sharing a 7-mer with a development peptide are dropped.
+  One-sided alpha 0.025.
+- *neoepitope*: the first holdout and the second sealed set together. Both were
+  analysed once already, for the foreignness hypothesis, and not for this one, so
+  their use is paid for by halving the threshold to alpha 0.0125. The primary
+  analysis keeps cohorts with at least five of each outcome; an inclusive
+  sensitivity analysis (at least one of each) is reported and cannot decide.
+
+Confirmed in a domain only if the one-sided z exceeds the critical value for its
+alpha **and** the odds ratio is at least 1.10 per SD. The two domains are judged
+separately.
+
+**Power** (approximate, from marginal counts only; 0-25% of information lost to
+adjustment; odds ratio per SD):
+
+| | 1.10 | 1.15 | 1.25 | 1.35 |
+| --- | ---: | ---: | ---: | ---: |
+| Viral, alpha 0.025 | 30%-38% | 56%-68% | 92%-97% | 99%-100% |
+| Neoepitope, alpha 0.0125 | 11%-14% | 22%-30% | 55%-69% | 83%-92% |
+
+At the development estimates (about 1.25 per SD) the viral test is well powered and
+the neoepitope test is only moderately so; a neoepitope miss would again be
+inconclusive about smaller effects.
+
+**Meaning.** A confirmed viral result would support adding TCR-face aromatic content
+to a presentation-based ranking for pathogen epitopes, and a confirmed neoepitope
+result would support it for neoepitopes. Neither would say anything about
+foreignness, and neither would be an implementation.
+
 ## Deviations
 
 Logged in the order they happened; none changes a registered rule.
@@ -489,3 +553,7 @@ Logged in the order they happened; none changes a registered rule.
 6. The second confirmation set was analysed once and the confirmatory evidence
    pooled (section above). The pooling is a post-hoc description, not a registered
    test, and the registered verdict for each set stands on its own.
+7. After the neoepitope sealed sets were analysed for the foreignness hypothesis,
+   a third hypothesis (the aromatic share) was registered above and the same sets
+   were reserved for it at a halved alpha. The viral holdout is used for the first
+   time.
