@@ -117,7 +117,9 @@ ALL_CANDIDATES: dict[str, str] = {**CANDIDATES, **G2_NEW_CANDIDATES}
 SELECTED_CANDIDATES: dict[str, str | None] = {
     "viral": None, "neoepitope": "nn_full_whole"}
 # Filled in and committed after the second-generation development stage.
-SELECTED_CONFIRM2: dict[str, str | None] = {"neoepitope": None}
+# Neoepitope: the registered rule again picks nn_full_whole; the novelty
+# candidates did not qualify (see "Second-generation development ranking").
+SELECTED_CONFIRM2: dict[str, str | None] = {"neoepitope": "nn_full_whole"}
 
 COND_PANEL = (
     "HLA-A*01:01", "HLA-A*02:01", "HLA-A*03:01", "HLA-A*11:01",

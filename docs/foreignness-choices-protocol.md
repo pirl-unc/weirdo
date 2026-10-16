@@ -261,24 +261,46 @@ learned classifiers show nothing, and differential agretopicity does not help.
 
 ### What the selected score is separating (exploratory, after selection)
 
-These descriptive checks were run after the selection and did not change it.
-Across the 13 neoepitope cohorts, the positive rate by whole-peptide mismatches
-to the nearest human window is:
+**Correction.** An earlier revision of this section read the raw table below as
+evidence that the selected score mostly separates point mutants from substantially
+novel sequence. That reading was wrong, and the second-generation development stage
+below shows why. Descriptive checks run after the selection, over the 13 neoepitope
+cohorts, give these raw positive rates by whole-peptide mismatches to the nearest
+human window:
 
 | Mismatches | 0 (self-identical) | 1 | 2 | 3 | 4 or more |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Peptides | 119 | 2,112 | 163 | 147 | 42 |
 | Positive rate | 14% | 16% | 37% | 35% | 38% |
 
-The rate is flat from zero to one mismatch and then more than doubles. So the
-selected score mostly separates point mutants (and self-identical peptides) from
-peptides that differ more substantially, such as frameshift, fusion or
-multi-residue changes, instead of grading foreignness among point mutants.
-Whether the mutated residue sits at an anchor or on the TCR face makes no
-visible difference (positive rate 20% for anchor-only changes, 18% for
-TCR-facing ones), which is not what the usual TCR-facing-mutation argument
-predicts. Both observations are in development data only and are hypotheses for
-the holdout and for future cohorts.
+The crude odds ratio for two or more mismatches against fewer is 3.04, but
+stratified by cohort alone it is **1.16**. The cohorts with the most multi-mismatch
+peptides (33665637 at 93%, 38244726 at 98%, 40273911 at 86%) simply have high
+base rates (47%, 65%, 33%), so the raw difference is mostly cohort composition.
+Whether the mutated residue is at an anchor or on the TCR face also makes no clear
+difference in the raw rates (20% against 18%), but that comparison carries the same
+confounding and is not evidence either way.
+
+### Second-generation development ranking
+
+Run after the registration in [Second generation](#second-generation-a-sealed-set-for-the-novelty-hypothesis),
+on the 13 neoepitope development cohorts only, under the identical model:
+
+| Candidate | OR/SD (95% CI) | z | p (Bonf., 4 tried) | Cohorts + | Gate |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `nn_full_whole` | 1.21 (1.05-1.40) | +2.70 | 0.003 (0.01) | 100% (7) | passes |
+| `mismatch_whole` | 1.11 (0.98-1.27) | +1.65 | 0.050 (0.20) | 83% (6) | passes |
+| `novel_2plus` | 1.11 (0.98-1.26) | +1.65 | 0.049 (0.20) | 50% (6) | fails the 60% sign gate |
+| `novel_log` | 1.04 (0.91-1.19) | +0.60 | 0.276 (1.00) | 67% (6) | fails z |
+
+Adjusted within cohorts, the two-or-more-mismatch indicator is weak and unstable
+(its per-cohort coefficients run from -0.70 to +5.45), so the novelty hypothesis
+that motivated the second sealed set is **not supported by the development data**.
+The graded whole-peptide distance is the only candidate that is positive in every
+cohort reported alone (coefficients +0.13 to +0.53, homogeneous across cohorts).
+Under the registered rule the selection is therefore `nn_full_whole` again: the
+same score that was inconclusive on the first holdout is the one tested on the
+second sealed set. That is a replication attempt, not a test of the novelty idea.
 
 ## Selection committed
 
@@ -315,15 +337,16 @@ detectable with 80% power was 1.51. The development estimate (log odds ratio
 differ by z of about 1.85, which is what a winner's-curse estimate looks like
 after the best of 26 candidates was chosen on the development data.
 
-**Why the holdout may have had little to detect (post hoc, inputs only).** The
-development signal came from peptides with two or more mismatches to the nearest
-human window. Looking only at the holdout's peptide sequences, never at its
-outcomes, 94.0% are single point mutants and 4.6% (74 peptides) have two or more
-mismatches, against 13.6% in development, and the score's spread is smaller
-(SD 0.34 against 0.45). So the holdout contained little of the variation the
-development effect came from. This explains why the test is inconclusive; it
-does not make the development effect real, and the registered conclusion does not
-change.
+**A tempting explanation that does not hold (post hoc, inputs only).** Looking only
+at the holdout's peptide sequences, never at its outcomes, 94.0% are single point
+mutants and 4.6% (74 peptides) have two or more mismatches to the nearest human
+window, against 13.6% in development, and the score's spread is smaller (SD 0.34
+against 0.45). It is tempting to say the holdout lacked the variation that drove the
+development effect. The second-generation development ranking below shows that
+the multi-mismatch contrast does not carry the development effect (within-cohort
+odds ratio 1.16), so this does not explain the miss. The simpler readings are that
+the development estimate was inflated by choosing the best of 26 candidates and
+that the effect differs across studies.
 
 **What this means.** No definition of foreignness has been validated in either
 domain. The neoepitope holdout is spent for this candidate: reusing it to test a
@@ -417,3 +440,7 @@ Logged in the order they happened; none changes a registered rule.
    the novelty candidates and the inclusive sensitivity analysis were registered
    (section above) before the new candidates were ranked and before any
    outcome in the set was analysed.
+5. After the second-generation development ranking, the mismatch contrast was
+   re-examined stratified by cohort. It showed the raw novelty table was a
+   cohort-composition artefact, and the exploratory statements that relied on it
+   were withdrawn in the same commit that records the second selection.
