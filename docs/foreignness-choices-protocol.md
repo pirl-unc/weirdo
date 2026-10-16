@@ -293,6 +293,44 @@ The holdout code path was verified before use by running it on development rows
 (`--stage holdout --dry-run`), where it reproduces the development estimate to
 six decimals. That check reads no holdout row.
 
+## Holdout result: not confirmed
+
+Run once, at 23:39 on 2026-10-15 after the selection commit `d801c9d`, with
+`--stage holdout --selection-is-committed`. Only the neoepitope domain was
+opened. 84 of 1,688 holdout rows were dropped for sharing a 7-mer with a
+development peptide, leaving 1,604 pairs with 61 positives (TESLA, PMID
+33038342, and cohort 31511069).
+
+| Candidate | Odds ratio per SD (95% CI) | z (one-sided) | Required | Reading |
+| --- | ---: | ---: | --- | --- |
+| `nn_full_whole` | 0.90 (0.67-1.19) | -0.75 | z > 1.96 and OR >= 1.10 | **not confirmed; inconclusive** |
+
+Both holdout cohorts point the wrong way (coefficients -0.05 for TESLA, with 39
+positives, and -0.20 for 31511069, with 22). The interval excludes the
+development estimate's centre but does not exclude the minimum effect of
+interest (upper bound 1.19), so the registered reading is *inconclusive*, not
+*refuted*. The holdout could only have confirmed a large effect: the odds ratio
+detectable with 80% power was 1.51. The development estimate (log odds ratio
+0.19, standard error 0.07) and the holdout estimate (-0.11, standard error 0.15)
+differ by z of about 1.85, which is what a winner's-curse estimate looks like
+after the best of 26 candidates was chosen on the development data.
+
+**Why the holdout may have had little to detect (post hoc, inputs only).** The
+development signal came from peptides with two or more mismatches to the nearest
+human window. Looking only at the holdout's peptide sequences, never at its
+outcomes, 94.0% are single point mutants and 4.6% (74 peptides) have two or more
+mismatches, against 13.6% in development, and the score's spread is smaller
+(SD 0.34 against 0.45). So the holdout contained little of the variation the
+development effect came from. This explains why the test is inconclusive; it
+does not make the development effect real, and the registered conclusion does not
+change.
+
+**What this means.** No definition of foreignness has been validated in either
+domain. The neoepitope holdout is spent for this candidate: reusing it to test a
+refined candidate would not be an independent confirmation. The viral holdout,
+including the 21,419-pair vaccinia screen, is sealed and available to any future
+viral candidate that clears development.
+
 ## Deviations
 
 Logged in the order they happened; none changes a registered rule.
@@ -302,3 +340,7 @@ Logged in the order they happened; none changes a registered rule.
    holdout and the viral holdout stays unopened. Implementation only.
 2. After the development run, the mismatch-count tables above were computed
    from development data. They are exploratory and did not change the selection.
+3. After the holdout result, the holdout's peptide mismatch distribution and
+   score spread were computed from sequences alone, with no outcome read, to
+   explain why the test was inconclusive. It is a post-hoc description, not part
+   of the registered test, and it did not alter the result or the selection.
