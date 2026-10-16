@@ -966,9 +966,6 @@ def run_holdout(args, dry_run: bool = False, confirm2: bool = False) -> None:
     ``confirm2`` evaluates the second-generation selection on the second
     confirmation set instead of the first holdout.
     """
-    from datacache import Cache
-    import joblib
-
     if dry_run:
         dev_report = json.loads((OUTPUT_ROOT / "dev-report.json").read_text())
         chosen = {d: v["selection"]["selected"]
@@ -988,6 +985,10 @@ def run_holdout(args, dry_run: bool = False, confirm2: bool = False) -> None:
                 "committed before this run.")
         evaluation_roles = ("confirm2",) if confirm2 else ("holdout",)
         reference_roles = ("dev",)
+    # Imported only after the guards above, so a refusal never needs them.
+    from datacache import Cache
+    import joblib
+
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
     opened = set(chosen)
     dev_rows, _ = assemble_rows(reference_roles, cache, opened)
@@ -1090,8 +1091,6 @@ def run_confirm3(args, dry_run: bool = False) -> None:
     itself. ``dry_run`` points the identical code at the development rows and
     checks that it reproduces the dev3 estimate; it reads no sealed row.
     """
-    from datacache import Cache
-
     if dry_run:
         dev3 = json.loads((OUTPUT_ROOT / "dev3-report.json").read_text())
         chosen = {d: v["selection"]["selected"]
@@ -1107,6 +1106,8 @@ def run_confirm3(args, dry_run: bool = False) -> None:
             raise SystemExit(
                 "Pass --selection-is-committed to confirm the selection was "
                 "committed before this run.")
+    from datacache import Cache
+
     cache = Cache("sources", cache_root=str(args.cache_root.resolve()))
     report = {"stage": "confirm3-dry-run" if dry_run else "confirm3",
               "selected": chosen, "domains": {}}
