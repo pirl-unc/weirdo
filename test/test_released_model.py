@@ -119,6 +119,14 @@ def test_self_consistent_replacement_is_not_the_named_release(loader, tmp_path):
         loader(model_dir=directory)
 
 
+def test_explicit_copy_preserves_identity_and_reports_location(loader, tmp_path):
+    directory = tmp_path / "model"
+    shutil.copytree(released.MODEL_DIRECTORY, directory)
+    copied = loader(model_dir=directory)
+    assert copied.prediction_identity == loader().prediction_identity
+    assert copied.manifest["path"] == str(directory.resolve())
+
+
 def test_manifest_copies_cannot_change_the_model_identity(model):
     original = model.prediction_identity
     modified = model.manifest

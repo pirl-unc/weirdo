@@ -33,7 +33,8 @@ def get_model_manifest(model=DEFAULT_PRETRAINED_MODEL, model_dir=None):
     Returns
     -------
     dict
-        A new manifest dictionary, including its SHA-256 ``artifact_id``.
+        A new manifest dictionary, including its SHA-256 ``artifact_id`` and
+        resolved local ``path`` (the path is not part of artifact identity).
         Reading this manifest does not download or deserialize weights. Use
         :func:`load_pretrained_model` to verify all artifact checksums.
     """
@@ -50,6 +51,7 @@ def get_model_manifest(model=DEFAULT_PRETRAINED_MODEL, model_dir=None):
     if manifest.get("schema_version") != 1 or manifest.get("model_id") != model:
         raise ValueError("Unsupported WEIRDO model manifest schema or model identity")
     manifest["artifact_id"] = artifact_id
+    manifest["path"] = str(directory.resolve())
     return manifest
 
 
