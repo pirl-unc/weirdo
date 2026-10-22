@@ -60,7 +60,7 @@ def test_bounded_batches_duplicates_case_and_generator(model, monkeypatch):
 @pytest.mark.parametrize("peptides", [[""], ["ACD"], ["A" * 12], ["ACDEFGHX"],
                                       ["ACDEFGHI "], ["ACDEFGH*"], [None], [123], None,
                                       ["ACDEFGHı"]])
-@pytest.mark.parametrize("method", ["score", "predict_categories"])
+@pytest.mark.parametrize("method", ["score", "predict_categories", "predict_dataframe"])
 def test_invalid_inputs_fail_before_inference(model, peptides, method, monkeypatch):
     monkeypatch.setattr(model._scorer, "predict_proba", lambda *a, **kw: pytest.fail("invalid input reached inference"))
     with pytest.raises(ValueError):
@@ -79,6 +79,11 @@ def test_empty_batch_and_single_sequence(model):
     assert model.score([]).shape == (0,)
     assert model.score([]).dtype == np.float64
     assert len(model.score("acdefghi")) == 1
+    for peptides in [[], ["acdefghi", "MTMDKSELV", "ACDEFGHI"]]:
+        frame = model.predict_dataframe(peptides)
+        np.testing.assert_array_equal(frame.foreignness, model.score(peptides))
+        np.testing.assert_array_equal(frame.foreignness, 1 - frame.human)
+        assert frame.attrs["prediction_identity"] == model.prediction_identity
 
 
 @pytest.mark.parametrize("kwargs", [{"model": "unknown"}, {"score_policy": "other"},

@@ -180,6 +180,27 @@ class PretrainedModel:
         )
         return frame
 
+    def predict_dataframe(self, peptides, batch_size=1024):
+        """Return categories and the explicit scalar score with their provenance.
+
+        Parameters
+        ----------
+        peptides : str or iterable of str
+            Inputs accepted by :meth:`predict_categories`, including empty batches.
+        batch_size : int
+            Maximum distinct peptides per inference batch.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Category columns plus ``foreignness`` for the selected policy.
+            Normalized peptides, order, duplicates and identity attributes are
+            retained so adapters need not repeat normalization or score logic.
+        """
+        frame = self.predict_categories(peptides, batch_size)
+        frame["foreignness"] = 1.0 - frame["human"]
+        return frame
+
     def score(self, peptides, batch_size=1024):
         """Return human-category complement scores, preserving order and duplicates.
 
@@ -197,7 +218,7 @@ class PretrainedModel:
             ``1 - P(human category)`` in [0, 1]. This descriptive score has no
             independently established benefit for immune-response ranking.
         """
-        return 1.0 - self.predict_categories(peptides, batch_size)["human"].to_numpy()
+        return self.predict_dataframe(peptides, batch_size)["foreignness"].to_numpy()
 
 
 def load_pretrained_model(
