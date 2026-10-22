@@ -2,24 +2,30 @@
 
 **W**idely **E**stimated **I**mmunological **R**ecognition and **D**etection of **O**utliers
 
-A Python library for computing peptide foreignness scores—predicting whether a peptide sequence is likely from a pathogen (bacteria, virus) or from self (human, mammalian).
+A Python library that predicts, for any peptide, the probability that it occurs in proteins of each of ten species categories, and summarizes them as a pathogen-versus-mammalian foreignness score.
 
 ## How It Works
 
-WEIRDO trains a neural network on k-mer presence data from SwissProt to predict organism category membership:
+WEIRDO trains a neural network on k-mer presence data from SwissProt to predict organism category membership, and ships a trained model (`swissprot-categories`):
 
 ```
-Peptide → Feature Extraction (592 features) → MLP → Category Probabilities → Foreignness Score
-             ↓                                              ↓
-    - AA properties (48)                        human: 0.82
-    - Structural (27)                          viruses: 0.12
-    - Composition (420)                       bacteria: 0.08
+Peptide → Feature Extraction (592 features) → MLP → 10 sigmoid probabilities → Pathogen vs self
+             ↓                                              ↓                         ↓
+    - AA properties (48)                  P(bacteria), P(viruses), P(human),   pathogen_max = max(P(bacteria), P(viruses))
+    - Structural (27)                     P(rodents), P(mammals), P(fungi),    self_max     = max(P(human), P(rodents), P(mammals))
+    - Composition (420)                   P(plants), P(archaea), ...           foreignness  = pathogen_max / (pathogen_max + self_max)
     - Sequence stats (12)
     - Reduced alphabets (80)
     - Dipeptide summary (5)
-                                                    ↓
-                                    foreignness = max(pathogens) / (max(pathogens) + max(self))
-                                                = 0.12 / (0.12 + 0.82) = 0.13
+```
+
+The outputs are close to calibrated probabilities but only weakly informative (mean AUC about 0.6
+on protein families not seen in training); see [Species-category predictor](category-predictor.md).
+
+```python
+from weirdo import predict_categories
+
+predict_categories(['SIINFEKL', 'NLVPMVATV', 'GILGFVFTL'])
 ```
 
 ## Quick Start
@@ -45,7 +51,7 @@ scorer.train(peptides, labels, target_categories=categories, epochs=200)
 
 # Score peptides
 df = scorer.predict_dataframe(['MTMDKSEL', 'SIINFEKL', 'NLVPMVATV'])
-print(df[['peptide', 'human', 'viruses', 'bacteria', 'foreignness']])
+print(df[['peptide', 'human', 'viruses', 'bacteria', 'pathogen_max', 'self_max', 'foreignness']])
 ```
 
 ## Installation
@@ -53,7 +59,7 @@ print(df[['peptide', 'human', 'viruses', 'bacteria', 'foreignness']])
 ```bash
 pip install weirdo
 
-# Download reference data (~2.5 GB compressed / ~7.5 GB uncompressed)
+# Build reference data from UniProt (~670 MB download, then a ~8 GB 8-mer table)
 weirdo data download
 ```
 
@@ -61,11 +67,12 @@ weirdo data download
 
 ### Multi-Category Prediction
 
-Predict probability of peptide appearing in 10 organism categories:
-
-- **Self**: human, rodents, mammals, vertebrates, invertebrates
-- **Pathogens**: bacteria, viruses, archaea, fungi
-- **Other**: plants
+Predict the probability of a peptide appearing in each of 10 organism categories
+(archaea, bacteria, fungi, human, invertebrates, mammals, plants, rodents, vertebrates, viruses).
+The default foreignness groups are **pathogens** = bacteria, viruses and **self** = human,
+rodents, mammals; both are configurable, and so is how the probabilities in a group are
+combined (`combine='max'` by default, or `'sum'`). Archaea, fungi, invertebrates, plants and
+vertebrates are in neither default group.
 
 ### Rich Feature Extraction
 

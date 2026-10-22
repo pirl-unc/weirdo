@@ -1,13 +1,28 @@
 import pytest
 
 from weirdo.cli import create_parser, run
+from weirdo.model_manager import DEFAULT_CATEGORY_MODEL
 from weirdo.reduced_alphabet import alphabets
 
 
-def test_score_command_requires_model_argument():
+def test_score_command_defaults_to_the_bundled_category_model():
+    parser = create_parser()
+    args = parser.parse_args(["score", "MTMDKSEL"])
+    assert args.model == DEFAULT_CATEGORY_MODEL
+    assert args.combine == "max"
+    assert args.csv is False
+
+
+def test_score_command_reports_a_missing_model(capsys):
+    code = run(["score", "MTMDKSEL", "-m", "no-such-model-anywhere"])
+    assert code == 1
+    assert "Model not found" in capsys.readouterr().out
+
+
+def test_score_command_rejects_unknown_combine():
     parser = create_parser()
     with pytest.raises(SystemExit):
-        parser.parse_args(["score", "MTMDKSEL"])
+        parser.parse_args(["score", "MTMDKSEL", "--combine", "median"])
 
 
 def test_translate_fasta_file(tmp_path, capsys):

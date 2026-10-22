@@ -13,7 +13,7 @@ Example
 >>> scores = score_peptides(['MTMDKSEL', 'ACDEFGHI'], model=scorer)
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 
@@ -241,6 +241,88 @@ def score_peptides(
         return scorer.score(peptides)
 
 
+def predict_categories(
+    peptides: Union[str, Sequence[str]],
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    pathogen_categories: Optional[List[str]] = None,
+    self_categories: Optional[List[str]] = None,
+    aggregate: str = 'mean',
+    combine: Union[str, Callable[[Any], Any]] = 'max',
+):
+    """Probability that each peptide came from each species category.
+
+    Runs a multi-label predictor with one independent sigmoid output per
+    category, by default the ``'swissprot-categories'`` model that ships with
+    WEIRDO (archaea, bacteria, fungi, human, invertebrates, mammals, plants,
+    rodents, vertebrates, viruses). Column ``c`` estimates the probability that
+    the peptide occurs in SwissProt proteins of category ``c``. Columns are not
+    mutually exclusive and need not sum to one.
+
+    The result also contains a probability for the pathogen group and one for the
+    self group and their ratio, ``foreignness = pathogen / (pathogen + self)``; by
+    default each group value is the largest probability in the group (``combine``
+    chooses ``'sum'`` or your own function); see
+    :meth:`weirdo.scorers.MLPScorer.foreignness`.
+
+    Parameters
+    ----------
+    peptides : str or sequence of str
+        Peptide sequence(s), 8 residues or longer.
+    model : str or MLPScorer, optional
+        Model name (bundled or from the model directory) or a trained scorer.
+        Defaults to the bundled ``'swissprot-categories'`` model.
+    model_dir : str, optional
+        Custom model directory when loading by name.
+    pathogen_categories : list of str, optional
+        Defaults to ``['bacteria', 'viruses']``.
+    self_categories : list of str, optional
+        Defaults to ``['human', 'rodents', 'mammals']``.
+    aggregate : {'mean', 'max', 'min'}, default='mean'
+        How to combine the 8-mer windows of longer peptides.
+    combine : {'max', 'sum'} or callable, default='max'
+        How to combine probabilities within each group: the largest, their sum (the
+        expected number of categories that contain the peptide), or a function that
+        maps an (n_peptides, n_categories_in_group) array to one value per peptide.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per peptide: ``peptide``, one probability column per category,
+        ``pathogen_<combine>``, ``self_<combine>`` and ``foreignness``.
+
+    Example
+    -------
+    >>> from weirdo import predict_categories
+    >>> predict_categories(['SIINFEKL', 'NLVPMVATV']).round(2)  # doctest: +SKIP
+    """
+    from .model_manager import DEFAULT_CATEGORY_MODEL
+
+    if model is None:
+        model = DEFAULT_CATEGORY_MODEL
+    scorer = load_model(model, model_dir) if isinstance(model, str) else model
+
+    if isinstance(scorer, TrainableScorer) and not scorer.is_trained:
+        raise RuntimeError(
+            "Scorer is not trained. Train it or load a trained model before predicting."
+        )
+    if not getattr(scorer, 'target_categories', None):
+        raise ValueError(
+            "predict_categories needs a model trained with target_categories "
+            "(one output per category)."
+        )
+
+    if isinstance(peptides, str):
+        peptides = [peptides]
+    return scorer.predict_dataframe(
+        list(peptides),
+        pathogen_categories=pathogen_categories,
+        self_categories=self_categories,
+        aggregate=aggregate,
+        combine=combine,
+    )
+
+
 def clear_cache() -> None:
     """Clear the scorer cache.
 
@@ -361,6 +443,12 @@ def save_model(
     """
     from .model_manager import save_model as _save_model
     return str(_save_model(scorer, name, model_dir, overwrite))
+
+
+def list_bundled_models() -> List[Dict[str, Any]]:
+    """List the models that ship inside the package (name, path, metadata)."""
+    from .model_manager import list_bundled_models as _list_bundled_models
+    return _list_bundled_models()
 
 
 def list_pretrained_models(model_dir: Optional[str] = None) -> List[Dict[str, Any]]:

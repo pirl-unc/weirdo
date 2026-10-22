@@ -5,448 +5,114 @@ Uses rich peptide features including amino acid properties and composition
 statistics.
 """
 
+import copy
+import hashlib
 import pickle
-import multiprocessing as mp
 import time
+import warnings
+import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from sklearn.neural_network import MLPRegressor
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
 from .trainable import TrainableScorer
 from .registry import register_scorer
-from ..reduced_alphabet import alphabets as REDUCED_ALPHABETS
+from .peptide_features import (  # noqa: F401  (re-exported for backward compatibility)
+    AA_TO_IDX,
+    AMINO_ACIDS,
+    NUM_AMINO_ACIDS,
+    REDUCED_ALPHABET_GROUPS,
+    REDUCED_ALPHABET_ORDER,
+    _compute_composition_features,
+    _compute_dipeptide_features,
+    _compute_property_features,
+    _get_aa_properties,
+    extract_features,
+    extract_features_batch,
+    feature_count,
+    get_feature_names as _feature_names,
+)
 
 
-# Amino acid to index mapping
-AA_TO_IDX = {
-    'A': 0, 'C': 1, 'D': 2, 'E': 3, 'F': 4,
-    'G': 5, 'H': 6, 'I': 7, 'K': 8, 'L': 9,
-    'M': 10, 'N': 11, 'P': 12, 'Q': 13, 'R': 14,
-    'S': 15, 'T': 16, 'V': 17, 'W': 18, 'Y': 19,
-    'X': 20,  # Unknown/padding
-}
-AMINO_ACIDS = 'ACDEFGHIKLMNPQRSTVWY'
-NUM_AMINO_ACIDS = 21
+# Default category groups for the pathogen-versus-self foreignness summary.
+DEFAULT_PATHOGEN_CATEGORIES = ('bacteria', 'viruses')
+DEFAULT_SELF_CATEGORIES = ('human', 'rodents', 'mammals')
 
-# Amino acid categories for derived features
-POSITIVE_CHARGED = set('KRH')  # Basic residues (H partially charged at pH 7)
-NEGATIVE_CHARGED = set('DE')   # Acidic residues
-HYDROPHOBIC = set('AILMFVPWG')
-AROMATIC = set('FWY')
-ALIPHATIC = set('AVILM')
-POLAR_UNCHARGED = set('STNQ')
-TINY = set('AGS')
-SMALL = set('AGSCTDNPV')
-DISORDER_PROMOTING = set('AEGRQSKP')  # Disorder-promoting residues
-ORDER_PROMOTING = set('WFYILMVC')     # Order-promoting residues
-
-# Chou-Fasman secondary structure propensities
-HELIX_PROPENSITY = {
-    'A': 1.42, 'C': 0.70, 'D': 1.01, 'E': 1.51, 'F': 1.13,
-    'G': 0.57, 'H': 1.00, 'I': 1.08, 'K': 1.16, 'L': 1.21,
-    'M': 1.45, 'N': 0.67, 'P': 0.57, 'Q': 1.11, 'R': 0.98,
-    'S': 0.77, 'T': 0.83, 'V': 1.06, 'W': 1.08, 'Y': 0.69,
-}
-SHEET_PROPENSITY = {
-    'A': 0.83, 'C': 1.19, 'D': 0.54, 'E': 0.37, 'F': 1.38,
-    'G': 0.75, 'H': 0.87, 'I': 1.60, 'K': 0.74, 'L': 1.30,
-    'M': 1.05, 'N': 0.89, 'P': 0.55, 'Q': 1.10, 'R': 0.93,
-    'S': 0.75, 'T': 1.19, 'V': 1.70, 'W': 1.37, 'Y': 1.47,
-}
-TURN_PROPENSITY = {
-    'A': 0.66, 'C': 1.19, 'D': 1.46, 'E': 0.74, 'F': 0.60,
-    'G': 1.56, 'H': 0.95, 'I': 0.47, 'K': 1.01, 'L': 0.59,
-    'M': 0.60, 'N': 1.56, 'P': 1.52, 'Q': 0.98, 'R': 0.95,
-    'S': 1.43, 'T': 0.96, 'V': 0.50, 'W': 0.96, 'Y': 1.14,
+# How the probabilities inside the pathogen group and inside the self group are
+# combined before they are compared. ``combine`` may also be a callable that maps an
+# array of shape (n_peptides, n_categories_in_group) to one value per peptide.
+DEFAULT_COMBINE = 'max'
+NAMED_COMBINERS: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
+    'max': lambda values: values.max(axis=1),
+    'sum': lambda values: values.sum(axis=1),
 }
 
 
-def _get_aa_properties() -> Dict[str, Dict[str, float]]:
-    """Load all amino acid property dictionaries."""
-    from ..amino_acid_properties import (
-        accessible_surface_area,
-        accessible_surface_area_folded,
-        hydropathy,
-        hydrophilicity,
-        local_flexibility,
-        mass,
-        pK_side_chain,
-        polarity,
-        prct_exposed_residues,
-        refractivity,
-        solvent_exposed_area,
-        volume,
-    )
-    return {
-        'accessible_surface_area': accessible_surface_area,
-        'accessible_surface_area_folded': accessible_surface_area_folded,
-        'hydropathy': hydropathy,
-        'hydrophilicity': hydrophilicity,
-        'local_flexibility': local_flexibility,
-        'mass': mass,
-        'pK_side_chain': pK_side_chain,
-        'polarity': polarity,
-        'prct_exposed_residues': prct_exposed_residues,
-        'refractivity': refractivity,
-        'solvent_exposed_area': solvent_exposed_area,
-        'volume': volume,
-    }
+def _sigmoid(z: np.ndarray) -> np.ndarray:
+    """Numerically stable logistic function."""
+    return 0.5 * (1.0 + np.tanh(0.5 * z))
 
 
-def _compute_property_features(peptide: str, properties: Dict[str, Dict[str, float]]) -> np.ndarray:
-    """Compute aggregate statistics from amino acid properties.
-
-    For each property, compute: mean, std, min, max over the peptide.
-    Returns array of shape (n_properties * 4,).
-"""
-    features = []
-
-    for prop_name, prop_dict in properties.items():
-        # Get property values for each residue
-        values = [prop_dict[aa] for aa in peptide if aa in prop_dict]
-
-        if values:
-            features.extend([
-                np.mean(values),
-                np.std(values),
-                np.min(values),
-                np.max(values),
-            ])
-        else:
-            # Unknown amino acids - use zeros
-            features.extend([0.0, 0.0, 0.0, 0.0])
-
-    return np.array(features, dtype=np.float32)
+_NUMPY_ACTIVATIONS: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
+    'relu': lambda z: np.maximum(z, 0.0),
+    'tanh': np.tanh,
+    'logistic': _sigmoid,
+    'identity': lambda z: z,
+}
 
 
-def _compute_composition_features(peptide: str) -> np.ndarray:
-    """Compute amino acid composition (frequencies).
+class _NumpyScaler:
+    """Inference-only standardizer equivalent to a fitted ``StandardScaler``."""
 
-    Returns array of shape (20,) with frequency of each amino acid.
+    def __init__(self, mean: np.ndarray, scale: np.ndarray):
+        self.mean_ = np.asarray(mean, dtype=np.float32)
+        self.scale_ = np.asarray(scale, dtype=np.float32)
+        self.n_features_in_ = int(self.mean_.shape[0])
+
+    def transform(self, X: np.ndarray) -> np.ndarray:
+        return (np.asarray(X, dtype=np.float32) - self.mean_) / self.scale_
+
+
+class _NumpyMLP:
+    """Inference-only feed-forward network with sigmoid outputs.
+
+    Holds the weights of a trained ``MLPClassifier`` in the same ``coefs_`` /
+    ``intercepts_`` layout so a model can be stored without pickling
+    scikit-learn objects and evaluated with NumPy alone.
     """
-    counts = np.zeros(20, dtype=np.float32)
-    for aa in peptide:
-        idx = AMINO_ACIDS.find(aa)
-        if idx >= 0:
-            counts[idx] += 1
 
-    # Normalize to frequencies
-    if len(peptide) > 0:
-        counts /= len(peptide)
+    def __init__(self, coefs: Sequence[np.ndarray], intercepts: Sequence[np.ndarray],
+                 activation: str = 'relu'):
+        if activation not in _NUMPY_ACTIVATIONS:
+            raise ValueError(
+                f"Unsupported activation '{activation}'. "
+                f"Available: {sorted(_NUMPY_ACTIVATIONS)}"
+            )
+        if len(coefs) != len(intercepts) or not coefs:
+            raise ValueError("coefs and intercepts must be non-empty and equally long.")
+        self.coefs_ = [np.asarray(w, dtype=np.float32) for w in coefs]
+        self.intercepts_ = [np.asarray(b, dtype=np.float32) for b in intercepts]
+        self.activation = activation
+        self.n_outputs_ = int(self.coefs_[-1].shape[1])
 
-    return counts
+    def _logits(self, X: np.ndarray) -> np.ndarray:
+        hidden = np.asarray(X, dtype=np.float32)
+        activate = _NUMPY_ACTIVATIONS[self.activation]
+        last = len(self.coefs_) - 1
+        for index, (weights, bias) in enumerate(zip(self.coefs_, self.intercepts_)):
+            hidden = hidden @ weights + bias
+            if index < last:
+                hidden = activate(hidden)
+        return hidden
 
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        return _sigmoid(self._logits(X))
 
-def _compute_dipeptide_features(peptide: str) -> np.ndarray:
-    """Compute dipeptide composition (frequencies of AA pairs).
-
-    Returns array of shape (400,) with frequency of each dipeptide.
-    """
-    counts = np.zeros(400, dtype=np.float32)  # 20 * 20
-
-    for i in range(len(peptide) - 1):
-        aa1_idx = AMINO_ACIDS.find(peptide[i])
-        aa2_idx = AMINO_ACIDS.find(peptide[i + 1])
-        if aa1_idx >= 0 and aa2_idx >= 0:
-            counts[aa1_idx * 20 + aa2_idx] += 1
-
-    # Normalize to frequencies
-    n_dipeptides = max(1, len(peptide) - 1)
-    counts /= n_dipeptides
-
-    return counts
-
-
-def _compute_structural_features(peptide: str) -> np.ndarray:
-    """Compute structural and physicochemical category features.
-
-    Returns array with:
-    - Secondary structure propensities (helix, sheet, turn) - 12 features (3 props × 4 stats)
-    - Category fractions (9 features: charged+/-, hydrophobic, aromatic, etc.)
-    - Charge features (4 features: net charge, charge density, transitions, clusters)
-    - Disorder features (2 features: disorder/order promoting ratios)
-
-    Total: 27 features
-    """
-    n = len(peptide) if peptide else 1
-    features = []
-
-    # Secondary structure propensities - mean, std, min, max for each
-    for prop_dict in [HELIX_PROPENSITY, SHEET_PROPENSITY, TURN_PROPENSITY]:
-        values = [prop_dict.get(aa, 1.0) for aa in peptide if aa in prop_dict]
-        if values:
-            features.extend([np.mean(values), np.std(values), np.min(values), np.max(values)])
-        else:
-            features.extend([1.0, 0.0, 1.0, 1.0])
-
-    # Category fractions (9 features)
-    features.append(sum(1 for aa in peptide if aa in POSITIVE_CHARGED) / n)  # Positive charged
-    features.append(sum(1 for aa in peptide if aa in NEGATIVE_CHARGED) / n)  # Negative charged
-    features.append(sum(1 for aa in peptide if aa in HYDROPHOBIC) / n)       # Hydrophobic
-    features.append(sum(1 for aa in peptide if aa in AROMATIC) / n)          # Aromatic
-    features.append(sum(1 for aa in peptide if aa in ALIPHATIC) / n)         # Aliphatic
-    features.append(sum(1 for aa in peptide if aa in POLAR_UNCHARGED) / n)   # Polar uncharged
-    features.append(sum(1 for aa in peptide if aa in TINY) / n)              # Tiny
-    features.append(sum(1 for aa in peptide if aa in SMALL) / n)             # Small
-    features.append(sum(1 for aa in peptide if aa == 'C') / n)               # Cysteine (viral)
-
-    # Charge features (4 features)
-    pos_count = sum(1 for aa in peptide if aa in POSITIVE_CHARGED)
-    neg_count = sum(1 for aa in peptide if aa in NEGATIVE_CHARGED)
-    net_charge = pos_count - neg_count
-    features.append(net_charge / n)  # Net charge per residue
-
-    # Charge transitions (+ to - or - to +)
-    transitions = 0
-    for i in range(len(peptide) - 1):
-        curr_pos = peptide[i] in POSITIVE_CHARGED
-        curr_neg = peptide[i] in NEGATIVE_CHARGED
-        next_pos = peptide[i+1] in POSITIVE_CHARGED
-        next_neg = peptide[i+1] in NEGATIVE_CHARGED
-        if (curr_pos and next_neg) or (curr_neg and next_pos):
-            transitions += 1
-    features.append(transitions / max(1, n - 1))  # Charge transitions
-
-    # Charge clustering - max consecutive same-sign charges
-    max_cluster = 0
-    current_cluster = 0
-    current_sign = None
-    for aa in peptide:
-        if aa in POSITIVE_CHARGED:
-            sign = '+'
-        elif aa in NEGATIVE_CHARGED:
-            sign = '-'
-        else:
-            sign = None
-        if sign and sign == current_sign:
-            current_cluster += 1
-        elif sign:
-            current_cluster = 1
-            current_sign = sign
-        else:
-            current_cluster = 0
-            current_sign = None
-        max_cluster = max(max_cluster, current_cluster)
-    features.append(max_cluster / n)  # Max charge cluster size
-
-    # Arginine depletion (viruses often have less R) - R/(R+K) ratio
-    r_count = sum(1 for aa in peptide if aa == 'R')
-    k_count = sum(1 for aa in peptide if aa == 'K')
-    if r_count + k_count > 0:
-        features.append(r_count / (r_count + k_count))
-    else:
-        features.append(0.5)  # Neutral when no R or K present
-
-    # Disorder features (2 features)
-    disorder_promoting = sum(1 for aa in peptide if aa in DISORDER_PROMOTING)
-    order_promoting = sum(1 for aa in peptide if aa in ORDER_PROMOTING)
-    features.append(disorder_promoting / n)  # Disorder-promoting fraction
-    features.append(order_promoting / n)     # Order-promoting fraction
-
-    return np.array(features, dtype=np.float32)
-
-
-def _build_reduced_alphabet_index():
-    """Build reduced alphabet group indices in a stable order."""
-    alphabet_order = list(REDUCED_ALPHABETS.keys())
-    alphabet_groups = {}
-    for name in alphabet_order:
-        mapping = REDUCED_ALPHABETS[name]
-        groups: List[str] = []
-        for aa in AMINO_ACIDS:
-            rep = mapping.get(aa)
-            if rep is None:
-                continue
-            if rep not in groups:
-                groups.append(rep)
-        alphabet_groups[name] = {
-            'groups': groups,
-            'rep_to_idx': {rep: idx for idx, rep in enumerate(groups)},
-        }
-    return alphabet_order, alphabet_groups
-
-
-REDUCED_ALPHABET_ORDER, REDUCED_ALPHABET_GROUPS = _build_reduced_alphabet_index()
-
-
-def _compute_sequence_stats(peptide: str) -> np.ndarray:
-    """Compute sequence-level non-positional statistics."""
-    if not peptide:
-        return np.zeros(12, dtype=np.float32)
-
-    n = len(peptide)
-    log_len = np.log1p(n)
-    sqrt_len = np.sqrt(n)
-
-    counts = np.zeros(20, dtype=np.float32)
-    unknown = 0
-    for aa in peptide:
-        idx = AMINO_ACIDS.find(aa)
-        if idx >= 0:
-            counts[idx] += 1
-        else:
-            unknown += 1
-
-    total = counts.sum()
-    if total > 0:
-        freqs = counts / total
-        nonzero = freqs[freqs > 0]
-        entropy = -np.sum(nonzero * np.log(nonzero))
-        entropy_norm = entropy / np.log(20)
-        effective = np.exp(entropy) / 20.0
-        gini = 1.0 - np.sum(freqs ** 2)
-        max_freq = float(freqs.max())
-        top2 = float(np.sort(freqs)[-2:].sum())
-        unique_frac = float(np.count_nonzero(counts) / 20.0)
-    else:
-        entropy_norm = 0.0
-        effective = 0.0
-        gini = 0.0
-        max_freq = 0.0
-        top2 = 0.0
-        unique_frac = 0.0
-
-    # Run-length and repeat statistics
-    max_run = 1
-    repeats = 0
-    current_run = 1
-    for i in range(1, n):
-        if peptide[i] == peptide[i - 1]:
-            repeats += 1
-            current_run += 1
-        else:
-            current_run = 1
-        if current_run > max_run:
-            max_run = current_run
-
-    max_run_frac = max_run / n
-    repeat_frac = repeats / max(1, n - 1)
-    frac_unknown = unknown / n
-
-    return np.array([
-        n,
-        log_len,
-        sqrt_len,
-        frac_unknown,
-        unique_frac,
-        max_run_frac,
-        repeat_frac,
-        entropy_norm,
-        effective,
-        max_freq,
-        top2,
-        gini,
-    ], dtype=np.float32)
-
-
-def _compute_reduced_alphabet_features(peptide: str) -> np.ndarray:
-    """Compute reduced alphabet composition features."""
-    if not peptide:
-        total_features = sum(
-            len(REDUCED_ALPHABET_GROUPS[name]['groups'])
-            for name in REDUCED_ALPHABET_ORDER
-        )
-        return np.zeros(total_features, dtype=np.float32)
-
-    features: List[np.ndarray] = []
-    for name in REDUCED_ALPHABET_ORDER:
-        mapping = REDUCED_ALPHABETS[name]
-        groups = REDUCED_ALPHABET_GROUPS[name]['groups']
-        rep_to_idx = REDUCED_ALPHABET_GROUPS[name]['rep_to_idx']
-        counts = np.zeros(len(groups), dtype=np.float32)
-        total = 0
-        for aa in peptide:
-            rep = mapping.get(aa)
-            if rep is None:
-                continue
-            counts[rep_to_idx[rep]] += 1
-            total += 1
-        if total > 0:
-            counts /= total
-        features.append(counts)
-
-    return np.concatenate(features) if features else np.array([], dtype=np.float32)
-
-
-def _compute_dipeptide_summary(dipeptide_freqs: np.ndarray) -> np.ndarray:
-    """Compute summary statistics from dipeptide frequencies."""
-    if dipeptide_freqs.size == 0:
-        return np.zeros(5, dtype=np.float32)
-
-    total = dipeptide_freqs.sum()
-    if total > 0:
-        probs = dipeptide_freqs / total
-        nonzero = probs[probs > 0]
-        entropy = -np.sum(nonzero * np.log(nonzero))
-        entropy_norm = entropy / np.log(probs.size)
-        gini = 1.0 - np.sum(probs ** 2)
-        max_freq = float(probs.max())
-        top2 = float(np.sort(probs)[-2:].sum()) if probs.size >= 2 else max_freq
-        homodipep = float(np.trace(probs.reshape(20, 20)))
-    else:
-        entropy_norm = 0.0
-        gini = 0.0
-        max_freq = 0.0
-        top2 = 0.0
-        homodipep = 0.0
-
-    return np.array(
-        [entropy_norm, gini, max_freq, top2, homodipep],
-        dtype=np.float32,
-    )
-
-
-def extract_features(peptide: str, k: int = 8, use_dipeptides: bool = True) -> np.ndarray:
-    """Extract all features from a peptide.
-
-    Features include:
-    - Amino acid property statistics (12 props × 4 stats = 48 features)
-    - Structural/physicochemical features (27 features)
-    - Amino acid composition (20 features)
-    - Dipeptide composition (400 features, optional)
-    - Dipeptide summary statistics (5 features, optional)
-    - Sequence-level statistics (12 features)
-    - Reduced alphabet compositions (80 features)
-
-    Parameters
-    ----------
-    peptide : str
-        Peptide sequence.
-    k : int
-        Unused; retained for backward compatibility.
-    use_dipeptides : bool
-        Include dipeptide composition features.
-
-    Returns
-    -------
-    features : np.ndarray
-        Feature vector.
-    """
-    properties = _get_aa_properties()
-
-    feature_parts = [
-        _compute_property_features(peptide, properties),  # 48 features (12 props × 4 stats)
-        _compute_structural_features(peptide),             # 27 features
-        _compute_composition_features(peptide),            # 20 features
-        _compute_sequence_stats(peptide),                  # 12 features
-        _compute_reduced_alphabet_features(peptide),       # 80 features
-    ]
-
-    if use_dipeptides:
-        dipep_freqs = _compute_dipeptide_features(peptide)
-        feature_parts.append(_compute_dipeptide_summary(dipep_freqs))  # 5 features
-        feature_parts.append(dipep_freqs)  # 400 features
-
-    return np.concatenate(feature_parts)
-
-
-def _extract_features_worker(args: Tuple[str, int, bool]) -> np.ndarray:
-    """Helper for multiprocessing feature extraction."""
-    peptide, k, use_dipeptides = args
-    return extract_features(peptide, k, use_dipeptides)
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self.predict_proba(X)
 
 
 @register_scorer('mlp', description='MLP foreignness scorer with rich peptide features')
@@ -459,6 +125,7 @@ class MLPScorer(TrainableScorer):
     - Dipeptide composition (AA pair frequencies)
     - Sequence-level statistics (entropy, repeats, complexity)
     - Reduced alphabet compositions (Murphy/GBMR/SDM, etc.)
+    - Optionally, a positional one-hot encoding of the k-mer (``positional=True``)
 
     All features are normalized using StandardScaler before training.
 
@@ -480,6 +147,24 @@ class MLPScorer(TrainableScorer):
         Include dipeptide composition features.
     batch_size : int, default=256
         Batch size for training.
+    random_state : int, optional
+        Seed for weight initialization and batch shuffling.
+    positional : bool, default=False
+        Append a position-specific one-hot encoding of the k-mer (``k * 21``
+        features: for each position, which amino acid is there). This lets the
+        network learn position-dependent patterns, such as an anchor residue at
+        position 2 of a peptide, but it also makes memorising individual k-mers
+        easy; the default composition-only features generalise to unseen
+        sequences better. Peptides longer than ``k`` are scored per k-mer, as
+        usual. Models trained with ``positional=True`` store the option and load
+        with it.
+    loss : {'auto', 'bce', 'squared'}, default='auto'
+        Training objective. ``'bce'`` trains one independent sigmoid output per
+        label with binary cross-entropy, so outputs are probabilities
+        (``P(label = 1 | peptide)``); it needs binary 0/1 labels. ``'squared'``
+        fits scores by least squares (the previous behaviour, kept for scalar
+        scores and for loading older models). ``'auto'`` uses ``'bce'`` for
+        multi-label binary targets and ``'squared'`` otherwise.
 
     Example
     -------
@@ -502,8 +187,14 @@ class MLPScorer(TrainableScorer):
         use_dipeptides: bool = True,
         batch_size: int = 256,
         random_state: Optional[int] = None,
+        loss: str = 'auto',
+        positional: bool = False,
         **kwargs
     ):
+        if loss not in ('auto', 'bce', 'squared'):
+            raise ValueError(
+                f"loss must be 'auto', 'bce' or 'squared', got {loss!r}."
+            )
         super().__init__(k=k, batch_size=batch_size, **kwargs)
         self._params.update({
             'hidden_layer_sizes': hidden_layer_sizes,
@@ -514,28 +205,169 @@ class MLPScorer(TrainableScorer):
             'early_stopping': early_stopping,
             'use_dipeptides': use_dipeptides,
             'random_state': random_state,
+            'loss': loss,
+            'positional': bool(positional),
         })
-        self._model: Optional[MLPRegressor] = None
-        self._scaler: Optional[StandardScaler] = None
+        self._model: Optional[Union[MLPClassifier, MLPRegressor, _NumpyMLP]] = None
+        self._scaler: Optional[Union[StandardScaler, _NumpyScaler]] = None
         self._target_categories: Optional[List[str]] = None
 
     def _extract_features(self, peptides: Sequence[str]) -> np.ndarray:
         """Extract features from a list of peptides."""
-        return np.asarray([
-            extract_features(p, self.k, self._params['use_dipeptides'])
-            for p in peptides
-        ], dtype=np.float32)
+        return extract_features_batch(
+            peptides,
+            self.k,
+            use_dipeptides=self._params['use_dipeptides'],
+            positional=self._params['positional'],
+        )
+
+    @property
+    def _is_logistic(self) -> bool:
+        """True when the network has sigmoid outputs trained with cross-entropy."""
+        return isinstance(self._model, (MLPClassifier, _NumpyMLP))
+
+    @staticmethod
+    def _resolve_loss(loss: str, y: np.ndarray) -> str:
+        """Pick the training objective for an in-memory label array."""
+        n_labels = 1 if y.ndim == 1 else int(y.shape[1])
+        binary = bool(np.isin(y, (0.0, 1.0)).all())
+        if loss == 'squared':
+            return 'squared'
+        if loss == 'bce':
+            if not binary:
+                raise ValueError(
+                    "loss='bce' needs binary 0/1 labels; use loss='squared' for "
+                    "continuous scores."
+                )
+            return 'bce'
+        return 'bce' if (n_labels >= 2 and binary) else 'squared'
+
+    def _make_network(self, loss_kind: str, learning_rate: float, n_iter_no_change: int):
+        """Create the (incrementally trained) scikit-learn network."""
+        network = MLPClassifier if loss_kind == 'bce' else MLPRegressor
+        return network(
+            hidden_layer_sizes=self._params['hidden_layer_sizes'],
+            activation=self._params['activation'],
+            alpha=self._params['alpha'],
+            learning_rate_init=learning_rate,
+            max_iter=1,
+            early_stopping=False,
+            n_iter_no_change=n_iter_no_change,
+            random_state=self._params['random_state'],
+            shuffle=False,
+            warm_start=True,
+            verbose=False,
+        )
+
+    def _partial_fit_batch(self, X_scaled: np.ndarray, y_batch: np.ndarray) -> None:
+        """One incremental optimizer step on a scaled feature batch."""
+        y_fit = y_batch.ravel() if (y_batch.ndim == 2 and y_batch.shape[1] == 1) else y_batch
+        if self._is_logistic:
+            if not np.isin(y_fit, (0.0, 1.0)).all():
+                raise ValueError(
+                    "Cross-entropy training needs binary 0/1 labels; pass "
+                    "loss='squared' for continuous targets."
+                )
+            classes = np.arange(y_fit.shape[1]) if y_fit.ndim == 2 else np.array([0.0, 1.0])
+            self._model.partial_fit(X_scaled, y_fit, classes=classes)
+        else:
+            self._model.partial_fit(X_scaled, y_fit)
+
+    def _batch_loss(self) -> float:
+        """Loss of the last optimizer step, averaged over samples and labels.
+
+        scikit-learn's multi-label ``MLPClassifier`` sums the cross-entropy over its
+        outputs; dividing by their number puts it on the scale of the validation
+        log loss.
+        """
+        loss = float(self._model.loss_)
+        if isinstance(self._model, MLPClassifier):
+            loss /= max(int(self._model.n_outputs_), 1)
+        return loss
+
+    def _model_outputs(self, X_scaled: np.ndarray) -> np.ndarray:
+        """Network outputs: probabilities for sigmoid heads, raw scores otherwise."""
+        if self._is_logistic:
+            outputs = np.asarray(self._model.predict_proba(X_scaled), dtype=np.float32)
+            if isinstance(self._model, MLPClassifier) and self._model.n_outputs_ == 1:
+                outputs = outputs[:, 1:2]  # scikit-learn returns [P(0), P(1)] for one label
+            return outputs
+        return np.asarray(self._model.predict(X_scaled), dtype=np.float32)
+
+    def _extract_matrix(self, peptides: Sequence[str], chunk_size: int = 65536) -> np.ndarray:
+        """Feature matrix for ``peptides``.
+
+        The matrix is filled chunk by chunk, so memory use stays close to the size
+        of the result (no second copy is built).
+        """
+        peptides = list(peptides)
+        features = np.empty((len(peptides), len(self.get_feature_names())), dtype=np.float32)
+        for start in range(0, len(peptides), chunk_size):
+            features[start:start + chunk_size] = self._extract_features(
+                peptides[start:start + chunk_size]
+            )
+        return features
+
+    def _fit_scaler_and_scale(self, features: np.ndarray, chunk_rows: int = 262144) -> None:
+        """Fit ``self._scaler`` on ``features`` in chunks, then standardize them in place."""
+        self._scaler = StandardScaler()
+        for start in range(0, len(features), chunk_rows):
+            self._scaler.partial_fit(features[start:start + chunk_rows])
+        self._scale_in_place(features, chunk_rows)
+
+    def _scale_in_place(self, features: np.ndarray, chunk_rows: int = 262144) -> None:
+        """Standardize ``features`` with the fitted scaler without making a copy."""
+        mean = np.asarray(self._scaler.mean_, dtype=np.float32)
+        scale = np.asarray(self._scaler.scale_, dtype=np.float32)
+        for start in range(0, len(features), chunk_rows):
+            block = features[start:start + chunk_rows]
+            block -= mean
+            block /= scale
+
+    @staticmethod
+    def _iter_cached_batches(
+        X_scaled: np.ndarray,
+        labels: np.ndarray,
+        batch_size: int,
+        shuffle: bool,
+        rng: np.random.RandomState,
+    ) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """Yield (scaled features, labels) batches from an in-memory matrix."""
+        order = rng.permutation(len(X_scaled)) if shuffle else np.arange(len(X_scaled))
+        for start in range(0, len(order), batch_size):
+            index = order[start:start + batch_size]
+            yield X_scaled[index], np.asarray(labels[index], dtype=np.float32)
+
+    def _snapshot_weights(self) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        return copy.deepcopy(self._model.coefs_), copy.deepcopy(self._model.intercepts_)
+
+    def _restore_weights(self, snapshot: Tuple[List[np.ndarray], List[np.ndarray]]) -> None:
+        self._model.coefs_, self._model.intercepts_ = snapshot
+
+    def _feature_signature(self) -> str:
+        """Short hash of the ordered feature names the network was trained on."""
+        joined = "\n".join(self.get_feature_names())
+        return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:16]
 
     def _predict_raw_kmers(self, kmers: Sequence[str]) -> np.ndarray:
-        """Predict raw model outputs for k-mers (no aggregation)."""
+        """Predict model outputs for k-mers (no aggregation).
+
+        Probabilities for sigmoid-head models, raw scores for least-squares models.
+        """
         if not self._is_trained:
             raise RuntimeError("Model must be trained before scoring.")
         if self._model is None or self._scaler is None:
             raise RuntimeError("Model is not initialized. Train or load a model first.")
 
-        X = self._extract_features(kmers)
+        X = self._extract_matrix(kmers)
         X_scaled = self._scaler.transform(X).astype(np.float32, copy=False)
-        return self._model.predict(X_scaled)
+        return self._model_outputs(X_scaled)
+
+    def _predict_kmer_probabilities(self, kmers: Sequence[str]) -> np.ndarray:
+        """Per-k-mer values in [0, 1], shape (n_kmers, n_outputs)."""
+        outputs = self._predict_raw_kmers(kmers)
+        probs = outputs if self._is_logistic else _sigmoid(outputs)
+        return probs.reshape(-1, 1) if probs.ndim == 1 else probs
 
     def _iter_feature_batches(
         self,
@@ -578,8 +410,20 @@ class MLPScorer(TrainableScorer):
             stop = min(start + batch_size, len(peptides))
             X_batch = self._extract_features(peptides[start:stop]).astype(np.float32, copy=False)
             X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
-            outputs.append(np.asarray(self._model.predict(X_scaled), dtype=np.float32))
+            outputs.append(self._model_outputs(X_scaled))
 
+        if not outputs:
+            return np.array([], dtype=np.float32)
+        if outputs[0].ndim == 1:
+            return np.concatenate(outputs, axis=0)
+        return np.vstack(outputs)
+
+    def _predict_scaled(self, X_scaled: np.ndarray, batch_size: int) -> np.ndarray:
+        """Predict from an already scaled feature matrix, in batches."""
+        outputs = [
+            self._model_outputs(X_scaled[start:start + batch_size])
+            for start in range(0, len(X_scaled), batch_size)
+        ]
         if not outputs:
             return np.array([], dtype=np.float32)
         if outputs[0].ndim == 1:
@@ -591,9 +435,18 @@ class MLPScorer(TrainableScorer):
         val_peptides: Sequence[str],
         val_labels: np.ndarray,
         batch_size: int,
+        features: Optional[np.ndarray] = None,
     ) -> Tuple[float, float]:
-        """Compute validation MSE and R^2 score in batches."""
-        y_pred = np.asarray(self._predict_batches(val_peptides, batch_size), dtype=np.float32)
+        """Validation (loss, score) in batches.
+
+        Sigmoid-head models report the mean binary cross-entropy and its negation
+        (higher is better); least-squares models report MSE and R^2. ``features``
+        may hold already scaled features for ``val_peptides``.
+        """
+        if features is not None:
+            y_pred = np.asarray(self._predict_scaled(features, batch_size), dtype=np.float32)
+        else:
+            y_pred = np.asarray(self._predict_batches(val_peptides, batch_size), dtype=np.float32)
         y_true = np.asarray(val_labels, dtype=np.float32)
 
         if y_pred.ndim == 1:
@@ -605,6 +458,11 @@ class MLPScorer(TrainableScorer):
                 "Validation labels shape does not match predictions: "
                 f"pred={y_pred.shape}, labels={y_true.shape}"
             )
+
+        if self._is_logistic:
+            clipped = np.clip(y_pred, 1e-7, 1.0 - 1e-7)
+            bce = float(np.mean(-(y_true * np.log(clipped) + (1.0 - y_true) * np.log1p(-clipped))))
+            return bce, -bce
 
         mse = float(np.mean((y_pred - y_true) ** 2))
 
@@ -633,8 +491,6 @@ class MLPScorer(TrainableScorer):
         expected_label_dim: int,
         max_rows: Optional[int] = None,
         skip_rows: int = 0,
-        feature_pool: Any = None,
-        pool_chunksize: int = 256,
     ) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
         """Yield feature/label batches from a row iterator factory."""
         if batch_size <= 0:
@@ -645,8 +501,6 @@ class MLPScorer(TrainableScorer):
             raise ValueError("max_rows must be positive when provided.")
         if skip_rows < 0:
             raise ValueError("skip_rows must be non-negative.")
-        if pool_chunksize <= 0:
-            raise ValueError("pool_chunksize must be positive.")
 
         peptides_batch: List[str] = []
         labels_batch: List[np.ndarray] = []
@@ -678,28 +532,14 @@ class MLPScorer(TrainableScorer):
             rows_emitted += 1
 
             if len(peptides_batch) >= batch_size:
-                if feature_pool is None:
-                    X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
-                else:
-                    task_iter = ((p, self.k, self._params['use_dipeptides']) for p in peptides_batch)
-                    X_batch = np.asarray(
-                        list(feature_pool.imap(_extract_features_worker, task_iter, chunksize=pool_chunksize)),
-                        dtype=np.float32,
-                    )
+                X_batch = self._extract_features(peptides_batch)
                 y_batch = np.stack(labels_batch).astype(np.float32, copy=False)
                 yield X_batch, y_batch
                 peptides_batch = []
                 labels_batch = []
 
         if peptides_batch:
-            if feature_pool is None:
-                X_batch = self._extract_features(peptides_batch).astype(np.float32, copy=False)
-            else:
-                task_iter = ((p, self.k, self._params['use_dipeptides']) for p in peptides_batch)
-                X_batch = np.asarray(
-                    list(feature_pool.imap(_extract_features_worker, task_iter, chunksize=pool_chunksize)),
-                    dtype=np.float32,
-                )
+            X_batch = self._extract_features(peptides_batch)
             y_batch = np.stack(labels_batch).astype(np.float32, copy=False)
             yield X_batch, y_batch
 
@@ -750,15 +590,19 @@ class MLPScorer(TrainableScorer):
             If <= 0, defaults to `train_max_rows_per_epoch`.
         shuffle_in_batch : bool, optional
             Shuffle rows within each streamed batch deterministically per epoch.
-        parallel_workers : int, optional
-            Number of worker processes for feature extraction. If <= 1, uses
-            single-process feature extraction.
-        parallel_chunksize : int, optional
-            Chunk size for multiprocessing feature extraction.
+        parallel_workers, parallel_chunksize : int, optional
+            Deprecated and ignored. Features are computed with vectorised array
+            operations in the calling process, which needs no worker processes.
 
         Returns
         -------
         self : MLPScorer
+
+        Notes
+        -----
+        The objective follows the scorer's ``loss`` setting; with ``'auto'``,
+        multi-label rows are trained with sigmoid outputs and binary
+        cross-entropy and every streamed label must then be 0 or 1.
         """
         batch_size = int(kwargs.pop('batch_size', self.batch_size))
         if batch_size <= 0:
@@ -791,6 +635,13 @@ class MLPScorer(TrainableScorer):
             raise ValueError("parallel_workers must be positive.")
         if parallel_chunksize <= 0:
             raise ValueError("parallel_chunksize must be positive.")
+        if parallel_workers != 1 or parallel_chunksize != 256:
+            warnings.warn(
+                "parallel_workers and parallel_chunksize are ignored: features are "
+                "computed with vectorised array operations in the calling process.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         if epochs is None:
             epochs = self._params['max_iter']
@@ -808,7 +659,10 @@ class MLPScorer(TrainableScorer):
                 "row_iterator_factory must yield (peptide, label) pairs."
             )
         _, probe_label = probe_item
-        label_dim = int(self._normalize_label_row(probe_label).shape[0])
+        probe_row = self._normalize_label_row(probe_label)
+        label_dim = int(probe_row.shape[0])
+        # Later rows are checked batch by batch (see _partial_fit_batch).
+        loss_kind = self._resolve_loss(self._params['loss'], probe_row.reshape(1, -1))
 
         if target_categories is not None:
             if label_dim != len(target_categories):
@@ -823,204 +677,174 @@ class MLPScorer(TrainableScorer):
 
         self._target_categories = target_categories
 
-        feature_pool = None
-        try:
-            if parallel_workers > 1:
-                available_methods = set(mp.get_all_start_methods())
-                start_method = 'fork' if 'fork' in available_methods else 'spawn'
-                feature_pool = mp.get_context(start_method).Pool(processes=parallel_workers)
+        # Fit scaler incrementally with one pass over the stream.
+        self._scaler = StandardScaler()
+        n_train = 0
+        n_features = 0
+        scaler_start = time.time()
+        next_scaler_log = progress_every_samples
+        scaler_target_rows = scaler_max_rows or total_rows_hint
+        for X_batch, _ in self._iter_feature_batches_from_rows(
+            row_iterator_factory=row_iterator_factory,
+            batch_size=batch_size,
+            expected_label_dim=label_dim,
+            max_rows=scaler_max_rows,
+        ):
+            self._scaler.partial_fit(X_batch)
+            n_train += X_batch.shape[0]
+            n_features = X_batch.shape[1]
 
-            # Fit scaler incrementally with one pass over the stream.
-            self._scaler = StandardScaler()
-            n_train = 0
-            n_features = 0
-            scaler_start = time.time()
-            next_scaler_log = progress_every_samples
-            scaler_target_rows = scaler_max_rows or total_rows_hint
-            for X_batch, _ in self._iter_feature_batches_from_rows(
+            if verbose and n_train >= next_scaler_log:
+                elapsed = max(time.time() - scaler_start, 1e-9)
+                rows_per_sec = n_train / elapsed
+                message = (
+                    f"[scaler] rows={n_train:,} "
+                    f"rate={rows_per_sec:,.0f} rows/s"
+                )
+                if scaler_target_rows is not None:
+                    pct = (100.0 * n_train) / max(float(scaler_target_rows), 1.0)
+                    remaining = max(scaler_target_rows - n_train, 0)
+                    eta_sec = remaining / max(rows_per_sec, 1e-9)
+                    message += f" ({pct:.2f}% est, ETA {eta_sec / 60.0:.1f} min)"
+                print(message)
+                while n_train >= next_scaler_log:
+                    next_scaler_log += progress_every_samples
+
+        if n_train == 0:
+            raise ValueError("Training data cannot be empty.")
+        if verbose:
+            elapsed = max(time.time() - scaler_start, 1e-9)
+            rows_per_sec = n_train / elapsed
+            print(
+                f"[scaler] complete rows={n_train:,} "
+                f"in {elapsed / 60.0:.2f} min ({rows_per_sec:,.0f} rows/s)"
+            )
+
+        # Incremental MLP training over multiple streaming passes.
+        self._model = self._make_network(
+            loss_kind, learning_rate, int(kwargs.pop('n_iter_no_change', 10))
+        )
+
+        self._training_history = []
+        epoch_row_target = train_max_rows_per_epoch or total_rows_hint
+        epoch_rows_history: List[int] = []
+        epoch_skip_rows: List[int] = []
+        base_seed = self._params['random_state']
+        if base_seed is None:
+            base_seed = 0
+        sampled_total_rows = (
+            total_rows_hint
+            if total_rows_hint is not None
+            else (n_train if scaler_max_rows is None else None)
+        )
+        for epoch_idx in range(int(epochs)):
+            batch_losses: List[float] = []
+            epoch_num = epoch_idx + 1
+            epoch_rows = 0
+            epoch_start = time.time()
+            next_epoch_log = progress_every_samples
+            epoch_rng = np.random.RandomState(base_seed + epoch_num)
+            skip_rows = 0
+            if epoch_shuffle and train_max_rows_per_epoch is not None:
+                max_skip_cap = (
+                    epoch_shuffle_max_skip_rows_arg
+                    if epoch_shuffle_max_skip_rows_arg > 0
+                    else train_max_rows_per_epoch
+                )
+                if (
+                    sampled_total_rows is not None
+                    and sampled_total_rows > train_max_rows_per_epoch
+                ):
+                    max_skip = min(
+                        sampled_total_rows - train_max_rows_per_epoch,
+                        max_skip_cap,
+                    )
+                    skip_rows = int(epoch_rng.randint(0, max_skip + 1))
+                elif sampled_total_rows is None:
+                    skip_rows = int(epoch_rng.randint(0, max_skip_cap + 1))
+            epoch_skip_rows.append(skip_rows)
+            for X_batch, y_batch in self._iter_feature_batches_from_rows(
                 row_iterator_factory=row_iterator_factory,
                 batch_size=batch_size,
                 expected_label_dim=label_dim,
-                max_rows=scaler_max_rows,
-                feature_pool=feature_pool,
-                pool_chunksize=parallel_chunksize,
+                max_rows=train_max_rows_per_epoch,
+                skip_rows=skip_rows,
             ):
-                self._scaler.partial_fit(X_batch)
-                n_train += X_batch.shape[0]
-                n_features = X_batch.shape[1]
+                if shuffle_in_batch and X_batch.shape[0] > 1:
+                    perm = epoch_rng.permutation(X_batch.shape[0])
+                    X_batch = X_batch[perm]
+                    y_batch = y_batch[perm]
+                X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
+                self._partial_fit_batch(X_scaled, y_batch)
+                batch_losses.append(self._batch_loss())
+                epoch_rows += X_batch.shape[0]
 
-                if verbose and n_train >= next_scaler_log:
-                    elapsed = max(time.time() - scaler_start, 1e-9)
-                    rows_per_sec = n_train / elapsed
-                    message = (
-                        f"[scaler] rows={n_train:,} "
-                        f"rate={rows_per_sec:,.0f} rows/s"
-                    )
-                    if scaler_target_rows is not None:
-                        pct = (100.0 * n_train) / max(float(scaler_target_rows), 1.0)
-                        remaining = max(scaler_target_rows - n_train, 0)
+                if verbose and epoch_rows >= next_epoch_log:
+                    elapsed = max(time.time() - epoch_start, 1e-9)
+                    rows_per_sec = epoch_rows / elapsed
+                    if epoch_row_target is not None:
+                        remaining = max(epoch_row_target - epoch_rows, 0)
                         eta_sec = remaining / max(rows_per_sec, 1e-9)
-                        message += f" ({pct:.2f}% est, ETA {eta_sec / 60.0:.1f} min)"
-                    print(message)
-                    while n_train >= next_scaler_log:
-                        next_scaler_log += progress_every_samples
+                        pct = (100.0 * epoch_rows) / max(float(epoch_row_target), 1.0)
+                        print(
+                            f"[epoch {epoch_num}] rows={epoch_rows:,}/{epoch_row_target:,} "
+                            f"({pct:.1f}%) rate={rows_per_sec:,.0f} rows/s "
+                            f"ETA {eta_sec / 60.0:.1f} min"
+                        )
+                    else:
+                        print(
+                            f"[epoch {epoch_num}] rows={epoch_rows:,} "
+                            f"rate={rows_per_sec:,.0f} rows/s"
+                        )
+                    while epoch_rows >= next_epoch_log:
+                        next_epoch_log += progress_every_samples
 
-            if n_train == 0:
+            if not batch_losses:
                 raise ValueError("Training data cannot be empty.")
+
+            epoch_loss = float(np.mean(batch_losses))
+            self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
+            epoch_rows_history.append(epoch_rows)
+
             if verbose:
-                elapsed = max(time.time() - scaler_start, 1e-9)
-                rows_per_sec = n_train / elapsed
+                epoch_minutes = (time.time() - epoch_start) / 60.0
                 print(
-                    f"[scaler] complete rows={n_train:,} "
-                    f"in {elapsed / 60.0:.2f} min ({rows_per_sec:,.0f} rows/s)"
+                    f"Iteration {epoch_num}, loss = {epoch_loss:.8f} "
+                    f"(epoch_time={epoch_minutes:.2f} min, rows={epoch_rows:,})"
                 )
 
-            # Incremental MLP training over multiple streaming passes.
-            self._model = MLPRegressor(
-                hidden_layer_sizes=self._params['hidden_layer_sizes'],
-                activation=self._params['activation'],
-                alpha=self._params['alpha'],
-                learning_rate_init=learning_rate,
-                max_iter=1,
-                early_stopping=False,
-                n_iter_no_change=int(kwargs.pop('n_iter_no_change', 10)),
-                random_state=self._params['random_state'],
-                shuffle=False,
-                warm_start=True,
-                verbose=False,
-            )
+        self._is_trained = True
+        self._is_fitted = True
 
-            self._training_history = []
-            epoch_row_target = train_max_rows_per_epoch or total_rows_hint
-            epoch_rows_history: List[int] = []
-            epoch_skip_rows: List[int] = []
-            base_seed = self._params['random_state']
-            if base_seed is None:
-                base_seed = 0
-            sampled_total_rows = (
-                total_rows_hint
-                if total_rows_hint is not None
-                else (n_train if scaler_max_rows is None else None)
-            )
-            for epoch_idx in range(int(epochs)):
-                batch_losses: List[float] = []
-                epoch_num = epoch_idx + 1
-                epoch_rows = 0
-                epoch_start = time.time()
-                next_epoch_log = progress_every_samples
-                epoch_rng = np.random.RandomState(base_seed + epoch_num)
-                skip_rows = 0
-                if epoch_shuffle and train_max_rows_per_epoch is not None:
-                    max_skip_cap = (
-                        epoch_shuffle_max_skip_rows_arg
-                        if epoch_shuffle_max_skip_rows_arg > 0
-                        else train_max_rows_per_epoch
-                    )
-                    if (
-                        sampled_total_rows is not None
-                        and sampled_total_rows > train_max_rows_per_epoch
-                    ):
-                        max_skip = min(
-                            sampled_total_rows - train_max_rows_per_epoch,
-                            max_skip_cap,
-                        )
-                        skip_rows = int(epoch_rng.randint(0, max_skip + 1))
-                    elif sampled_total_rows is None:
-                        skip_rows = int(epoch_rng.randint(0, max_skip_cap + 1))
-                epoch_skip_rows.append(skip_rows)
-                for X_batch, y_batch in self._iter_feature_batches_from_rows(
-                    row_iterator_factory=row_iterator_factory,
-                    batch_size=batch_size,
-                    expected_label_dim=label_dim,
-                    max_rows=train_max_rows_per_epoch,
-                    skip_rows=skip_rows,
-                    feature_pool=feature_pool,
-                    pool_chunksize=parallel_chunksize,
-                ):
-                    if shuffle_in_batch and X_batch.shape[0] > 1:
-                        perm = epoch_rng.permutation(X_batch.shape[0])
-                        X_batch = X_batch[perm]
-                        y_batch = y_batch[perm]
-                    X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
-                    y_fit: Union[np.ndarray, Sequence[float]]
-                    if y_batch.shape[1] == 1:
-                        y_fit = y_batch.ravel()
-                    else:
-                        y_fit = y_batch
-                    self._model.partial_fit(X_scaled, y_fit)
-                    batch_losses.append(float(self._model.loss_))
-                    epoch_rows += X_batch.shape[0]
+        final_train_loss = float(self._training_history[-1]['loss'])
+        n_train_effective = int(epoch_rows_history[0]) if epoch_rows_history else 0
+        self._metadata['n_train'] = n_train_effective
+        self._metadata['n_features'] = n_features
+        self._metadata['n_epochs'] = len(self._training_history)
+        self._metadata['final_train_loss'] = final_train_loss
+        self._metadata['loss'] = loss_kind
+        self._metadata['scaler_rows'] = n_train
+        self._metadata['scaler_max_rows'] = scaler_max_rows_arg
+        self._metadata['train_max_rows_per_epoch'] = train_max_rows_per_epoch_arg
+        self._metadata['total_rows_hint'] = total_rows_hint
+        self._metadata['epoch_rows'] = epoch_rows_history
+        self._metadata['epoch_skip_rows'] = epoch_skip_rows
+        self._metadata['epoch_shuffle'] = epoch_shuffle
+        self._metadata['epoch_shuffle_max_skip_rows'] = epoch_shuffle_max_skip_rows_arg
+        self._metadata['shuffle_in_batch'] = shuffle_in_batch
 
-                    if verbose and epoch_rows >= next_epoch_log:
-                        elapsed = max(time.time() - epoch_start, 1e-9)
-                        rows_per_sec = epoch_rows / elapsed
-                        if epoch_row_target is not None:
-                            remaining = max(epoch_row_target - epoch_rows, 0)
-                            eta_sec = remaining / max(rows_per_sec, 1e-9)
-                            pct = (100.0 * epoch_rows) / max(float(epoch_row_target), 1.0)
-                            print(
-                                f"[epoch {epoch_num}] rows={epoch_rows:,}/{epoch_row_target:,} "
-                                f"({pct:.1f}%) rate={rows_per_sec:,.0f} rows/s "
-                                f"ETA {eta_sec / 60.0:.1f} min"
-                            )
-                        else:
-                            print(
-                                f"[epoch {epoch_num}] rows={epoch_rows:,} "
-                                f"rate={rows_per_sec:,.0f} rows/s"
-                            )
-                        while epoch_rows >= next_epoch_log:
-                            next_epoch_log += progress_every_samples
+        if verbose:
+            print("\nTraining complete:")
+            print(f"  Features: {n_features}")
+            print(f"  n_train (per-epoch): {n_train_effective}")
+            print(f"  Scaler rows: {n_train}")
+            print(f"  Iterations: {len(self._training_history)}")
+            print(f"  Final loss: {final_train_loss:.4f}")
 
-                if not batch_losses:
-                    raise ValueError("Training data cannot be empty.")
+        if plot_loss:
+            self._save_loss_plot(plot_loss, verbose=verbose)
 
-                epoch_loss = float(np.mean(batch_losses))
-                self._training_history.append({'epoch': epoch_num, 'loss': epoch_loss})
-                epoch_rows_history.append(epoch_rows)
-
-                if verbose:
-                    epoch_minutes = (time.time() - epoch_start) / 60.0
-                    print(
-                        f"Iteration {epoch_num}, loss = {epoch_loss:.8f} "
-                        f"(epoch_time={epoch_minutes:.2f} min, rows={epoch_rows:,})"
-                    )
-
-            self._is_trained = True
-            self._is_fitted = True
-
-            final_train_loss = float(self._training_history[-1]['loss'])
-            n_train_effective = int(epoch_rows_history[0]) if epoch_rows_history else 0
-            self._metadata['n_train'] = n_train_effective
-            self._metadata['n_features'] = n_features
-            self._metadata['n_epochs'] = len(self._training_history)
-            self._metadata['final_train_loss'] = final_train_loss
-            self._metadata['scaler_rows'] = n_train
-            self._metadata['scaler_max_rows'] = scaler_max_rows_arg
-            self._metadata['train_max_rows_per_epoch'] = train_max_rows_per_epoch_arg
-            self._metadata['total_rows_hint'] = total_rows_hint
-            self._metadata['parallel_workers'] = parallel_workers
-            self._metadata['epoch_rows'] = epoch_rows_history
-            self._metadata['epoch_skip_rows'] = epoch_skip_rows
-            self._metadata['epoch_shuffle'] = epoch_shuffle
-            self._metadata['epoch_shuffle_max_skip_rows'] = epoch_shuffle_max_skip_rows_arg
-            self._metadata['shuffle_in_batch'] = shuffle_in_batch
-
-            if verbose:
-                print("\nTraining complete:")
-                print(f"  Features: {n_features}")
-                print(f"  n_train (per-epoch): {n_train_effective}")
-                print(f"  Scaler rows: {n_train}")
-                print(f"  Iterations: {len(self._training_history)}")
-                print(f"  Final loss: {final_train_loss:.4f}")
-
-            if plot_loss:
-                self._save_loss_plot(plot_loss, verbose=verbose)
-
-            return self
-        finally:
-            if feature_pool is not None:
-                feature_pool.close()
-                feature_pool.join()
+        return self
 
     def train(
         self,
@@ -1061,10 +885,28 @@ class MLPScorer(TrainableScorer):
         plot_loss : bool, str, or Path, optional
             Save loss curve plot. If True, saves to 'loss_curve.png' in
             current directory. If a path, saves to that location.
+        batch_size : int, optional
+            Rows per optimizer step (default: the scorer's ``batch_size``).
+        cache_features : bool, default=False
+            Extract and scale all features once and keep them in memory instead
+            of recomputing them every epoch. Much faster for large training
+            sets; needs about ``n_samples * n_features * 4`` bytes.
+        restore_best : bool, default=True
+            For sigmoid-head models with early stopping, restore the weights of
+            the epoch with the lowest validation loss rather than keeping the
+            weights of the last epoch.
 
         Returns
         -------
         self : MLPScorer
+
+        Notes
+        -----
+        With binary multi-label targets and ``loss='auto'`` the network is trained
+        with one independent sigmoid output per label and binary cross-entropy, so
+        ``predict_proba`` returns probabilities. Pass external ``val_peptides`` /
+        ``val_labels`` that are not near-duplicates of the training peptides for
+        early stopping to be meaningful.
         """
         peptides = list(peptides)
         if not peptides:
@@ -1096,6 +938,7 @@ class MLPScorer(TrainableScorer):
             epochs = self._params['max_iter']
         if learning_rate is None:
             learning_rate = self._params['learning_rate_init']
+        loss_kind = self._resolve_loss(self._params['loss'], y)
 
         if target_categories is not None:
             if y.ndim == 1 and len(target_categories) != 1:
@@ -1109,6 +952,8 @@ class MLPScorer(TrainableScorer):
         shuffle_batches = bool(kwargs.pop('shuffle_batches', True))
         tol = float(kwargs.pop('tol', 1e-4))
         n_iter_no_change = int(kwargs.pop('n_iter_no_change', 10))
+        cache_features = bool(kwargs.pop('cache_features', False))
+        restore_best = bool(kwargs.pop('restore_best', True))
 
         # Disable automatic validation split when too small.
         use_early_stopping = self._params['early_stopping']
@@ -1139,56 +984,58 @@ class MLPScorer(TrainableScorer):
 
         rng = np.random.RandomState(self._params['random_state'])
 
-        # Fit scaler incrementally over batches.
+        # Fit the scaler: once on a cached matrix, or incrementally over batches.
+        X_train_cached: Optional[np.ndarray] = None
+        X_val_cached: Optional[np.ndarray] = None
         self._scaler = StandardScaler()
-        for X_batch, _ in self._iter_feature_batches(
-            train_peptides,
-            y_train,
-            batch_size=batch_size,
-            shuffle=False,
-            rng=rng,
-        ):
-            self._scaler.partial_fit(X_batch)
+        if cache_features:
+            X_train_cached = self._extract_matrix(train_peptides)
+            self._fit_scaler_and_scale(X_train_cached)
+            if val_peptides is not None and y_val is not None:
+                X_val_cached = self._extract_matrix(val_peptides)
+                self._scale_in_place(X_val_cached)
+        else:
+            for X_batch, _ in self._iter_feature_batches(
+                train_peptides,
+                y_train,
+                batch_size=batch_size,
+                shuffle=False,
+                rng=rng,
+            ):
+                self._scaler.partial_fit(X_batch)
 
         # Train incrementally with partial_fit to avoid building a full feature matrix.
-        self._model = MLPRegressor(
-            hidden_layer_sizes=self._params['hidden_layer_sizes'],
-            activation=self._params['activation'],
-            alpha=self._params['alpha'],
-            learning_rate_init=learning_rate,
-            max_iter=1,
-            early_stopping=False,
-            n_iter_no_change=n_iter_no_change,
-            random_state=self._params['random_state'],
-            shuffle=False,
-            warm_start=True,
-            verbose=False,
-        )
+        self._model = self._make_network(loss_kind, learning_rate, n_iter_no_change)
 
         self._training_history = []
         best_val_score: Optional[float] = None
         best_val_loss: Optional[float] = None
         final_val_loss: Optional[float] = None
+        best_epoch: Optional[int] = None
+        best_weights = None
         no_improve_count = 0
 
         for epoch_idx in range(int(epochs)):
             batch_losses: List[float] = []
 
-            for X_batch, y_batch in self._iter_feature_batches(
-                train_peptides,
-                y_train,
-                batch_size=batch_size,
-                shuffle=shuffle_batches,
-                rng=rng,
-            ):
-                X_scaled = self._scaler.transform(X_batch).astype(np.float32, copy=False)
-                y_fit: Union[np.ndarray, Sequence[float]]
-                if y_batch.ndim == 2 and y_batch.shape[1] == 1:
-                    y_fit = y_batch.ravel()
-                else:
-                    y_fit = y_batch
-                self._model.partial_fit(X_scaled, y_fit)
-                batch_losses.append(float(self._model.loss_))
+            if X_train_cached is not None:
+                scaled_batches = self._iter_cached_batches(
+                    X_train_cached, y_train, batch_size, shuffle_batches, rng
+                )
+            else:
+                scaled_batches = (
+                    (self._scaler.transform(X_raw).astype(np.float32, copy=False), y_raw)
+                    for X_raw, y_raw in self._iter_feature_batches(
+                        train_peptides,
+                        y_train,
+                        batch_size=batch_size,
+                        shuffle=shuffle_batches,
+                        rng=rng,
+                    )
+                )
+            for X_scaled, y_batch in scaled_batches:
+                self._partial_fit_batch(X_scaled, y_batch)
+                batch_losses.append(self._batch_loss())
 
             if not batch_losses:
                 raise ValueError("Training data cannot be empty.")
@@ -1203,17 +1050,24 @@ class MLPScorer(TrainableScorer):
                     val_peptides=val_peptides,
                     val_labels=y_val,
                     batch_size=batch_size,
+                    features=X_val_cached,
                 )
+                self._training_history[-1]['val_loss'] = float(final_val_loss)
 
             if verbose:
                 print(f"Iteration {epoch_num}, loss = {epoch_loss:.8f}")
                 if val_score is not None:
                     print(f"Validation score: {val_score:.6f}")
+                    if self._is_logistic:
+                        print(f"Validation log loss: {final_val_loss:.6f}")
 
             if use_early_stopping and val_score is not None and final_val_loss is not None:
                 if best_val_score is None or val_score > best_val_score + tol:
                     best_val_score = float(val_score)
                     best_val_loss = float(final_val_loss)
+                    best_epoch = epoch_num
+                    if self._is_logistic and restore_best:
+                        best_weights = self._snapshot_weights()
                     no_improve_count = 0
                 else:
                     no_improve_count += 1
@@ -1225,6 +1079,11 @@ class MLPScorer(TrainableScorer):
                                 "Stopping."
                             )
                         break
+
+        if best_weights is not None:
+            self._restore_weights(best_weights)
+            if verbose and best_epoch != len(self._training_history):
+                print(f"Restored weights from epoch {best_epoch} (lowest validation loss).")
 
         self._is_trained = True
         self._is_fitted = True
@@ -1238,6 +1097,10 @@ class MLPScorer(TrainableScorer):
         self._metadata['n_features'] = n_features
         self._metadata['n_epochs'] = n_epochs_run
         self._metadata['final_train_loss'] = final_train_loss
+        self._metadata['loss'] = loss_kind
+        if best_epoch is not None:
+            self._metadata['best_epoch'] = best_epoch
+            self._metadata['weights_restored_from_best_epoch'] = best_weights is not None
         if best_val_score is not None:
             self._metadata['best_val_score'] = float(best_val_score)
 
@@ -1338,6 +1201,7 @@ class MLPScorer(TrainableScorer):
         aggregate: str = 'mean',
         pathogen_categories: Optional[List[str]] = None,
         self_categories: Optional[List[str]] = None,
+        combine: Union[str, Callable[[np.ndarray], np.ndarray]] = DEFAULT_COMBINE,
     ) -> np.ndarray:
         """Score peptides for foreignness.
 
@@ -1353,6 +1217,9 @@ class MLPScorer(TrainableScorer):
             Categories considered "foreign" (default: ['bacteria', 'viruses']).
         self_categories : list of str, optional
             Categories considered "self" (default: ['human', 'rodents', 'mammals']).
+        combine : {'max', 'sum'} or callable, default='max'
+            How to combine the probabilities within each group; see
+            :meth:`foreignness`.
 
         Returns
         -------
@@ -1376,6 +1243,7 @@ class MLPScorer(TrainableScorer):
             pathogen_categories=pathogen_categories,
             self_categories=self_categories,
             aggregate=aggregate,
+            combine=combine,
         )
 
     def _score_batch_impl(self, batch: List[str]) -> np.ndarray:
@@ -1387,7 +1255,17 @@ class MLPScorer(TrainableScorer):
         peptides: Union[str, Sequence[str]],
         aggregate: str = 'mean',
     ) -> np.ndarray:
-        """Predict category probabilities using sigmoid activation.
+        """Predict category probabilities with one independent sigmoid per category.
+
+        For models trained with binary cross-entropy (the default for binary
+        multi-label targets) column ``j`` estimates ``P(label j = 1 | peptide)``
+        under the training distribution. The columns are not mutually exclusive
+        and do not sum to one: a conserved peptide can belong to several
+        categories at once.
+
+        Peptides longer than ``k`` are split into overlapping k-mers whose
+        probabilities are aggregated; peptides shorter than ``k`` are padded with
+        ``X`` and are not reliable.
 
         Parameters
         ----------
@@ -1399,34 +1277,114 @@ class MLPScorer(TrainableScorer):
         Returns
         -------
         probs : np.ndarray
-            Probabilities for each category, shape (n_peptides, n_categories).
-            Values are in [0, 1] via sigmoid transformation.
+            Probabilities for each category, shape (n_peptides, n_categories),
+            in [0, 1].
+
+        Notes
+        -----
+        Models trained with ``loss='squared'`` (including models saved by older
+        versions) fit 0/1 labels by least squares and pass the result through a
+        sigmoid: a perfect fit of the 0/1 targets would output only 0.50 or 0.73,
+        so these values are *not* calibrated probabilities. A warning is issued
+        for such multi-output models.
         """
         if not self._is_trained:
             raise RuntimeError("Model must be trained before prediction.")
+        if aggregate not in ('mean', 'max', 'min'):
+            raise ValueError(f"Unknown aggregate method: {aggregate}")
 
         peptides = self._ensure_list(peptides)
-        results: List[np.ndarray] = []
+        n_outputs = int(self._model.coefs_[-1].shape[1])
+        if self._target_categories is not None and not self._is_logistic and n_outputs > 1:
+            warnings.warn(
+                "This model was trained with squared loss on binary labels; its "
+                "outputs are a sigmoid of a regression value and are not calibrated "
+                "probabilities. Retrain with the default loss='auto' (binary "
+                "cross-entropy) to obtain calibrated sigmoid outputs.",
+                UserWarning,
+                stacklevel=2,
+            )
+        if not peptides:
+            return np.zeros((0, n_outputs), dtype=np.float64)
 
+        windows: List[str] = []
+        counts: List[int] = []
         for peptide in peptides:
             kmers = self._extract_kmers(peptide)
-            raw = self._predict_raw_kmers(kmers)
-            probs = 1 / (1 + np.exp(-raw))
-            if probs.ndim == 1:
-                probs = probs.reshape(-1, 1)
+            windows.extend(kmers)
+            counts.append(len(kmers))
 
-            if aggregate == 'mean':
-                agg_probs = probs.mean(axis=0)
-            elif aggregate == 'max':
-                agg_probs = probs.max(axis=0)
-            elif aggregate == 'min':
-                agg_probs = probs.min(axis=0)
-            else:
-                raise ValueError(f"Unknown aggregate method: {aggregate}")
+        step = 65536
+        probs = np.vstack([
+            self._predict_kmer_probabilities(windows[start:start + step])
+            for start in range(0, len(windows), step)
+        ]).astype(np.float64, copy=False)
 
-            results.append(agg_probs)
+        counts_array = np.asarray(counts)
+        starts = np.concatenate([[0], np.cumsum(counts_array)[:-1]])
+        if aggregate == 'mean':
+            return np.add.reduceat(probs, starts, axis=0) / counts_array[:, None]
+        if aggregate == 'max':
+            return np.maximum.reduceat(probs, starts, axis=0)
+        return np.minimum.reduceat(probs, starts, axis=0)
 
-        return np.vstack(results)
+    def _group_indices(
+        self,
+        pathogen_categories: Optional[Sequence[str]],
+        self_categories: Optional[Sequence[str]],
+    ) -> Tuple[List[int], List[int]]:
+        """Column indices of the pathogen and self category groups."""
+        if self._target_categories is None:
+            raise RuntimeError(
+                "Model must be trained with target_categories to use foreignness(). "
+                "Use score() for single-output models."
+            )
+        if pathogen_categories is None:
+            pathogen_categories = DEFAULT_PATHOGEN_CATEGORIES
+        if self_categories is None:
+            self_categories = DEFAULT_SELF_CATEGORIES
+
+        available = list(self._target_categories)
+        pathogen_idx = [
+            available.index(cat) for cat in dict.fromkeys(pathogen_categories)
+            if cat in available
+        ]
+        self_idx = [
+            available.index(cat) for cat in dict.fromkeys(self_categories)
+            if cat in available
+        ]
+        if not pathogen_idx:
+            raise ValueError(f"No pathogen categories found. Available: {available}")
+        if not self_idx:
+            raise ValueError(f"No self categories found. Available: {available}")
+        return pathogen_idx, self_idx
+
+    @staticmethod
+    def _combine_category_scores(
+        probs: np.ndarray,
+        pathogen_idx: Sequence[int],
+        self_idx: Sequence[int],
+        combine: Union[str, Callable[[np.ndarray], np.ndarray]],
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Pathogen value, self value and ``pathogen / (pathogen + self)``."""
+        if callable(combine):
+            reduce = combine
+        elif combine in NAMED_COMBINERS:
+            reduce = NAMED_COMBINERS[combine]
+        else:
+            raise ValueError(
+                f"Unknown combine method: {combine!r}. Use one of "
+                f"{sorted(NAMED_COMBINERS)} or a callable."
+            )
+        pathogen_value = np.asarray(reduce(probs[:, list(pathogen_idx)]), dtype=np.float64)
+        self_value = np.asarray(reduce(probs[:, list(self_idx)]), dtype=np.float64)
+        denominator = pathogen_value + self_value
+        foreignness = np.where(
+            denominator > 0,
+            pathogen_value / np.where(denominator > 0, denominator, 1.0),
+            0.5,  # Neutral when both are zero
+        )
+        return pathogen_value, self_value, foreignness
 
     def foreignness(
         self,
@@ -1434,10 +1392,22 @@ class MLPScorer(TrainableScorer):
         pathogen_categories: Optional[List[str]] = None,
         self_categories: Optional[List[str]] = None,
         aggregate: str = 'mean',
+        combine: Union[str, Callable[[np.ndarray], np.ndarray]] = DEFAULT_COMBINE,
     ) -> np.ndarray:
-        """Compute foreignness score from category probabilities.
+        """Compute foreignness from category probabilities.
 
-        Foreignness = max(pathogens) / (max(pathogens) + max(self))
+        ``foreignness = pathogen / (pathogen + self)``, where ``pathogen`` and
+        ``self`` combine the probabilities of the categories in each group:
+
+        - ``combine='max'`` (default): the largest probability in each group, i.e.
+          ``max(pathogens) / (max(pathogens) + max(self))``.
+        - ``combine='sum'``: the sum of the probabilities in each group. The sum of
+          independent sigmoid outputs is the expected number of categories in the
+          group that contain the peptide, so this compares the expected number of
+          pathogen categories with the expected number of self categories (the
+          groups differ in size, which shifts the neutral point).
+        - a callable receiving an array of shape (n_peptides, n_categories_in_group)
+          and returning one value per peptide.
 
         Parameters
         ----------
@@ -1449,60 +1419,17 @@ class MLPScorer(TrainableScorer):
             Categories considered "self" (default: ['human', 'rodents', 'mammals']).
         aggregate : str, default='mean'
             How to aggregate k-mer probabilities for long peptides.
+        combine : {'max', 'sum'} or callable, default='max'
+            How to combine probabilities within each group.
 
         Returns
         -------
         foreignness : np.ndarray
-            Foreignness scores in [0, 1]. Higher = more foreign.
+            Scores in [0, 1] (0.5 when both groups are 0). Higher = more foreign.
         """
-        if self._target_categories is None:
-            raise RuntimeError(
-                "Model must be trained with target_categories to use foreignness(). "
-                "Use score() for single-output models."
-            )
-
-        if pathogen_categories is None:
-            pathogen_categories = ['bacteria', 'viruses']
-        if self_categories is None:
-            self_categories = ['human', 'rodents', 'mammals']
-
-        # Get category indices
-        pathogen_idx = [
-            self._target_categories.index(cat)
-            for cat in pathogen_categories
-            if cat in self._target_categories
-        ]
-        self_idx = [
-            self._target_categories.index(cat)
-            for cat in self_categories
-            if cat in self._target_categories
-        ]
-
-        if not pathogen_idx:
-            raise ValueError(
-                f"No pathogen categories found. Available: {self._target_categories}"
-            )
-        if not self_idx:
-            raise ValueError(
-                f"No self categories found. Available: {self._target_categories}"
-            )
-
-        # Get probabilities
+        pathogen_idx, self_idx = self._group_indices(pathogen_categories, self_categories)
         probs = self.predict_proba(peptides, aggregate=aggregate)
-
-        # Compute foreignness: max(pathogens) / (max(pathogens) + max(self))
-        max_pathogen = probs[:, pathogen_idx].max(axis=1)
-        max_self = probs[:, self_idx].max(axis=1)
-
-        # Avoid division by zero
-        denominator = max_pathogen + max_self
-        foreignness = np.where(
-            denominator > 0,
-            max_pathogen / denominator,
-            0.5  # Neutral when both are zero
-        )
-
-        return foreignness
+        return self._combine_category_scores(probs, pathogen_idx, self_idx, combine)[2]
 
     @property
     def target_categories(self) -> Optional[List[str]]:
@@ -1515,6 +1442,7 @@ class MLPScorer(TrainableScorer):
         pathogen_categories: Optional[List[str]] = None,
         self_categories: Optional[List[str]] = None,
         aggregate: str = 'mean',
+        combine: Union[str, Callable[[np.ndarray], np.ndarray]] = DEFAULT_COMBINE,
     ) -> 'pd.DataFrame':
         """Predict category probabilities and foreignness for variable-length peptides.
 
@@ -1530,6 +1458,9 @@ class MLPScorer(TrainableScorer):
             Categories considered "self" (default: ['human', 'rodents', 'mammals']).
         aggregate : str, default='mean'
             How to aggregate k-mer scores for long peptides: 'mean', 'max', 'min'.
+        combine : {'max', 'sum'} or callable, default='max'
+            How to combine probabilities within the pathogen and self groups; see
+            :meth:`foreignness`.
 
         Returns
         -------
@@ -1537,7 +1468,10 @@ class MLPScorer(TrainableScorer):
             DataFrame with columns:
             - 'peptide': input peptide sequence
             - One column per target category (probabilities)
-            - 'foreignness': foreignness score
+            - 'pathogen_<combine>' and 'self_<combine>': the group values, e.g.
+              'pathogen_max' / 'self_max' (a callable ``combine`` gives
+              'pathogen_value' / 'self_value')
+            - 'foreignness': pathogen / (pathogen + self)
         """
         import pandas as pd
 
@@ -1546,50 +1480,20 @@ class MLPScorer(TrainableScorer):
                 "Model must be trained with target_categories to use predict_dataframe()."
             )
 
-        if pathogen_categories is None:
-            pathogen_categories = ['bacteria', 'viruses']
-        if self_categories is None:
-            self_categories = ['human', 'rodents', 'mammals']
-
-        # Get category indices for foreignness calculation
-        pathogen_idx = [
-            self._target_categories.index(cat)
-            for cat in pathogen_categories
-            if cat in self._target_categories
-        ]
-        self_idx = [
-            self._target_categories.index(cat)
-            for cat in self_categories
-            if cat in self._target_categories
-        ]
-
-        if not pathogen_idx:
-            raise ValueError(
-                f"No pathogen categories found. Available: {self._target_categories}"
-            )
-        if not self_idx:
-            raise ValueError(
-                f"No self categories found. Available: {self._target_categories}"
-            )
-
+        pathogen_idx, self_idx = self._group_indices(pathogen_categories, self_categories)
         peptides = list(peptides)
         probs = self.predict_proba(peptides, aggregate=aggregate)
-        results = []
-        for peptide, row_probs in zip(peptides, probs):
-            max_pathogen = row_probs[pathogen_idx].max()
-            max_self = row_probs[self_idx].max()
-            denom = max_pathogen + max_self
-            foreignness = max_pathogen / denom if denom > 0 else 0.5
+        pathogen_value, self_value, foreignness = self._combine_category_scores(
+            probs, pathogen_idx, self_idx, combine
+        )
 
-            row = {'peptide': peptide}
-            for cat, p in zip(self._target_categories, row_probs):
-                row[cat] = float(p)
-            row['foreignness'] = float(foreignness)
-            results.append(row)
-
-        # Create DataFrame with consistent column order
-        columns = ['peptide'] + self._target_categories + ['foreignness']
-        return pd.DataFrame(results, columns=columns)
+        frame = pd.DataFrame(probs, columns=list(self._target_categories))
+        frame.insert(0, 'peptide', peptides)
+        label = combine if isinstance(combine, str) else 'value'
+        frame[f'pathogen_{label}'] = pathogen_value
+        frame[f'self_{label}'] = self_value
+        frame['foreignness'] = foreignness
+        return frame
 
     def features_dataframe(
         self,
@@ -1634,10 +1538,7 @@ class MLPScorer(TrainableScorer):
                 kmers = [peptide[i:i+self.k] for i in range(len(peptide) - self.k + 1)]
 
             # Extract features for all k-mers
-            kmer_features = np.asarray([
-                extract_features(kmer, self.k, self._params['use_dipeptides'])
-                for kmer in kmers
-            ], dtype=np.float32)
+            kmer_features = self._extract_features(kmers)
 
             # Aggregate across k-mers
             if aggregate == 'mean':
@@ -1664,7 +1565,33 @@ class MLPScorer(TrainableScorer):
         return pd.DataFrame(results, columns=columns)
 
     def _save_model(self, path: Path) -> None:
-        """Save model weights."""
+        """Save model weights.
+
+        Sigmoid-head models are written to ``path`` as a pickle-free ``.npz``
+        archive holding the weights, the scaler statistics, the category names and
+        a hash of the feature definitions, so they load without scikit-learn
+        internals. Least-squares models keep the legacy pickle format.
+        """
+        if self._is_logistic:
+            arrays: Dict[str, np.ndarray] = {
+                'format_version': np.array(1),
+                'activation': np.array(self._model.activation),
+                'n_layers': np.array(len(self._model.coefs_)),
+                'has_categories': np.array(self._target_categories is not None),
+                'target_categories': np.array(self._target_categories or [], dtype=str),
+                'scaler_mean': np.asarray(self._scaler.mean_, dtype=np.float32),
+                'scaler_scale': np.asarray(self._scaler.scale_, dtype=np.float32),
+                'feature_signature': np.array(self._feature_signature()),
+            }
+            for index, (weights, bias) in enumerate(
+                zip(self._model.coefs_, self._model.intercepts_)
+            ):
+                arrays[f'coef_{index}'] = np.asarray(weights, dtype=np.float32)
+                arrays[f'intercept_{index}'] = np.asarray(bias, dtype=np.float32)
+            with open(path, 'wb') as handle:
+                np.savez_compressed(handle, **arrays)
+            return
+
         model_data = {
             'model': self._model,
             'scaler': self._scaler,
@@ -1674,9 +1601,47 @@ class MLPScorer(TrainableScorer):
             pickle.dump(model_data, f)
 
     def _load_model(self, path: Path) -> None:
-        """Load model weights."""
+        """Load model weights (portable ``.npz`` archive or legacy pickle)."""
+        if zipfile.is_zipfile(path):
+            with np.load(path, allow_pickle=False) as archive:
+                version = int(archive['format_version'])
+                if version != 1:
+                    raise ValueError(f"Unsupported model format version: {version}")
+                n_layers = int(archive['n_layers'])
+                coefs = [archive[f'coef_{index}'] for index in range(n_layers)]
+                intercepts = [archive[f'intercept_{index}'] for index in range(n_layers)]
+                activation = str(archive['activation'])
+                scaler_mean = archive['scaler_mean']
+                scaler_scale = archive['scaler_scale']
+                signature = str(archive['feature_signature'])
+                categories = (
+                    [str(name) for name in archive['target_categories']]
+                    if bool(archive['has_categories']) else None
+                )
+            if signature != self._feature_signature():
+                raise ValueError(
+                    "The feature definitions of this WEIRDO version differ from those the "
+                    "model was trained with (feature signature mismatch); retrain the "
+                    "model or install the WEIRDO version that created it."
+                )
+            self._model = _NumpyMLP(coefs, intercepts, activation)
+            self._scaler = _NumpyScaler(scaler_mean, scaler_scale)
+            self._target_categories = categories
+            return
+
         with open(path, 'rb') as f:
             model_data = pickle.load(f)
+        trained_on = getattr(model_data['scaler'], 'n_features_in_', None)
+        expected = len(self.get_feature_names())
+        if trained_on is not None and int(trained_on) != expected:
+            raise ValueError(
+                f"This model was trained on {int(trained_on)} features, but this version "
+                f"of WEIRDO builds {expected} for its configuration "
+                f"(use_dipeptides={self._params['use_dipeptides']}, "
+                f"positional={self._params['positional']}, k={self.k}). Models saved by "
+                "development versions with a different feature layout cannot be used "
+                "to score peptides; retrain the model (see MLPScorer.train)."
+            )
         self._model = model_data['model']
         self._scaler = model_data['scaler']
         self._target_categories = model_data.get('target_categories')
@@ -1687,69 +1652,10 @@ class MLPScorer(TrainableScorer):
         Returns
         -------
         names : list of str
-            Feature names.
+            Feature names, in column order.
         """
-        properties = list(_get_aa_properties().keys())
-        names = []
-
-        # Property statistics (12 props × 4 stats = 48 features)
-        for prop in properties:
-            for stat in ['mean', 'std', 'min', 'max']:
-                names.append(f'{prop}_{stat}')
-
-        # Structural features (27 features)
-        for struct in ['helix', 'sheet', 'turn']:
-            for stat in ['mean', 'std', 'min', 'max']:
-                names.append(f'{struct}_propensity_{stat}')
-        names.extend([
-            'frac_positive_charged', 'frac_negative_charged', 'frac_hydrophobic',
-            'frac_aromatic', 'frac_aliphatic', 'frac_polar_uncharged',
-            'frac_tiny', 'frac_small', 'frac_cysteine',
-            'net_charge_per_residue', 'charge_transitions', 'max_charge_cluster',
-            'arginine_ratio',  # R/(R+K) - lower in viruses
-            'frac_disorder_promoting', 'frac_order_promoting',
-        ])
-
-        # Amino acid composition (20 features)
-        for aa in AMINO_ACIDS:
-            names.append(f'aa_freq_{aa}')
-
-        # Sequence statistics (12 features)
-        names.extend([
-            'seq_length',
-            'seq_log_length',
-            'seq_sqrt_length',
-            'frac_unknown',
-            'unique_frac',
-            'max_run_frac',
-            'repeat_frac',
-            'entropy_aa',
-            'effective_aa',
-            'max_aa_freq',
-            'top2_aa_freq',
-            'gini_aa',
-        ])
-
-        # Reduced alphabet compositions (80 features)
-        for name in REDUCED_ALPHABET_ORDER:
-            groups = REDUCED_ALPHABET_GROUPS[name]['groups']
-            for rep in groups:
-                names.append(f'{name}_freq_{rep}')
-
-        # Dipeptide summary (5 features)
-        if self._params.get('use_dipeptides', True):
-            names.extend([
-                'dipep_entropy',
-                'dipep_gini',
-                'dipep_max_freq',
-                'dipep_top2_freq',
-                'dipep_homodimer_frac',
-            ])
-
-        # Dipeptide composition (400 features)
-        if self._params.get('use_dipeptides', True):
-            for aa1 in AMINO_ACIDS:
-                for aa2 in AMINO_ACIDS:
-                    names.append(f'dipep_{aa1}{aa2}')
-
-        return names
+        return _feature_names(
+            use_dipeptides=self._params.get('use_dipeptides', True),
+            positional=self._params.get('positional', False),
+            k=self.k,
+        )

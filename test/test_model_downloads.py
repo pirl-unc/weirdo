@@ -1,11 +1,30 @@
+import hashlib
 import io
 import json
-import shutil
 import tarfile
 
 import pytest
 
-from weirdo.model_manager import ModelManager
+from weirdo.model_manager import ModelManager, _safe_extract_tar
+
+
+@pytest.mark.parametrize("member_name,member_type", [
+    ("../extract-sibling/escaped.txt", tarfile.REGTYPE),
+    ("named-pipe", tarfile.FIFOTYPE),
+])
+def test_archive_preflight_rejects_prefix_siblings_and_special_files(
+    tmp_path, monkeypatch, member_name, member_type,
+):
+    archive = tmp_path / "unsafe.tar"
+    with tarfile.open(archive, "w") as tar:
+        member = tarfile.TarInfo(member_name)
+        member.type = member_type
+        tar.addfile(member)
+    def forbidden(*args, **kwargs):
+        pytest.fail("Unsafe member reached extractall")
+    monkeypatch.setattr(tarfile.TarFile, "extractall", forbidden)
+    with pytest.raises(RuntimeError, match="Unsafe archive path|unsupported special files"):
+        _safe_extract_tar(archive, tmp_path / "extract")
 
 
 def _create_model_archive(tmp_path, archive_name="model.tar.gz", top_level="demo-model"):
@@ -21,20 +40,16 @@ def _create_model_archive(tmp_path, archive_name="model.tar.gz", top_level="demo
     return archive_path
 
 
+# The downloads go through datacache, which handles file:// URLs like HTTP ones, so the tests
+# use real archives on disk instead of replacing the download function.
 class TestModelDownloads:
-    def test_download_from_url_extracts_model(self, tmp_path, monkeypatch):
+    def test_download_from_url_extracts_model(self, tmp_path):
         archive = _create_model_archive(tmp_path, top_level="demo-model")
         mm = ModelManager(model_dir=tmp_path / "models")
 
-        def fake_urlretrieve(url, filename):
-            shutil.copyfile(archive, filename)
-            return filename, None
-
-        monkeypatch.setattr("weirdo.model_manager.urlretrieve", fake_urlretrieve)
-
         path = mm.download_from_url(
             name="downloaded-model",
-            url="https://example.com/model.tar.gz",
+            url=archive.as_uri(),
             overwrite=False,
         )
 
@@ -43,7 +58,33 @@ class TestModelDownloads:
         assert (path / "model.pt").exists()
         assert mm.get_model_info("downloaded-model") is not None
 
-    def test_download_from_url_rejects_unsafe_archive_paths(self, tmp_path, monkeypatch):
+    def test_download_from_url_checks_the_sha256(self, tmp_path):
+        archive = _create_model_archive(tmp_path, top_level="demo-model")
+        mm = ModelManager(model_dir=tmp_path / "models")
+        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+
+        with pytest.raises(RuntimeError, match="failed verification"):
+            mm.download_from_url("bad-checksum", archive.as_uri(), expected_sha256="0" * 64)
+        assert not (mm.model_dir / "bad-checksum").exists()
+
+        path = mm.download_from_url("good-checksum", archive.as_uri(), expected_sha256=digest.upper())
+        assert (path / "model.pt").exists()
+
+    def test_download_from_url_reports_unreachable_sources(self, tmp_path):
+        mm = ModelManager(model_dir=tmp_path / "models")
+        with pytest.raises(RuntimeError, match="Failed to download model archive"):
+            mm.download_from_url("missing", (tmp_path / "no-such-archive.tar.gz").as_uri())
+        assert not (mm.model_dir / "missing").exists()
+
+    def test_download_from_url_refuses_to_overwrite_unless_asked(self, tmp_path):
+        archive = _create_model_archive(tmp_path, top_level="demo-model")
+        mm = ModelManager(model_dir=tmp_path / "models")
+        mm.download_from_url("model", archive.as_uri())
+        with pytest.raises(FileExistsError):
+            mm.download_from_url("model", archive.as_uri())
+        assert mm.download_from_url("model", archive.as_uri(), overwrite=True).exists()
+
+    def test_download_from_url_rejects_unsafe_archive_paths(self, tmp_path):
         archive = tmp_path / "malicious.tar.gz"
         with tarfile.open(archive, "w:gz") as tar:
             bad = tarfile.TarInfo("../evil.txt")
@@ -53,34 +94,24 @@ class TestModelDownloads:
 
         mm = ModelManager(model_dir=tmp_path / "models")
 
-        def fake_urlretrieve(url, filename):
-            shutil.copyfile(archive, filename)
-            return filename, None
-
-        monkeypatch.setattr("weirdo.model_manager.urlretrieve", fake_urlretrieve)
-
         with pytest.raises(RuntimeError, match="Unsafe archive path detected"):
             mm.download_from_url(
                 name="bad-model",
-                url="https://example.com/malicious.tar.gz",
+                url=archive.as_uri(),
             )
+        assert not (mm.model_dir / "bad-model").exists()
 
     def test_download_pretrained_uses_registry(self, tmp_path, monkeypatch):
         archive = _create_model_archive(tmp_path, top_level="registry-model")
         mm = ModelManager(model_dir=tmp_path / "models")
 
-        def fake_urlretrieve(url, filename):
-            shutil.copyfile(archive, filename)
-            return filename, None
-
-        monkeypatch.setattr("weirdo.model_manager.urlretrieve", fake_urlretrieve)
         monkeypatch.setattr(
             "weirdo.model_manager.PRETRAINED_MODELS",
             {
                 "registry-model": {
                     "description": "test model",
-                    "url": "https://example.com/registry-model.tar.gz",
-                    "sha256": None,
+                    "url": archive.as_uri(),
+                    "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
                 }
             },
         )

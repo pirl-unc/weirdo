@@ -3,20 +3,24 @@
 Handles saving, loading, and listing trained ML models.
 """
 
-import hashlib
 import json
-import os
 import shutil
 import tarfile
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-from urllib.error import URLError
-from urllib.request import urlretrieve
+
+from datacache import FileValidationError, fetch_file
 
 # Default model storage directory
 DEFAULT_MODEL_DIR = Path.home() / '.weirdo' / 'models'
+
+# Models shipped inside the package: weirdo/pretrained/<name>/{config.json,model.pt,...}
+BUNDLED_MODEL_DIR = Path(__file__).resolve().parent / 'pretrained'
+
+# Name of the bundled species-category predictor.
+DEFAULT_CATEGORY_MODEL = 'swissprot-categories'
 
 # Public registry of downloadable pretrained model artifacts.
 # These URLs should point to .tar.gz archives containing model files
@@ -24,13 +28,39 @@ DEFAULT_MODEL_DIR = Path.home() / '.weirdo' / 'models'
 PRETRAINED_MODELS: Dict[str, Dict[str, Optional[str]]] = {}
 
 
-def _sha256_file(path: Path) -> str:
-    """Compute SHA256 for a file."""
-    hasher = hashlib.sha256()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b''):
-            hasher.update(chunk)
-    return hasher.hexdigest()
+def _is_plain_name(name: str) -> bool:
+    """True for a bare model name (no path separators or parent references)."""
+    return bool(name) and Path(name).name == name and name not in ('.', '..')
+
+
+def list_bundled_models() -> List[Dict[str, Any]]:
+    """Describe the models that ship inside the package.
+
+    Returns
+    -------
+    models : list of dict
+        One entry per bundled model with its ``name``, ``path``, the scorer
+        ``scorer_type`` and the training/evaluation ``metadata`` stored with it.
+    """
+    results: List[Dict[str, Any]] = []
+    if not BUNDLED_MODEL_DIR.is_dir():
+        return results
+    for path in sorted(BUNDLED_MODEL_DIR.iterdir()):
+        if not (path.is_dir() and (path / 'config.json').exists()):
+            continue
+        with open(path / 'config.json', 'r') as f:
+            config = json.load(f)
+        metadata: Dict[str, Any] = {}
+        if (path / 'metadata.json').exists():
+            with open(path / 'metadata.json', 'r') as f:
+                metadata = json.load(f)
+        results.append({
+            'name': path.name,
+            'path': str(path),
+            'scorer_type': config.get('scorer_type', 'unknown'),
+            'metadata': metadata,
+        })
+    return results
 
 
 def _safe_extract_tar(archive_path: Path, extract_dir: Path) -> None:
@@ -40,8 +70,10 @@ def _safe_extract_tar(archive_path: Path, extract_dir: Path) -> None:
         for member in tar.getmembers():
             if member.issym() or member.islnk():
                 raise RuntimeError("Archive contains symlinks, which are not allowed.")
+            if not (member.isfile() or member.isdir()):
+                raise RuntimeError("Archive contains unsupported special files.")
             member_path = (extract_dir / member.name).resolve()
-            if not str(member_path).startswith(str(extract_dir)):
+            if not member_path.is_relative_to(extract_dir):
                 raise RuntimeError(f"Unsafe archive path detected: {member.name}")
         try:
             tar.extractall(path=extract_dir, filter='data')
@@ -176,6 +208,8 @@ class ModelManager:
         path = self._model_dir / name
         if path.exists() and (path / 'config.json').exists():
             return self._load_model_info(path)
+        if _is_plain_name(name) and (BUNDLED_MODEL_DIR / name / 'config.json').exists():
+            return self._load_model_info(BUNDLED_MODEL_DIR / name)
         return None
 
     def load(self, name: str) -> 'TrainableScorer':
@@ -184,7 +218,8 @@ class ModelManager:
         Parameters
         ----------
         name : str
-            Model name (directory name in model storage).
+            Model name (directory name in model storage, or the name of a model
+            bundled with the package such as ``'swissprot-categories'``).
 
         Returns
         -------
@@ -195,7 +230,12 @@ class ModelManager:
 
         path = self._model_dir / name
         if not path.exists():
-            raise FileNotFoundError(f"Model not found: {name}")
+            # Models installed by the user take precedence over bundled ones.
+            bundled = BUNDLED_MODEL_DIR / name
+            if _is_plain_name(name) and (bundled / 'config.json').exists():
+                path = bundled
+            else:
+                raise FileNotFoundError(f"Model not found: {name}")
 
         # Load config to determine scorer type
         with open(path / 'config.json', 'r') as f:
@@ -334,36 +374,38 @@ class ModelManager:
                 )
             shutil.rmtree(target_dir)
 
-        temp_fd, temp_archive = tempfile.mkstemp(suffix='.tar.gz')
-        os.close(temp_fd)
-        temp_archive_path = Path(temp_archive)
-        extract_root = Path(tempfile.mkdtemp(prefix='weirdo-model-extract-'))
+        work_dir = Path(tempfile.mkdtemp(prefix='weirdo-model-download-'))
+        archive_path = work_dir / 'model.tar.gz'
+        extract_root = work_dir / 'extracted'
+        extract_root.mkdir()
 
         try:
-            urlretrieve(url, str(temp_archive_path))
-            if expected_sha256:
-                observed_sha256 = _sha256_file(temp_archive_path)
-                if observed_sha256.lower() != expected_sha256.lower():
-                    raise RuntimeError(
-                        "SHA256 mismatch for downloaded model archive: "
-                        f"expected {expected_sha256}, got {observed_sha256}"
-                    )
+            try:
+                # Retried and size/checksum-checked by datacache; the archive is kept only
+                # until the model directory has been extracted from it.
+                fetch_file(
+                    url,
+                    destination=archive_path,
+                    raw=True,
+                    expected_sha256=expected_sha256.lower() if expected_sha256 else None,
+                    timeout=60,
+                )
+            except FileValidationError as e:
+                raise RuntimeError(f"Downloaded model archive failed verification: {e}") from e
+            except OSError as e:  # includes requests and urllib network errors
+                raise RuntimeError(f"Failed to download model archive: {e}") from e
 
-            _safe_extract_tar(temp_archive_path, extract_root)
+            _safe_extract_tar(archive_path, extract_root)
             source_dir = self._find_extracted_model_dir(extract_root)
 
             shutil.copytree(source_dir, target_dir)
             return target_dir
-        except URLError as e:
-            raise RuntimeError(f"Failed to download model archive: {e}") from e
         except Exception:
             if target_dir.exists():
                 shutil.rmtree(target_dir)
             raise
         finally:
-            if temp_archive_path.exists():
-                temp_archive_path.unlink()
-            shutil.rmtree(extract_root, ignore_errors=True)
+            shutil.rmtree(work_dir, ignore_errors=True)
 
     def print_models(self) -> None:
         """Print formatted list of available models."""

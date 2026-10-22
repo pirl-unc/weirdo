@@ -30,6 +30,7 @@ nav:
   - Getting Started: getting-started.md
   - User Guide:
     - Foreignness Scorers: scorers.md
+    - Species-Category Predictor: category-predictor.md
     - Amino Acid Data: amino-acids.md
   - API Reference: api.md
   - Development:
