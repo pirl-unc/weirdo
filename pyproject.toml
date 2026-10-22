@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "weirdo"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [{name="Alex Rubinsteyn", email="alex.rubinsteyn@unc.edu"}]
 description = "Metrics of immunological foreignness for candidate T-cell epitopes"
 classifiers = [
@@ -14,6 +14,12 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 readme = "README.md"
@@ -27,7 +33,7 @@ dependencies = {file = ["requirements.txt"]}
 exclude = ["test", "test.*", "examples"]
 
 [tool.setuptools.package-data]
-weirdo = ["logging.conf", "matrices/*"]
+weirdo = ["logging.conf", "matrices/*", "pretrained/*/*"]
 
 [project.urls]
 "Homepage" = "https://github.com/pirl-unc/weirdo"

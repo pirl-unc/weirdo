@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "model_id": "swissprot-categories-v1",
+  "format": "numpy-npz-v1",
+  "files": {
+    "model.pt": "3845c0e692469628929c7f5a820949ed84e7a96ccad7f14993ff16a72fe283e1",
+    "config.json": "a3f2b5b52d024b17d824b1edc3f40987ebc10d2cde4a209cc585db33f7265e65",
+    "metadata.json": "e3db0125ba7ee3d0f06f459a25de1f153ff3908ed35dbd3a6febcf45b0cd6727"
+  },
+  "feature_schema": "composition-592-v1",
+  "feature_definition_sha256": "eff55ae9d0e0787c4c71669c1ed8a83031ce4a99ccccf7ef499f7efc7e3c2a7d",
+  "categories": [
+    "archaea",
+    "bacteria",
+    "fungi",
+    "human",
+    "invertebrates",
+    "mammals",
+    "plants",
+    "rodents",
+    "vertebrates",
+    "viruses"
+  ],
+  "input": {
+    "alphabet": "ACDEFGHIKLMNPQRSTVWY",
+    "case": "uppercase",
+    "min_length": 8,
+    "max_length": 11,
+    "window_length": 8,
+    "window_aggregation": "mean"
+  },
+  "training_data": {
+    "source": "UniProtKB/Swiss-Prot taxonomic divisions",
+    "source_file_date": "2023-05-03",
+    "sequence_table_sha256": "e9c44a34fcd3f8fb1f4151d489985dd5578a947eda3e62213d5109ace36e115d",
+    "sequence_table_bytes": 221588916,
+    "license": "CC-BY-4.0",
+    "attribution": "The UniProt Consortium, https://www.uniprot.org/",
+    "training_code_provenance": "67e6224-dirty",
+    "provenance_note": "Training used an uncommitted checkout. The original code_version is retained; no release commit is claimed as the training commit."
+  },
+  "splits": {
+    "id": "category-predictor-v1",
+    "method": "CRC32 of salt and UniProt entry-name mnemonic prefix; exact k-mers shared across folds removed",
+    "limitation": "Mnemonic groups are a heuristic, not sequence-homology clusters; homologous sequences with different names may cross folds.",
+    "files": {
+      "8": {
+        "splits.json": "571356e92fd1da71cf173be9f5e59c6aa128467f347de37aa30815d78923fc1f",
+        "splits.npz": "99b21eb93196cf2b0a0b1ae4bbb63066224a6864e48dd3a8d47fe67bd34fcf79"
+      },
+      "9": {
+        "splits.json": "4a7c6e5e462c8cd1453783dd36e302372ff40e57059bd6353753271d15605890",
+        "splits.npz": "199e37163b65c41f79b5614063689ca09f45d5e4699c9f1d25f8a9fe88df66c9"
+      },
+      "10": {
+        "splits.json": "a6fcca764c0b54f97e3a088bc63fd9f11ef17fbcc8f652ca078a2aa0cd846f83",
+        "splits.npz": "7619571e0e314036cacfa289dfc38d908c40c7275b8f5fab60e1df9096a169d2"
+      },
+      "11": {
+        "splits.json": "f9b8db887e6ef23ccabbe4dcf4e3357396d62c0f24eb0e7112d0b1d328893cb9",
+        "splits.npz": "aa3aaf3fcf08a5dafedd40f06f93f1aa82d9e645293e032fe3a7d8453056d717"
+      }
+    }
+  },
+  "score_policies": {
+    "human-self-complement-v1": {
+      "formula": "1 - mean_window_P(human)",
+      "host_taxon_id": 9606,
+      "direction": "higher",
+      "range": [
+        0,
+        1
+      ],
+      "interpretation": "Complement of the human-category output under the training distribution. Not a probability of immune recognition.",
+      "validation": "No independently confirmed immune-response ranking benefit; opt-in experimental use only."
+    }
+  },
+  "evaluation": {
+    "report": "metadata.json:evaluation",
+    "evaluated_lengths": [
+      8,
+      9,
+      10,
+      11
+    ],
+    "mean_test_category_auc": 0.6145497112412202
+  },
+  "smoke": {
+    "peptide": "ACDEFGHI",
+    "category_values": [
+      0.036051779985427856,
+      0.5230810642242432,
+      0.10473024845123291,
+      0.07562151551246643,
+      0.06922474503517151,
+      0.03829553723335266,
+      0.07968699932098389,
+      0.08275151252746582,
+      0.03283444046974182,
+      0.03380066156387329
+    ],
+    "atol": 2e-06
+  }
+}

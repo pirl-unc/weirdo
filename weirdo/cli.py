@@ -1,10 +1,11 @@
 """Command-line interface for WEIRDO.
 
 Usage:
+    weirdo score PEPTIDE...     # Species-category probabilities and foreignness
     weirdo data status          # Show data status
-    weirdo data download        # Download reference data
+    weirdo data download        # Download SwissProt from UniProt, build the reference data
     weirdo data clear           # Clear all data
-    weirdo score --model NAME PEPTIDE...  # Score peptides
+    weirdo score --model NAME PEPTIDE...  # Score peptides with another model
     weirdo models list          # List trained models
     weirdo models available     # List downloadable pretrained models
     weirdo models download NAME # Download pretrained model weights
@@ -15,7 +16,11 @@ Usage:
 import sys
 import argparse
 
+from .data_manager import DATASETS as _DATASETS
+from .model_manager import DEFAULT_CATEGORY_MODEL
 from .reduced_alphabet import alphabets
+
+DATASET_NAMES = tuple(_DATASETS)
 
 
 def _translate_sequence(sequence, alphabet):
@@ -43,12 +48,21 @@ def create_parser():
     data_subparsers.add_parser('status', help='Alias for list')
 
     # data download
-    download_parser = data_subparsers.add_parser('download', help='Download reference data')
+    download_parser = data_subparsers.add_parser(
+        'download',
+        help='Download SwissProt from UniProt and build the reference data',
+        description=(
+            'Downloads the SwissProt taxonomic-division files from UniProt (about 670 MB, '
+            'checked against the sizes and MD5s UniProt lists) and builds the dataset from them. '
+            'swissprot-8mers also builds the k-mer table (several GB, some minutes).'
+        ),
+    )
     download_parser.add_argument(
         'dataset',
         nargs='?',
         default='swissprot-8mers',
-        help='Dataset to download (default: swissprot-8mers)',
+        choices=sorted(DATASET_NAMES),
+        help='Dataset to build (default: %(default)s)',
     )
     download_parser.add_argument(
         '--all',
@@ -85,7 +99,10 @@ def create_parser():
     # -------------------------------------------------------------------------
     # Score command
     # -------------------------------------------------------------------------
-    score_parser = subparsers.add_parser('score', help='Score peptides for foreignness')
+    score_parser = subparsers.add_parser(
+        'score',
+        help='Predict species-category probabilities and foreignness for peptides',
+    )
     score_parser.add_argument(
         'peptides',
         nargs='+',
@@ -93,8 +110,20 @@ def create_parser():
     )
     score_parser.add_argument(
         '-m', '--model',
-        required=True,
-        help='Trained model name to use for scoring',
+        default=DEFAULT_CATEGORY_MODEL,
+        help='Model name (bundled or trained); default: %(default)s',
+    )
+    score_parser.add_argument(
+        '--combine',
+        choices=['max', 'sum'],
+        default='max',
+        help='Combine probabilities within the pathogen and self groups by their largest '
+             'value or their sum (multi-label models only; default: %(default)s)',
+    )
+    score_parser.add_argument(
+        '--csv',
+        action='store_true',
+        help='Print the result as CSV with no extra text (multi-label models only)',
     )
 
     # -------------------------------------------------------------------------
@@ -237,6 +266,7 @@ def cmd_data_list(args):
     from .data_manager import get_data_manager
     dm = get_data_manager()
     dm.print_status()
+    return 0
 
 
 def cmd_data_download(args):
@@ -244,14 +274,18 @@ def cmd_data_download(args):
     from .data_manager import get_data_manager, DATASETS
     dm = get_data_manager()
 
-    if args.all:
-        dm.download_all(force=args.force)
-    else:
-        if args.dataset not in DATASETS:
-            print(f"Unknown dataset: {args.dataset}")
-            print(f"Available: {list(DATASETS.keys())}")
-            return 1
-        dm.download(args.dataset, force=args.force)
+    try:
+        if args.all:
+            dm.download_all(force=args.force)
+        else:
+            if args.dataset not in DATASETS:
+                print(f"Unknown dataset: {args.dataset}")
+                print(f"Available: {list(DATASETS.keys())}")
+                return 1
+            dm.download(args.dataset, force=args.force)
+    except RuntimeError as e:
+        print(f"Error: {e}")
+        return 1
     return 0
 
 
@@ -293,22 +327,40 @@ def cmd_data_path(args):
     from .data_manager import get_data_manager
     dm = get_data_manager()
     print(dm.data_dir)
+    return 0
 
 
 def cmd_score(args):
     """Handle: weirdo score"""
     from .model_manager import load_model
 
-    print(f"Scoring {len(args.peptides)} peptide(s) with model '{args.model}'...")
-    print()
+    csv_output = bool(getattr(args, 'csv', False))
+    if not csv_output:
+        print(f"Scoring {len(args.peptides)} peptide(s) with model '{args.model}'...")
+        print()
 
     try:
         scorer = load_model(args.model)
         if getattr(scorer, 'target_categories', None):
-            df = scorer.predict_dataframe(args.peptides)
-            print(df.to_string(index=False))
+            combine = getattr(args, 'combine', 'max')
+            df = scorer.predict_dataframe(args.peptides, combine=combine)
+            if csv_output:
+                print(df.to_csv(index=False), end='')
+                return 0
+            print(df.round(3).to_string(index=False))
             print()
-            print("Foreignness is derived from max(pathogens) vs max(self).")
+            print("Category columns: independent sigmoid probabilities that the peptide occurs in")
+            print("proteins of that category (they need not sum to 1).")
+            if combine == 'sum':
+                print("foreignness = pathogen_sum / (pathogen_sum + self_sum), the expected number of")
+                print("pathogen categories (bacteria, viruses) against self categories (human, rodents,")
+                print("mammals) that contain the peptide.")
+            else:
+                print("foreignness = pathogen_max / (pathogen_max + self_max): the largest probability")
+                print("among the pathogen categories (bacteria, viruses) against the largest among the")
+                print("self categories (human, rodents, mammals).")
+            print("Compare a foreignness value with the reference distributions in the documentation;")
+            print("typical peptides score well above 0.5.")
         else:
             scores = scorer.score(args.peptides)
             print(f"{'Peptide':<40} {'Score':>10}")
@@ -318,7 +370,7 @@ def cmd_score(args):
                 print(f"{display_pep:<40} {score:>10.4f}")
             print()
             print("Higher scores = more foreign")
-    except FileNotFoundError as e:
+    except (FileNotFoundError, ValueError, RuntimeError) as e:
         print(f"Error: {e}")
         return 1
 
@@ -382,8 +434,12 @@ def cmd_setup(args):
     print()
 
     # Download data
-    print("Step 1: Downloading reference data...")
-    dm.download('swissprot-8mers')
+    print("Step 1: Downloading SwissProt from UniProt and building the reference data...")
+    try:
+        dm.download('swissprot-8mers')
+    except RuntimeError as e:
+        print(f"Error: {e}")
+        return 1
     print()
 
     print("Setup complete!")
@@ -605,7 +661,18 @@ def cmd_models_path(args):
 
 def cmd_models_available(args):
     """Handle: weirdo models available"""
-    from .model_manager import list_pretrained_models
+    from .model_manager import list_bundled_models, list_pretrained_models
+
+    bundled = list_bundled_models()
+    if bundled:
+        print("Models bundled with WEIRDO (no download needed):")
+        print("-" * 60)
+        for model in bundled:
+            print(f"\n  {model['name']}  ({model['scorer_type']})")
+            description = model['metadata'].get('description')
+            if description:
+                print(f"    {description}")
+        print()
 
     models = list_pretrained_models()
     if not models:

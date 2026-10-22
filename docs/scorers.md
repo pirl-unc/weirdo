@@ -157,12 +157,37 @@ scorer.train(
 | `alpha` | float | 0.0001 | L2 regularization strength |
 | `early_stopping` | bool | True | Stop when validation loss plateaus |
 | `use_dipeptides` | bool | True | Include dipeptide frequencies + summary stats |
+| `positional` | bool | False | Also append a position-specific one-hot encoding of the k-mer (`k * 21` features); see below |
+| `loss` | str | 'auto' | `'bce'`: one sigmoid per label trained with binary cross-entropy (outputs are probabilities); `'squared'`: least squares (scalar scores, and the behaviour of older versions); `'auto'`: `'bce'` for binary multi-label targets, else `'squared'` |
+
+`train()` also accepts `val_peptides` / `val_labels` for early stopping, `cache_features=True` to
+extract and scale all features once instead of every epoch, and `restore_best=True` to keep the
+weights of the epoch with the lowest validation loss.
+
+Features are computed with vectorised array operations (about 100,000 peptides per second on one
+core, 35 times faster than looping over peptides), so there are no worker processes and no
+`if __name__ == "__main__":` requirement. The `parallel_workers` / `parallel_chunksize` options of
+`train_streaming()` are accepted for compatibility but ignored, with a `DeprecationWarning`.
+
+#### Optional positional features
+
+`MLPScorer(positional=True)` appends a position-specific one-hot encoding of the k-mer to the 592
+composition features (`k * 21` more: for each of the `k` positions, which amino acid is there).
+This lets the network learn position-dependent patterns, such as an anchor residue at position 2
+of an MHC ligand, but it also makes it easy to memorise individual k-mers, which composition
+features cannot do, so it generalises worse to unseen protein families. Releases 2.0.0 to 2.0.2 used
+such features by default. The option is stored with the model, which loads with it.
+
+Models saved by development versions with a different feature layout (for example, 684 features)
+cannot be used by this version: loading one raises an error that states both feature counts.
 
 ### Prediction Methods
 
 #### `predict_proba(peptides, aggregate='mean')` - Category Probabilities
 
-Returns sigmoid-activated probabilities for each category:
+Returns one independent sigmoid probability per category, `P(peptide occurs in proteins of
+that category)`. The columns do not sum to one. Peptides longer than `k` are averaged (or
+max/min-combined) over their k-mer windows:
 
 ```python
 probs = scorer.predict_proba(['MTMDKSEL', 'SIINFEKL'], aggregate='mean')
@@ -170,22 +195,30 @@ probs = scorer.predict_proba(['MTMDKSEL', 'SIINFEKL'], aggregate='mean')
 # Values in [0, 1]
 ```
 
-#### `foreignness(peptides)` - Foreignness Score
+A model trained with `loss='squared'` (or saved by an older version) returns a sigmoid of a
+regression value instead, which is not a calibrated probability; a warning is issued.
 
-Computes: `max(pathogens) / (max(pathogens) + max(self))`
+#### `foreignness(peptides, combine='max')` - Foreignness Score
+
+Computes `max(pathogens) / (max(pathogens) + max(self))`. `combine` chooses how the
+probabilities inside a group are combined: `'max'` (default), `'sum'`, which compares the
+expected number of categories in each group that contain the peptide, or a function that maps an
+array of shape (n_peptides, n_categories_in_group) to one value per peptide.
 
 ```python
 scores = scorer.foreignness(
     ['MTMDKSEL', 'SIINFEKL'],
     pathogen_categories=['bacteria', 'viruses'],
-    self_categories=['human', 'mammals', 'rodents']
+    self_categories=['human', 'mammals', 'rodents'],
+    combine='max',          # or 'sum', or a function
 )
-# Values in [0, 1], higher = more foreign
+# Values in [0, 1], 0.5 = equal, higher = more pathogen-like
 ```
 
 #### `predict_dataframe(peptides)` - Full Results
 
-Returns DataFrame with all category probabilities and foreignness:
+Returns a DataFrame with the category probabilities, the two group values
+(`pathogen_max`, `self_max`; `pathogen_sum`, `self_sum` with `combine='sum'`) and `foreignness`:
 
 ```python
 df = scorer.predict_dataframe([
@@ -195,18 +228,15 @@ df = scorer.predict_dataframe([
 ])
 ```
 
-Output:
-```
-         peptide  human  viruses  bacteria  mammals  ...  foreignness
-        MTMDKSEL   0.82     0.12      0.08     0.79  ...        0.127
-MTMDKSELVQKAKLAE   0.78     0.15      0.10     0.75  ...        0.161
-        SIINFEKL   0.15     0.73      0.21     0.18  ...        0.802
-```
-
 Options:
 - `aggregate='mean'|'max'|'min'`: How to combine k-mer scores for long peptides
-- `pathogen_categories`: Categories for foreignness numerator
-- `self_categories`: Categories for foreignness denominator
+- `pathogen_categories`: Categories for the pathogen group (default bacteria, viruses)
+- `self_categories`: Categories for the self group (default human, rodents, mammals)
+- `combine='max'|'sum'` or a function: How to combine probabilities within each group (default `'max'`)
+
+The bundled `swissprot-categories` model and its evaluation are described in
+[Species-category predictor](category-predictor.md); `weirdo.predict_categories()` is the
+shortcut that loads it.
 
 #### `features_dataframe(peptides)` - Feature Extraction
 
@@ -317,7 +347,7 @@ Key parameters:
 
 ```bash
 # Data management
-weirdo data download    # Download SwissProt reference
+weirdo data download    # Download SwissProt from UniProt and build the reference data
 weirdo data list        # Show data status
 weirdo data path        # Show data directory
 

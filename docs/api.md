@@ -1,8 +1,38 @@
 # API Reference
 
+For reproducible downstream inference, use `weirdo.load_pretrained_model()` and its
+`score`, `predict_categories`, `manifest`, and `prediction_identity` interface. See the
+[stable integration contract](category-predictor.md#stable-integration-api) for input limits,
+the explicit human-reference policy, and model provenance. Scalar scores are experimental
+category summaries, not immune-response probabilities.
+
 Complete API documentation for WEIRDO.
 
 ## High-Level API
+
+### `weirdo.predict_categories`
+
+```python
+def predict_categories(
+    peptides: Union[str, Sequence[str]],
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    pathogen_categories: Optional[List[str]] = None,
+    self_categories: Optional[List[str]] = None,
+    aggregate: str = 'mean',
+    combine: Union[str, Callable] = 'max',
+) -> pandas.DataFrame
+```
+
+Probability that each peptide occurs in proteins of each species category, from the bundled
+`swissprot-categories` model by default. Returns one row per peptide with a column per
+category, `pathogen_<combine>`, `self_<combine>` and `foreignness`; `combine` is `'max'`
+(default), `'sum'` or a function that maps an (n_peptides, n_categories_in_group) array to one
+value per peptide. See [Species-category predictor](category-predictor.md).
+
+### `weirdo.list_bundled_models`
+
+- `list_bundled_models()` → Models that ship inside the package (name, path, metadata including their evaluation)
 
 ### `weirdo.score_peptide`
 
@@ -143,19 +173,23 @@ class MLPScorer(TrainableScorer):
         early_stopping: bool = True,
         use_dipeptides: bool = True,
         batch_size: int = 256,
-        random_state: Optional[int] = None
+        random_state: Optional[int] = None,
+        loss: str = 'auto',
+        positional: bool = False
     )
 ```
 
-Parametric neural network scorer for category probabilities and foreignness.
+Parametric neural network scorer for category probabilities and foreignness. With binary
+multi-label targets (`loss='auto'`) it has one sigmoid output per label trained with binary
+cross-entropy.
 
 **Methods:**
 
-- `train(peptides, labels, target_categories=None, ...)` → Train model
-- `score(peptides, aggregate='mean')` → Foreignness scores in [0, 1]
+- `train(peptides, labels, target_categories=None, val_peptides=None, val_labels=None, cache_features=False, restore_best=True, ...)` → Train model
+- `score(peptides, aggregate='mean', combine='max')` → Foreignness scores in [0, 1]
 - `predict_proba(peptides, aggregate='mean')` → Category probabilities
-- `foreignness(peptides, aggregate='mean')` → Derived foreignness
-- `predict_dataframe(peptides, aggregate='mean')` → Full DataFrame output
+- `foreignness(peptides, aggregate='mean', combine='max')` → Pathogen-vs-self foreignness
+- `predict_dataframe(peptides, aggregate='mean', combine='max')` → Full DataFrame output
 
 ---
 
@@ -329,23 +363,27 @@ class DataManager:
         self,
         data_dir: Optional[Path] = None,
         auto_download: bool = False,
-        verbose: bool = True
+        verbose: bool = True,
+        uniprot_url: Optional[str] = None
     )
 ```
 
-Manages WEIRDO reference data downloads.
+Manages WEIRDO reference data. Datasets are built from UniProtKB/Swiss-Prot: `'swissprot-sequences'`
+downloads the taxonomic-division files from UniProt (with `datacache`) and writes the protein
+sequence table; `'swissprot-8mers'` builds the k-mer reference table from it. `uniprot_url` (or the
+`WEIRDO_UNIPROT_URL` environment variable) selects a mirror.
 
 **Methods:**
 
-- `download(name)` → Download a dataset
-- `download_all()` → Download all datasets
+- `download(name, force=False)` → Download from UniProt and build a dataset
+- `download_all()` → Build all datasets
 - `is_downloaded(name)` → Check if dataset exists
 - `get_data_path(name)` → Get path to dataset
 - `delete_download(name)` → Delete a dataset
 - `delete_all_downloads()` → Delete all datasets
 - `status()` → Get status dict
 - `print_status()` → Print human-readable status
-- `clear_all()` → Delete all downloads
+- `clear_all()` → Delete all datasets and the raw UniProt downloads
 
 **Example:**
 
@@ -384,19 +422,46 @@ Ensure reference data is available, optionally downloading.
 
 ---
 
+## UniProt Data and K-mer Tables
+
+### `weirdo.uniprot`
+
+- `fetch_swissprot_divisions(download_dir, divisions=None, release=None, base_url=None, force=False, show_progress=False, timeout=60)` → `DownloadedRelease(version, base_url, paths, files)`: downloads the SwissProt taxonomic-division files of UniProt's current release with `datacache` into `download_dir/release-<version>/`, checking the sizes and MD5s UniProt lists; reuses cached files; falls back to the newest complete cached release (with a warning) when UniProt cannot be reached
+- `fetch_release(base_url=None)` → `UniProtRelease(version, files)`: UniProt's current release listing (`RELEASE.metalink`)
+- `iter_swissprot_sequences(path)` → iterator of `(entry name, sequence)` from a `.dat` or `.dat.gz` file
+- `build_sequence_table(division_paths, output_path)` → writes `identifier,sequence,category` rows and returns their number
+- `read_sequence_table(path_or_dataframe)` → DataFrame with those columns (also reads the older layout with an index column)
+- `SWISSPROT_DIVISIONS`, `UNIPROT_BASE_URL`
+
+### `weirdo.kmer_table`
+
+- `build_kmer_table(sequences, output_path, k=8, categories=None, memory_passes=4)` → writes the reference table (`seq`, one `True`/`False` column per category, `label_count`; sorted by k-mer; only k-mers made of the 20 canonical residues) and returns the number of k-mers. Memory use is about `1/memory_passes` of the windows at a time.
+- `iter_kmer_masks(sequences, bits, k=8)` → unique packed k-mers with category bitmasks, in sorted order, a block at a time
+- `encode_residues`, `window_codes`, `unique_with_masks`, `decode_kmers`, `masks_to_matrix`: the packing primitives (five bits per residue, k up to 12)
+
+### `weirdo.scorers.peptide_features`
+
+- `extract_features(peptide, k=8, use_dipeptides=True, positional=False)` → the definition of each feature for one peptide
+- `extract_features_batch(peptides, k=8, use_dipeptides=True, positional=False)` → the same features for many peptides at once (what training and prediction use)
+- `get_feature_names(use_dipeptides=True, positional=False, k=8)`, `feature_count(...)`
+
+---
+
 ## Command-Line Interface
 
 ```bash
 # Setup
-weirdo setup                  # Download reference data
+weirdo setup                  # Download SwissProt from UniProt and build the reference data
 
 # Data management
 weirdo data list              # List datasets (alias: ls, status)
-weirdo data download          # Download reference data
+weirdo data download          # Build swissprot-8mers from UniProt (or: data download swissprot-sequences)
 weirdo data clear             # Clear data
 weirdo data path              # Show data directory
 
 # Model training + scoring
 weirdo models train --data train.csv --name my-model
-weirdo score --model my-model PEPTIDE...
+weirdo score PEPTIDE...                       # bundled swissprot-categories model
+weirdo score --model my-model PEPTIDE...      # a trained model; --combine max|sum, --csv
+weirdo models available                       # bundled and downloadable models
 ```

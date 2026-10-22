@@ -14,18 +14,25 @@ from .distances import hamming
 from .api import (
     score_peptide,
     score_peptides,
+    predict_categories,
     create_scorer,
     clear_cache,
     get_available_presets,
     get_preset_info,
     # Model management
     list_models,
+    list_bundled_models,
     load_model,
     save_model,
     list_pretrained_models,
     download_pretrained_model,
     download_model_from_url,
     get_available_scorers,
+)
+
+from .released import (
+    DEFAULT_PRETRAINED_MODEL, DEFAULT_SCORE_POLICY, PretrainedModel,
+    get_model_manifest, load_pretrained_model,
 )
 
 # Data management
@@ -58,9 +65,11 @@ from .scorers import (
 # ML scorer
 from .scorers import MLPScorer
 
-__version__ = "2.1.4"
+__version__ = "2.2.0"
 
 __all__ = [
+    "DEFAULT_PRETRAINED_MODEL", "DEFAULT_SCORE_POLICY", "PretrainedModel",
+    "get_model_manifest", "load_pretrained_model",
     # Amino acid data
     "AminoAcid",
     "canonical_amino_acids",
@@ -76,6 +85,7 @@ __all__ = [
     # High-level scoring API
     "score_peptide",
     "score_peptides",
+    "predict_categories",
     "create_scorer",
     "clear_cache",
     "get_available_presets",
@@ -83,6 +93,7 @@ __all__ = [
     "get_available_scorers",
     # Model management
     "list_models",
+    "list_bundled_models",
     "load_model",
     "save_model",
     "list_pretrained_models",

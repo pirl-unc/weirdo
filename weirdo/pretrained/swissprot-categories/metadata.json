@@ -1,0 +1,1424 @@
+{
+  "training_history": [
+    {
+      "epoch": 1,
+      "loss": 0.29397660085600535,
+      "val_loss": 0.2865630090236664
+    },
+    {
+      "epoch": 2,
+      "loss": 0.29249041740195136,
+      "val_loss": 0.28610143065452576
+    },
+    {
+      "epoch": 3,
+      "loss": 0.2922665971150316,
+      "val_loss": 0.28600460290908813
+    },
+    {
+      "epoch": 4,
+      "loss": 0.2921120707139104,
+      "val_loss": 0.28595539927482605
+    },
+    {
+      "epoch": 5,
+      "loss": 0.29194811471712023,
+      "val_loss": 0.28584474325180054
+    },
+    {
+      "epoch": 6,
+      "loss": 0.2918369782566513,
+      "val_loss": 0.2860172390937805
+    },
+    {
+      "epoch": 7,
+      "loss": 0.2917331179704674,
+      "val_loss": 0.286149263381958
+    },
+    {
+      "epoch": 8,
+      "loss": 0.2916300105938333,
+      "val_loss": 0.28570836782455444
+    },
+    {
+      "epoch": 9,
+      "loss": 0.29155498641915,
+      "val_loss": 0.2859813868999481
+    },
+    {
+      "epoch": 10,
+      "loss": 0.29145310163017213,
+      "val_loss": 0.2867761552333832
+    },
+    {
+      "epoch": 11,
+      "loss": 0.2913870907092159,
+      "val_loss": 0.2861117124557495
+    }
+  ],
+  "n_train": 3000000,
+  "n_features": 592,
+  "n_epochs": 11,
+  "final_train_loss": 0.2913870907092159,
+  "loss": "bce",
+  "best_epoch": 8,
+  "weights_restored_from_best_epoch": true,
+  "best_val_score": -0.28570836782455444,
+  "final_val_loss": 0.2861117124557495,
+  "best_val_loss": 0.28570836782455444,
+  "description": "Multi-label sigmoid predictor of the ten SwissProt taxonomic divisions (archaea, bacteria, fungi, human, invertebrates, mammals, plants, rodents, vertebrates, viruses) for 8-mer windows. Output c is the probability that the peptide occurs in SwissProt proteins of division c; outputs are independent and need not sum to one.",
+  "categories": [
+    "archaea",
+    "bacteria",
+    "fungi",
+    "human",
+    "invertebrates",
+    "mammals",
+    "plants",
+    "rodents",
+    "vertebrates",
+    "viruses"
+  ],
+  "label_definition": "A k-mer is positive for a category when it occurs in at least one SwissProt protein of that UniProt taxonomic division. Train, validation and test k-mers come from disjoint protein families (entry-name mnemonic prefixes) and no k-mer occurs in two folds.",
+  "code_version": "67e6224-dirty",
+  "environment": {
+    "python": "3.12.6",
+    "numpy": "2.5.3",
+    "scikit_learn": "1.9.1"
+  },
+  "protocol": {
+    "family_salt": "category-predictor-v1",
+    "k": 8,
+    "sequences": "data/swissprot-sequences.csv",
+    "proteins": 569516,
+    "universe_sizes": {
+      "train": 73136147,
+      "val": 15046236,
+      "test": 14582469
+    },
+    "k_mers_shared_across_folds_dropped": {
+      "train": 2965836,
+      "val": 1862198,
+      "test": 1878861
+    },
+    "bootstrap_resamples": 100,
+    "family_buckets": 20,
+    "train_n": 3000000,
+    "val_n": 300000,
+    "test_n": 600000,
+    "label_definition": "A k-mer is positive for a category when it occurs in at least one SwissProt protein of that UniProt taxonomic division. Train, validation and test k-mers come from disjoint protein families (entry-name mnemonic prefixes) and no k-mer occurs in two folds.",
+    "data_source": "UniProtKB/Swiss-Prot taxonomic-division files, https://www.uniprot.org (CC BY 4.0); files dated 2023-05-03"
+  },
+  "evaluation": {
+    "test": {
+      "n": 600000,
+      "metrics": {
+        "archaea": {
+          "prevalence": 0.036383334547281265,
+          "auc": 0.6639536651217546,
+          "average_precision": 0.06755623462847322,
+          "log_loss": 0.15040711538189708,
+          "log_loss_prevalence": 0.15638568631881697,
+          "log_loss_skill": 0.03822965565231862,
+          "ece": 0.003347706356877741,
+          "calibration_intercept": -0.20092170155992786,
+          "calibration_slope": 0.9642287497401424,
+          "mean_probability": 0.039731038813165975
+        },
+        "bacteria": {
+          "prevalence": 0.3859499990940094,
+          "auc": 0.6551578605682444,
+          "average_precision": 0.5282830989335953,
+          "log_loss": 0.6313875835054055,
+          "log_loss_prevalence": 0.6676538305046171,
+          "log_loss_skill": 0.054318937961909675,
+          "ece": 0.026924121356721366,
+          "calibration_intercept": -0.14887551882874542,
+          "calibration_slope": 0.9032820902733631,
+          "mean_probability": 0.41231699336512945
+        },
+        "fungi": {
+          "prevalence": 0.1450316607952118,
+          "auc": 0.5859383079330358,
+          "average_precision": 0.190765989135175,
+          "log_loss": 0.4094858726270381,
+          "log_loss_prevalence": 0.4147378552905446,
+          "log_loss_skill": 0.012663379039338452,
+          "ece": 0.017343126278057074,
+          "calibration_intercept": -0.05170853057556257,
+          "calibration_slope": 0.8933156960631973,
+          "mean_probability": 0.12768854409441663
+        },
+        "human": {
+          "prevalence": 0.1003766655921936,
+          "auc": 0.6284231895598573,
+          "average_precision": 0.16125432206891083,
+          "log_loss": 0.31645793788965715,
+          "log_loss_prevalence": 0.3261085197928812,
+          "log_loss_skill": 0.02959316091880504,
+          "ece": 0.007076280495990842,
+          "calibration_intercept": -0.14347596415998023,
+          "calibration_slope": 0.8977225781016224,
+          "mean_probability": 0.09358704981913712
+        },
+        "invertebrates": {
+          "prevalence": 0.09013666957616806,
+          "auc": 0.611472245532005,
+          "average_precision": 0.1438085725957649,
+          "log_loss": 0.2958113949705367,
+          "log_loss_prevalence": 0.3029792082362273,
+          "log_loss_skill": 0.023657772780573127,
+          "ece": 0.0063474549460628416,
+          "calibration_intercept": -0.1815980287792565,
+          "calibration_slope": 0.8873260707851671,
+          "mean_probability": 0.08394837978286358
+        },
+        "mammals": {
+          "prevalence": 0.042213331907987595,
+          "auc": 0.602194326433792,
+          "average_precision": 0.06106005997314661,
+          "log_loss": 0.17234210828643318,
+          "log_loss_prevalence": 0.1749189035175636,
+          "log_loss_skill": 0.014731370819916378,
+          "ece": 0.002270931832981683,
+          "calibration_intercept": -0.47449773494059594,
+          "calibration_slope": 0.8600720418461216,
+          "mean_probability": 0.0444842666844329
+        },
+        "plants": {
+          "prevalence": 0.09527833014726639,
+          "auc": 0.5755811671898069,
+          "average_precision": 0.12299072350683102,
+          "log_loss": 0.31201128070462436,
+          "log_loss_prevalence": 0.3147993404463892,
+          "log_loss_skill": 0.00885662510541263,
+          "ece": 0.009427701405750895,
+          "calibration_intercept": -0.43663078519568305,
+          "calibration_slope": 0.8432533716996757,
+          "mean_probability": 0.10470603279863018
+        },
+        "rodents": {
+          "prevalence": 0.10012666881084442,
+          "auc": 0.6279140823644163,
+          "average_precision": 0.1578266597943418,
+          "log_loss": 0.31600606270769793,
+          "log_loss_prevalence": 0.3254219519717569,
+          "log_loss_skill": 0.028934401035355273,
+          "ece": 0.00454899226905002,
+          "calibration_intercept": -0.2676302915539978,
+          "calibration_slope": 0.8919711007038328,
+          "mean_probability": 0.10415257873308069
+        },
+        "vertebrates": {
+          "prevalence": 0.041146665811538696,
+          "auc": 0.6028782998496994,
+          "average_precision": 0.058723045986715475,
+          "log_loss": 0.16909755628039458,
+          "log_loss_prevalence": 0.17162026774124503,
+          "log_loss_skill": 0.014699379589909412,
+          "ece": 0.001260570171473858,
+          "calibration_intercept": -0.49828438372531747,
+          "calibration_slope": 0.8297632279526359,
+          "mean_probability": 0.03996233954326715
+        },
+        "viruses": {
+          "prevalence": 0.03765000030398369,
+          "auc": 0.5919839678595904,
+          "average_precision": 0.05570000436976371,
+          "log_loss": 0.15834342780528943,
+          "log_loss_prevalence": 0.16084056352627837,
+          "log_loss_skill": 0.015525534518417428,
+          "ece": 0.0003079086065011051,
+          "calibration_intercept": -0.08325828301719021,
+          "calibration_slope": 0.9712664273505093,
+          "mean_probability": 0.0373420909039585
+        },
+        "mean": {
+          "prevalence": 0.10742933265864849,
+          "auc": 0.6145497112412202,
+          "average_precision": 0.1547968710992718,
+          "log_loss": 0.2931350340158974,
+          "log_loss_prevalence": 0.301546612734632,
+          "log_loss_skill": 0.024121021742195603,
+          "ece": 0.007885479371946742,
+          "calibration_intercept": -0.24868812223362577,
+          "calibration_slope": 0.8942201354516268,
+          "mean_probability": 0.10879193145380821
+        }
+      },
+      "summary_auc": {
+        "n_pathogen_only": 253867.0,
+        "n_self_only": 106390.0,
+        "sum_ratio": 0.692798391935706,
+        "max_ratio": 0.6919119658679838,
+        "sum_difference": 0.6899368594033675
+      },
+      "summary_quantiles": {
+        "max_ratio": {
+          "pathogen_only": {
+            "n": 253867.0,
+            "p5": 0.5705094228254026,
+            "p50": 0.8421572176819014,
+            "p95": 0.9413755107445517
+          },
+          "self_only": {
+            "n": 106390.0,
+            "p5": 0.36387951163487897,
+            "p50": 0.7607268527310633,
+            "p95": 0.9122932142205645
+          },
+          "all": {
+            "n": 600000.0,
+            "p5": 0.4592699415528855,
+            "p50": 0.8137676136728926,
+            "p95": 0.9328943148843098
+          }
+        },
+        "sum_ratio": {
+          "pathogen_only": {
+            "n": 253867.0,
+            "p5": 0.41024112430357457,
+            "p50": 0.7113249511579086,
+            "p95": 0.8746577309853084
+          },
+          "self_only": {
+            "n": 106390.0,
+            "p5": 0.2494964279793088,
+            "p50": 0.6041480096811659,
+            "p95": 0.8215618897684109
+          },
+          "all": {
+            "n": 600000.0,
+            "p5": 0.3212729576581297,
+            "p50": 0.6722502267330439,
+            "p95": 0.8586814636421655
+          }
+        }
+      }
+    },
+    "test_intervals": {
+      "auc": {
+        "archaea": [
+          0.6551306691226737,
+          0.6716649328494547
+        ],
+        "bacteria": [
+          0.6480101592803941,
+          0.6611051375150244
+        ],
+        "fungi": [
+          0.5799874370807969,
+          0.5923116472877612
+        ],
+        "human": [
+          0.6232094969846476,
+          0.6336931330926433
+        ],
+        "invertebrates": [
+          0.603444791790418,
+          0.6211961075580315
+        ],
+        "mammals": [
+          0.5965187446468253,
+          0.6078623893261663
+        ],
+        "plants": [
+          0.5707846612686562,
+          0.5816454201036781
+        ],
+        "rodents": [
+          0.621146931685321,
+          0.635071741258563
+        ],
+        "vertebrates": [
+          0.5913492458637716,
+          0.6112863898809155
+        ],
+        "viruses": [
+          0.5765349968956701,
+          0.606202921810395
+        ]
+      },
+      "log_loss_skill": {
+        "archaea": [
+          0.03354574506097775,
+          0.041923749892889835
+        ],
+        "bacteria": [
+          0.047709413231816176,
+          0.060149147464266015
+        ],
+        "fungi": [
+          0.010230791854454732,
+          0.015016210336373816
+        ],
+        "human": [
+          0.027273063755285657,
+          0.03204759417892945
+        ],
+        "invertebrates": [
+          0.019368655958139046,
+          0.028622704199163858
+        ],
+        "mammals": [
+          0.012946752510996513,
+          0.01659691231363624
+        ],
+        "plants": [
+          0.007470930719266994,
+          0.010757515103715769
+        ],
+        "rodents": [
+          0.026230189617013108,
+          0.031979618771012686
+        ],
+        "vertebrates": [
+          0.009754186897661754,
+          0.01916140553758357
+        ],
+        "viruses": [
+          0.0016777008771842324,
+          0.032129886244546255
+        ]
+      },
+      "mean": {
+        "auc": [
+          0.6102773353329314,
+          0.6193201146565811
+        ],
+        "log_loss_skill": [
+          0.02206028911965487,
+          0.02626461880495629
+        ]
+      },
+      "summary_auc": {
+        "sum_ratio": [
+          0.6875513593308102,
+          0.6989450774165781
+        ],
+        "max_ratio": [
+          0.6864581843370009,
+          0.6982736110157926
+        ],
+        "sum_difference": [
+          0.684197970280935,
+          0.6966435167959021
+        ],
+        "legacy_max_ratio": [
+          0.6706734848040411,
+          0.6856152585317663
+        ]
+      }
+    },
+    "validation": {
+      "n": 300000,
+      "metrics": {
+        "archaea": {
+          "prevalence": 0.041323333978652954,
+          "auc": 0.6607714996458597,
+          "average_precision": 0.07689949324629682,
+          "log_loss": 0.16552264682164183,
+          "log_loss_prevalence": 0.17218372611636407,
+          "log_loss_skill": 0.038685881906287634,
+          "ece": 0.0013121803124043336,
+          "calibration_intercept": -0.10570055680661827,
+          "calibration_slope": 0.9550919801640875,
+          "mean_probability": 0.04018018505073657
+        },
+        "bacteria": {
+          "prevalence": 0.4211699962615967,
+          "auc": 0.6522214952147899,
+          "average_precision": 0.5610257867330796,
+          "log_loss": 0.6447429034488391,
+          "log_loss_prevalence": 0.6812115128472482,
+          "log_loss_skill": 0.05353492815466654,
+          "ece": 0.012247981789236275,
+          "calibration_intercept": -0.01171174911938458,
+          "calibration_slope": 0.8784699277589806,
+          "mean_probability": 0.41547511324224373
+        },
+        "fungi": {
+          "prevalence": 0.1287499964237213,
+          "auc": 0.5905030086903497,
+          "average_precision": 0.17353739264324586,
+          "log_loss": 0.37810331999426555,
+          "log_loss_prevalence": 0.3840444534380633,
+          "log_loss_skill": 0.015469910815300802,
+          "ece": 0.0022852427071705364,
+          "calibration_intercept": -0.10137493929191292,
+          "calibration_slope": 0.9388329977673147,
+          "mean_probability": 0.12721415088071178
+        },
+        "human": {
+          "prevalence": 0.089286670088768,
+          "auc": 0.6331345453855539,
+          "average_precision": 0.14692811123669341,
+          "log_loss": 0.29155506212947896,
+          "log_loss_prevalence": 0.30104533162818553,
+          "log_loss_skill": 0.03152438686685166,
+          "ece": 0.0032487323522125407,
+          "calibration_intercept": -0.1919825074571671,
+          "calibration_slope": 0.9305563078740114,
+          "mean_probability": 0.09252795104866769
+        },
+        "invertebrates": {
+          "prevalence": 0.0855799987912178,
+          "auc": 0.6149675847965572,
+          "average_precision": 0.13835857657474815,
+          "log_loss": 0.28487885335231217,
+          "log_loss_prevalence": 0.29219053612952556,
+          "log_loss_skill": 0.02502368103384489,
+          "ece": 0.0036564050346550863,
+          "calibration_intercept": -0.18485490595463014,
+          "calibration_slope": 0.9090543261685646,
+          "mean_probability": 0.08360568245500948
+        },
+        "mammals": {
+          "prevalence": 0.042729999870061874,
+          "auc": 0.6003314061141845,
+          "average_precision": 0.06044791455498256,
+          "log_loss": 0.17405198699088348,
+          "log_loss_prevalence": 0.1765385466764234,
+          "log_loss_skill": 0.014085080750650625,
+          "ece": 0.0013383793819986742,
+          "calibration_intercept": -0.514724731353305,
+          "calibration_slope": 0.8397228010378445,
+          "mean_probability": 0.04406837871740689
+        },
+        "plants": {
+          "prevalence": 0.09452333301305771,
+          "auc": 0.5769694491728958,
+          "average_precision": 0.12309997057406455,
+          "log_loss": 0.3102162800335694,
+          "log_loss_prevalence": 0.3131529803145893,
+          "log_loss_skill": 0.009377845543956709,
+          "ece": 0.009924299464349947,
+          "calibration_intercept": -0.4050899814302861,
+          "calibration_slope": 0.8611513943811426,
+          "mean_probability": 0.10443595327394704
+        },
+        "rodents": {
+          "prevalence": 0.09133332967758179,
+          "auc": 0.6298514237057585,
+          "average_precision": 0.14474513201316572,
+          "log_loss": 0.2975167593811674,
+          "log_loss_prevalence": 0.30578888823234196,
+          "log_loss_skill": 0.027051764042156146,
+          "ece": 0.011639869934750406,
+          "calibration_intercept": -0.335311981612411,
+          "calibration_slope": 0.9037334495832318,
+          "mean_probability": 0.10297320268686395
+        },
+        "vertebrates": {
+          "prevalence": 0.043113332241773605,
+          "auc": 0.6096496225968366,
+          "average_precision": 0.06296330306847875,
+          "log_loss": 0.17480026086260606,
+          "log_loss_prevalence": 0.17771531032089852,
+          "log_loss_skill": 0.0164029168507136,
+          "ece": 0.003587233005157905,
+          "calibration_intercept": -0.24189131864303146,
+          "calibration_slope": 0.8933864936722056,
+          "mean_probability": 0.03957531866448194
+        },
+        "viruses": {
+          "prevalence": 0.030570000410079956,
+          "auc": 0.5914097547608107,
+          "average_precision": 0.04495489874443696,
+          "log_loss": 0.13569587199845196,
+          "log_loss_prevalence": 0.13896931963098558,
+          "log_loss_skill": 0.023555182116641427,
+          "ece": 0.006660432730606601,
+          "calibration_intercept": -0.3188016340155349,
+          "calibration_slope": 0.9643605446548413,
+          "mean_probability": 0.03723043212124845
+        },
+        "mean": {
+          "prevalence": 0.10683799907565117,
+          "auc": 0.6159809790083596,
+          "average_precision": 0.15329605793891926,
+          "log_loss": 0.28570839450132157,
+          "log_loss_prevalence": 0.29428406053346257,
+          "log_loss_skill": 0.025471157808107003,
+          "ece": 0.005590075671254231,
+          "calibration_intercept": -0.24114443056842813,
+          "calibration_slope": 0.9074360223062223,
+          "mean_probability": 0.10872863681413174
+        }
+      },
+      "summary_auc": {
+        "n_pathogen_only": 135345.0,
+        "n_self_only": 49428.0,
+        "sum_ratio": 0.6912932581485528,
+        "max_ratio": 0.6910034337092074,
+        "sum_difference": 0.689408329086665
+      }
+    },
+    "train_subset": {
+      "n": 100000,
+      "metrics": {
+        "archaea": {
+          "prevalence": 0.03926999866962433,
+          "auc": 0.6704770516963574,
+          "average_precision": 0.07579414505307906,
+          "log_loss": 0.1585441385109898,
+          "log_loss_prevalence": 0.1656171994528762,
+          "log_loss_skill": 0.04270728502385357,
+          "ece": 0.001054601968820934,
+          "calibration_intercept": 0.021330878248059716,
+          "calibration_slope": 1.0148540144199054,
+          "mean_probability": 0.0401451399414202
+        },
+        "bacteria": {
+          "prevalence": 0.40421000123023987,
+          "auc": 0.6658756161550241,
+          "average_precision": 0.5562561049522516,
+          "log_loss": 0.6315621694149762,
+          "log_loss_prevalence": 0.6746828844392125,
+          "log_loss_skill": 0.06391256695369951,
+          "ece": 0.011717034455109389,
+          "calibration_intercept": -0.059015520676037776,
+          "calibration_slope": 0.9784104013490061,
+          "mean_probability": 0.4158770372567885
+        },
+        "fungi": {
+          "prevalence": 0.13208000361919403,
+          "auc": 0.595495935540509,
+          "average_precision": 0.18115786806770579,
+          "log_loss": 0.38366534919568873,
+          "log_loss_prevalence": 0.3903220066063771,
+          "log_loss_skill": 0.017054271340127936,
+          "ece": 0.005219165680082507,
+          "calibration_intercept": 0.03776767141242509,
+          "calibration_slope": 0.9951242765145161,
+          "mean_probability": 0.12686083161692135
+        },
+        "human": {
+          "prevalence": 0.09539999812841415,
+          "auc": 0.6455212943766104,
+          "average_precision": 0.16732803128652782,
+          "log_loss": 0.3026699735220401,
+          "log_loss_prevalence": 0.31486134818786443,
+          "log_loss_skill": 0.038719819806368405,
+          "ece": 0.002886494311271234,
+          "calibration_intercept": 0.0946697589278833,
+          "calibration_slope": 1.0276767730296503,
+          "mean_probability": 0.09254994800326415
+        },
+        "invertebrates": {
+          "prevalence": 0.0872500017285347,
+          "auc": 0.6202273478475497,
+          "average_precision": 0.15001315799434653,
+          "log_loss": 0.2875680766677808,
+          "log_loss_prevalence": 0.2961445410493921,
+          "log_loss_skill": 0.028960400050666135,
+          "ece": 0.0037449915597494703,
+          "calibration_intercept": -0.030952526128901224,
+          "calibration_slope": 0.965614282639298,
+          "mean_probability": 0.08353066432395019
+        },
+        "mammals": {
+          "prevalence": 0.041600000113248825,
+          "auc": 0.6176818548241461,
+          "average_precision": 0.06712862451864206,
+          "log_loss": 0.1693349696835996,
+          "log_loss_prevalence": 0.1729962303483365,
+          "log_loss_skill": 0.02116381760090824,
+          "ece": 0.0028615165341040125,
+          "calibration_intercept": -0.005961174446463001,
+          "calibration_slope": 1.0184116863976553,
+          "mean_probability": 0.04408330193897243
+        },
+        "plants": {
+          "prevalence": 0.10063000023365021,
+          "auc": 0.594868972128249,
+          "average_precision": 0.14016848002686347,
+          "log_loss": 0.3213000375955861,
+          "log_loss_prevalence": 0.32646923533206124,
+          "log_loss_skill": 0.015833644267330027,
+          "ece": 0.003933948202589527,
+          "calibration_intercept": 0.07718196648944814,
+          "calibration_slope": 1.0566594255817832,
+          "mean_probability": 0.10446541978740133
+        },
+        "rodents": {
+          "prevalence": 0.09662999957799911,
+          "auc": 0.6463626480568784,
+          "average_precision": 0.16520749188548067,
+          "log_loss": 0.3056968923839508,
+          "log_loss_prevalence": 0.31761486938546185,
+          "log_loss_skill": 0.037523359736181705,
+          "ece": 0.006383180871908555,
+          "calibration_intercept": -0.01903858159396846,
+          "calibration_slope": 1.0261204052649613,
+          "mean_probability": 0.10300045557886828
+        },
+        "vertebrates": {
+          "prevalence": 0.042490001767873764,
+          "auc": 0.6178763945519347,
+          "average_precision": 0.06387437638234728,
+          "log_loss": 0.17230462539113614,
+          "log_loss_prevalence": 0.1757834917405677,
+          "log_loss_skill": 0.019790631731026798,
+          "ece": 0.0029366168599110074,
+          "calibration_intercept": -0.03341036090693309,
+          "calibration_slope": 0.965054222378832,
+          "mean_probability": 0.039556955518657344
+        },
+        "viruses": {
+          "prevalence": 0.04414999857544899,
+          "auc": 0.5937407397292621,
+          "average_precision": 0.06479727700322542,
+          "log_loss": 0.17904176937208885,
+          "log_loss_prevalence": 0.18092009535105277,
+          "log_loss_skill": 0.01038207488957632,
+          "ece": 0.007014954542054327,
+          "calibration_intercept": 0.15895552508151503,
+          "calibration_slope": 0.9930373721831669,
+          "mean_probability": 0.037135045111307406
+        },
+        "mean": {
+          "prevalence": 0.10837100036442279,
+          "auc": 0.6268127854906521,
+          "average_precision": 0.16317255571704697,
+          "log_loss": 0.2911688001737837,
+          "log_loss_prevalence": 0.30154119018932024,
+          "log_loss_skill": 0.029604787139973866,
+          "ece": 0.004775250498560097,
+          "calibration_intercept": 0.024152763640702773,
+          "calibration_slope": 1.0040962859758775,
+          "mean_probability": 0.10872047990775513
+        }
+      },
+      "summary_auc": {
+        "n_pathogen_only": 44652.0,
+        "n_self_only": 16682.0,
+        "sum_ratio": 0.7072716159450961,
+        "max_ratio": 0.7061112389877313,
+        "sum_difference": 0.704010568809348
+      }
+    },
+    "within_family_holdout": {
+      "n": 300000,
+      "metrics": {
+        "archaea": {
+          "prevalence": 0.03979000076651573,
+          "auc": 0.6609213036238617,
+          "average_precision": 0.07352656407988467,
+          "log_loss": 0.16091592455759843,
+          "log_loss_prevalence": 0.16728015101051275,
+          "log_loss_skill": 0.03804531747771056,
+          "ece": 0.0002654190429375268,
+          "calibration_intercept": -0.1453188881736183,
+          "calibration_slope": 0.9531131460368297,
+          "mean_probability": 0.03992846238299452
+        },
+        "bacteria": {
+          "prevalence": 0.405073344707489,
+          "auc": 0.6615648557304609,
+          "average_precision": 0.5543167660843971,
+          "log_loss": 0.6343084485141989,
+          "log_loss_prevalence": 0.6750152183145428,
+          "log_loss_skill": 0.06030496601541124,
+          "ece": 0.012224778484236443,
+          "calibration_intercept": -0.06488815934018596,
+          "calibration_slope": 0.9429372866081576,
+          "mean_probability": 0.41573579111605263
+        },
+        "fungi": {
+          "prevalence": 0.13314667344093323,
+          "auc": 0.5874557660864873,
+          "average_precision": 0.17632590708070073,
+          "log_loss": 0.386902389453081,
+          "log_loss_prevalence": 0.3923328344480792,
+          "log_loss_skill": 0.013841423705047817,
+          "ece": 0.006628123050462446,
+          "calibration_intercept": -0.12421468733232195,
+          "calibration_slope": 0.9047451742772937,
+          "mean_probability": 0.1269137764506725
+        },
+        "human": {
+          "prevalence": 0.09374333173036575,
+          "auc": 0.6350071250898894,
+          "average_precision": 0.1546466607372028,
+          "log_loss": 0.3010575590972881,
+          "log_loss_prevalence": 0.31111731316596675,
+          "log_loss_skill": 0.032334279202624217,
+          "ece": 0.0017999118824272096,
+          "calibration_intercept": -0.12450057675899077,
+          "calibration_slope": 0.9379343132358918,
+          "mean_probability": 0.09283791839361501
+        },
+        "invertebrates": {
+          "prevalence": 0.08522666990756989,
+          "auc": 0.6166619705645705,
+          "average_precision": 0.14051857324735362,
+          "log_loss": 0.283735644159121,
+          "log_loss_prevalence": 0.29135396023829635,
+          "log_loss_skill": 0.02614797503677102,
+          "ece": 0.0028456582931087665,
+          "calibration_intercept": -0.1494355089771199,
+          "calibration_slope": 0.9253172301765843,
+          "mean_probability": 0.08342695653208532
+        },
+        "mammals": {
+          "prevalence": 0.04147333279252052,
+          "auc": 0.6126190738304444,
+          "average_precision": 0.06368521507300846,
+          "log_loss": 0.1694355738739197,
+          "log_loss_prevalence": 0.17259915654164826,
+          "log_loss_skill": 0.0183290737400863,
+          "ece": 0.002724736541880607,
+          "calibration_intercept": -0.2116219321639927,
+          "calibration_slope": 0.9517248745195781,
+          "mean_probability": 0.04419806989135686
+        },
+        "plants": {
+          "prevalence": 0.10153999924659729,
+          "auc": 0.5822256797173971,
+          "average_precision": 0.13383508878330524,
+          "log_loss": 0.3245400912186344,
+          "log_loss_prevalence": 0.3284535899280055,
+          "log_loss_skill": 0.011914921405574819,
+          "ece": 0.002810004841548707,
+          "calibration_intercept": -0.21171870236580476,
+          "calibration_slope": 0.9142853173798433,
+          "mean_probability": 0.10434385493309548
+        },
+        "rodents": {
+          "prevalence": 0.09622333198785782,
+          "auc": 0.6383576252620842,
+          "average_precision": 0.15914663507520582,
+          "log_loss": 0.30623398985984057,
+          "log_loss_prevalence": 0.3167068960055495,
+          "log_loss_skill": 0.03306813422062471,
+          "ece": 0.007088794693805587,
+          "calibration_intercept": -0.15357778373590544,
+          "calibration_slope": 0.9647978091548977,
+          "mean_probability": 0.10331212714568556
+        },
+        "vertebrates": {
+          "prevalence": 0.04267333447933197,
+          "auc": 0.6097677570872817,
+          "average_precision": 0.06185063598544431,
+          "log_loss": 0.17348064713662456,
+          "log_loss_prevalence": 0.1763516736759591,
+          "log_loss_skill": 0.016280120735400416,
+          "ece": 0.0030893763329794956,
+          "calibration_intercept": -0.29086276203701106,
+          "calibration_slope": 0.881611845350193,
+          "mean_probability": 0.03963982840412995
+        },
+        "viruses": {
+          "prevalence": 0.04329000040888786,
+          "auc": 0.5907640429804931,
+          "average_precision": 0.061337288066873163,
+          "log_loss": 0.17652900585684514,
+          "log_loss_prevalence": 0.17826341883269797,
+          "log_loss_skill": 0.00972949462772621,
+          "ece": 0.00616543879631713,
+          "calibration_intercept": -0.020603341990239006,
+          "calibration_slope": 0.9433679805061965,
+          "mean_probability": 0.03712456166278765
+        },
+        "mean": {
+          "prevalence": 0.1082180019468069,
+          "auc": 0.619534519997297,
+          "average_precision": 0.1579189334213376,
+          "log_loss": 0.2917139273727151,
+          "log_loss_prevalence": 0.3009474212161258,
+          "log_loss_skill": 0.02599957061669773,
+          "ece": 0.004564224195970392,
+          "calibration_intercept": -0.14967423428751897,
+          "calibration_slope": 0.9319834977245467,
+          "mean_probability": 0.10874613469124753
+        }
+      },
+      "summary_auc": {
+        "n_pathogen_only": 133931.0,
+        "n_self_only": 49776.0,
+        "sum_ratio": 0.7006218226276367,
+        "max_ratio": 0.6998705882697347,
+        "sum_difference": 0.6979538956712121
+      }
+    },
+    "lengths": {
+      "9": {
+        "n": 400000,
+        "metrics": {
+          "archaea": {
+            "prevalence": 0.035667501389980316,
+            "auc": 0.6727441921029382,
+            "average_precision": 0.07064045585372951,
+            "log_loss": 0.1474982708413501,
+            "log_loss_prevalence": 0.15392187379608277,
+            "log_loss_skill": 0.041732879130894296,
+            "ece": 0.004211721783428408,
+            "calibration_intercept": 0.06119322346191484,
+            "calibration_slope": 1.0594026266704089,
+            "mean_probability": 0.039879221033993134
+          },
+          "bacteria": {
+            "prevalence": 0.3899500072002411,
+            "auc": 0.6641894306582001,
+            "average_precision": 0.5403817782797028,
+            "log_loss": 0.6276808248445318,
+            "log_loss_prevalence": 0.6687257159865178,
+            "log_loss_skill": 0.06137776693907415,
+            "ece": 0.023743653940679798,
+            "calibration_intercept": -0.11022110446832076,
+            "calibration_slope": 0.9912193678828761,
+            "mean_probability": 0.41369365988043166
+          },
+          "fungi": {
+            "prevalence": 0.14259499311447144,
+            "auc": 0.5919873408219358,
+            "average_precision": 0.19164837150727398,
+            "log_loss": 0.4040226367937765,
+            "log_loss_prevalence": 0.4096463405965848,
+            "log_loss_skill": 0.013728192456493704,
+            "ece": 0.015409927968748377,
+            "calibration_intercept": 0.10506106443493211,
+            "calibration_slope": 0.9846830063578718,
+            "mean_probability": 0.1271850756831537
+          },
+          "human": {
+            "prevalence": 0.09837000072002411,
+            "auc": 0.6333115725541977,
+            "average_precision": 0.1626216785112637,
+            "log_loss": 0.3111311105064285,
+            "log_loss_prevalence": 0.3214866648919358,
+            "log_loss_skill": 0.0322114585654375,
+            "ece": 0.005060976084093854,
+            "calibration_intercept": -0.03467106885834195,
+            "calibration_slope": 0.9576563915886679,
+            "mean_probability": 0.09349713695517246
+          },
+          "invertebrates": {
+            "prevalence": 0.08809249848127365,
+            "auc": 0.6193751547810289,
+            "average_precision": 0.14715851100984326,
+            "log_loss": 0.28987636222745966,
+            "log_loss_prevalence": 0.2981022081148901,
+            "log_loss_skill": 0.027594045476711626,
+            "ece": 0.004492993465973998,
+            "calibration_intercept": -0.06173696355215995,
+            "calibration_slope": 0.9494971638542448,
+            "mean_probability": 0.08384663950477261
+          },
+          "mammals": {
+            "prevalence": 0.042284999042749405,
+            "auc": 0.6040386237429881,
+            "average_precision": 0.0615101137368685,
+            "log_loss": 0.17245180264128862,
+            "log_loss_prevalence": 0.17513922231195603,
+            "log_loss_skill": 0.015344476441037314,
+            "ece": 0.002136602993515482,
+            "calibration_intercept": -0.3755283385042326,
+            "calibration_slope": 0.8920847945664553,
+            "mean_probability": 0.04442160321340074
+          },
+          "plants": {
+            "prevalence": 0.09525000303983688,
+            "auc": 0.5795602243989326,
+            "average_precision": 0.12514533734658984,
+            "log_loss": 0.31140202458305627,
+            "log_loss_prevalence": 0.3145190015519135,
+            "log_loss_skill": 0.009910297799106793,
+            "ece": 0.009231057320549154,
+            "calibration_intercept": -0.25614148973291195,
+            "calibration_slope": 0.927786634939439,
+            "mean_probability": 0.1044769070653012
+          },
+          "rodents": {
+            "prevalence": 0.09918750077486038,
+            "auc": 0.635182000251733,
+            "average_precision": 0.15935433447131578,
+            "log_loss": 0.31291691142865674,
+            "log_loss_prevalence": 0.32329405202184514,
+            "log_loss_skill": 0.03209814881619666,
+            "ece": 0.00486605946974946,
+            "calibration_intercept": -0.13495235836616934,
+            "calibration_slope": 0.9609905157216548,
+            "mean_probability": 0.10405161590632167
+          },
+          "vertebrates": {
+            "prevalence": 0.04091750085353851,
+            "auc": 0.60537221048477,
+            "average_precision": 0.05824258677165138,
+            "log_loss": 0.16819418810999293,
+            "log_loss_prevalence": 0.17084913050857417,
+            "log_loss_skill": 0.015539689260800849,
+            "ece": 0.0011654708723200025,
+            "calibration_intercept": -0.3667296917949577,
+            "calibration_slope": 0.8733363567963502,
+            "mean_probability": 0.03987523656615638
+          },
+          "viruses": {
+            "prevalence": 0.036752499639987946,
+            "auc": 0.5976744516501662,
+            "average_precision": 0.0549192817177887,
+            "log_loss": 0.15525279330535244,
+            "log_loss_prevalence": 0.1574823831753811,
+            "log_loss_skill": 0.01415770973916286,
+            "ece": 0.0004344198479292399,
+            "calibration_intercept": 0.17770555953399908,
+            "calibration_slope": 1.0586092593130818,
+            "mean_probability": 0.03710375669965273
+          },
+          "mean": {
+            "prevalence": 0.10690675042569638,
+            "auc": 0.620343520144689,
+            "average_precision": 0.15716224492060274,
+            "log_loss": 0.29004269252818937,
+            "log_loss_prevalence": 0.2993166592955681,
+            "log_loss_skill": 0.026369466462491574,
+            "ece": 0.007075288374698776,
+            "calibration_intercept": -0.09960211678462483,
+            "calibration_slope": 0.965526611769105,
+            "mean_probability": 0.10880308525083562
+          }
+        },
+        "summary_auc": {
+          "n_pathogen_only": 170602.0,
+          "n_self_only": 71063.0,
+          "sum_ratio": 0.7017561101159775,
+          "max_ratio": 0.7010582421710506,
+          "sum_difference": 0.6993272376395094
+        }
+      },
+      "10": {
+        "n": 400000,
+        "metrics": {
+          "archaea": {
+            "prevalence": 0.03543249890208244,
+            "auc": 0.6744020343917783,
+            "average_precision": 0.06880399801691875,
+            "log_loss": 0.1467815807641375,
+            "log_loss_prevalence": 0.15314622817770251,
+            "log_loss_skill": 0.04155928284554178,
+            "ece": 0.004494447070731771,
+            "calibration_intercept": 0.1605709448141832,
+            "calibration_slope": 1.09502970940861,
+            "mean_probability": 0.03992694832021276
+          },
+          "bacteria": {
+            "prevalence": 0.39484500885009766,
+            "auc": 0.6690191876801757,
+            "average_precision": 0.5511648199291499,
+            "log_loss": 0.6266803435979957,
+            "log_loss_prevalence": 0.6708660513510523,
+            "log_loss_skill": 0.06586368122827391,
+            "ece": 0.01946949046372434,
+            "calibration_intercept": -0.07132797180740519,
+            "calibration_slope": 1.0551830390035348,
+            "mean_probability": 0.41422886451893487
+          },
+          "fungi": {
+            "prevalence": 0.1404149979352951,
+            "auc": 0.5967119397103684,
+            "average_precision": 0.19098852267378214,
+            "log_loss": 0.3992928716804047,
+            "log_loss_prevalence": 0.40571611577075106,
+            "log_loss_skill": 0.01583186824645577,
+            "ece": 0.01342843510958754,
+            "calibration_intercept": 0.24153037411166453,
+            "calibration_slope": 1.065608445290664,
+            "mean_probability": 0.12698656394832378
+          },
+          "human": {
+            "prevalence": 0.09632500261068344,
+            "auc": 0.6394701111276085,
+            "average_precision": 0.16291850811426586,
+            "log_loss": 0.3057242534245783,
+            "log_loss_prevalence": 0.31693230924823784,
+            "log_loss_skill": 0.035364194487602085,
+            "ece": 0.0030153738004435847,
+            "calibration_intercept": 0.08806266852004284,
+            "calibration_slope": 1.0242173115028559,
+            "mean_probability": 0.0933655966264474
+          },
+          "invertebrates": {
+            "prevalence": 0.08655499666929245,
+            "auc": 0.6231509639566565,
+            "average_precision": 0.1521914695015056,
+            "log_loss": 0.28532349793022543,
+            "log_loss_prevalence": 0.2944940468720215,
+            "log_loss_skill": 0.03114001467670191,
+            "ece": 0.002752956983750916,
+            "calibration_intercept": 0.04400282757296065,
+            "calibration_slope": 1.0038368133937121,
+            "mean_probability": 0.08388141071219657
+          },
+          "mammals": {
+            "prevalence": 0.04143499955534935,
+            "auc": 0.6085108106529944,
+            "average_precision": 0.06159679489595339,
+            "log_loss": 0.16958651919158688,
+            "log_loss_prevalence": 0.1724781440263559,
+            "log_loss_skill": 0.016765166688755384,
+            "ece": 0.0029189541356275687,
+            "calibration_intercept": -0.19473798764209493,
+            "calibration_slope": 0.9589484936935322,
+            "mean_probability": 0.04435395263565806
+          },
+          "plants": {
+            "prevalence": 0.09373249858617783,
+            "auc": 0.5841928048372562,
+            "average_precision": 0.1253123137783997,
+            "log_loss": 0.3077362162980759,
+            "log_loss_prevalence": 0.3110894510474767,
+            "log_loss_skill": 0.010779005003577091,
+            "ece": 0.010690823494866488,
+            "calibration_intercept": -0.09825895645386773,
+            "calibration_slope": 1.010725881135031,
+            "mean_probability": 0.10442332484228536
+          },
+          "rodents": {
+            "prevalence": 0.09694749861955643,
+            "auc": 0.6369300879837722,
+            "average_precision": 0.159288310346312,
+            "log_loss": 0.3078973741406437,
+            "log_loss_prevalence": 0.31832370448791675,
+            "log_loss_skill": 0.032753860929225276,
+            "ece": 0.006955615705789532,
+            "calibration_intercept": -0.07524677169327684,
+            "calibration_slope": 1.001775565881881,
+            "mean_probability": 0.10390311774495756
+          },
+          "vertebrates": {
+            "prevalence": 0.04091750085353851,
+            "auc": 0.6125136580008337,
+            "average_precision": 0.060295943497451376,
+            "log_loss": 0.16774683182581923,
+            "log_loss_prevalence": 0.1708491305085742,
+            "log_loss_skill": 0.018158118063113404,
+            "ece": 0.0012204306387338666,
+            "calibration_intercept": -0.09066575919701651,
+            "calibration_slope": 0.9613646699859827,
+            "mean_probability": 0.03978607294332896
+          },
+          "viruses": {
+            "prevalence": 0.03668750077486038,
+            "auc": 0.60071636627016,
+            "average_precision": 0.055168042476336554,
+            "log_loss": 0.15498940303694161,
+            "log_loss_prevalence": 0.15727002670038798,
+            "log_loss_skill": 0.01450132432285478,
+            "ece": 0.0004035682603718781,
+            "calibration_intercept": 0.3202991569286641,
+            "calibration_slope": 1.1031911638447114,
+            "mean_probability": 0.03705029701945702
+          },
+          "mean": {
+            "prevalence": 0.10632925033569336,
+            "auc": 0.6245617964611605,
+            "average_precision": 0.1587728723230075,
+            "log_loss": 0.2871758891890409,
+            "log_loss_prevalence": 0.29711652081904766,
+            "log_loss_skill": 0.02827165164921014,
+            "ece": 0.006535009566362748,
+            "calibration_intercept": 0.03242285251538542,
+            "calibration_slope": 1.0279881093140513,
+            "mean_probability": 0.10879061493118025
+          }
+        },
+        "summary_auc": {
+          "n_pathogen_only": 172562.0,
+          "n_self_only": 70826.0,
+          "sum_ratio": 0.7079809800809657,
+          "max_ratio": 0.7072609785159556,
+          "sum_difference": 0.705612473642357
+        }
+      },
+      "11": {
+        "n": 400000,
+        "metrics": {
+          "archaea": {
+            "prevalence": 0.035602498799562454,
+            "auc": 0.6773118829608199,
+            "average_precision": 0.07211977490078934,
+            "log_loss": 0.14706376870129947,
+            "log_loss_prevalence": 0.1537074945861585,
+            "log_loss_skill": 0.04322317465876713,
+            "ece": 0.004362208507985714,
+            "calibration_intercept": 0.3347668557600987,
+            "calibration_slope": 1.1514603828654772,
+            "mean_probability": 0.039960735997038796
+          },
+          "bacteria": {
+            "prevalence": 0.3969325125217438,
+            "auc": 0.6718803103138571,
+            "average_precision": 0.5573664826719591,
+            "log_loss": 0.6260019886198491,
+            "log_loss_prevalence": 0.6717482826944777,
+            "log_loss_skill": 0.06810035135651371,
+            "ece": 0.018330536330979447,
+            "calibration_intercept": -0.048288522385696524,
+            "calibration_slope": 1.107438026734414,
+            "mean_probability": 0.41466190652848606
+          },
+          "fungi": {
+            "prevalence": 0.13879750669002533,
+            "auc": 0.5985050898475128,
+            "average_precision": 0.1902912444415788,
+            "log_loss": 0.3959956046531616,
+            "log_loss_prevalence": 0.4027745794115421,
+            "log_loss_skill": 0.016830691669480924,
+            "ece": 0.011996608490037043,
+            "calibration_intercept": 0.3276407783613222,
+            "calibration_slope": 1.1174338302269518,
+            "mean_probability": 0.12680089089476854
+          },
+          "human": {
+            "prevalence": 0.09387999773025513,
+            "auc": 0.6416357993544174,
+            "average_precision": 0.1606941505429179,
+            "log_loss": 0.3001381892240635,
+            "log_loss_prevalence": 0.3114239842559363,
+            "log_loss_skill": 0.03623932517219952,
+            "ece": 0.0024310885587596563,
+            "calibration_intercept": 0.14910646717445242,
+            "calibration_slope": 1.0648667589671479,
+            "mean_probability": 0.09323971137164219
+          },
+          "invertebrates": {
+            "prevalence": 0.08609499782323837,
+            "auc": 0.6283356313287969,
+            "average_precision": 0.1597847272307687,
+            "log_loss": 0.28315190325623585,
+            "log_loss_prevalence": 0.29340874271750533,
+            "log_loss_skill": 0.034957511375674266,
+            "ece": 0.002081039845807829,
+            "calibration_intercept": 0.18252785682283795,
+            "calibration_slope": 1.0671536637640118,
+            "mean_probability": 0.08402534290841374
+          },
+          "mammals": {
+            "prevalence": 0.041382499039173126,
+            "auc": 0.6109567760935228,
+            "average_precision": 0.061952535099564054,
+            "log_loss": 0.16931392974372084,
+            "log_loss_prevalence": 0.1723131904640955,
+            "log_loss_skill": 0.01740586842073244,
+            "ece": 0.0029321212217523706,
+            "calibration_intercept": -0.07075798374045512,
+            "calibration_slope": 1.0003489700929815,
+            "mean_probability": 0.04430563242838112
+          },
+          "plants": {
+            "prevalence": 0.09455499798059464,
+            "auc": 0.5840254511545055,
+            "average_precision": 0.1252617445585696,
+            "log_loss": 0.30960089641916505,
+            "log_loss_prevalence": 0.3129516411423021,
+            "log_loss_skill": 0.010706908936174764,
+            "ece": 0.00982927469262446,
+            "calibration_intercept": -0.07010611069478634,
+            "calibration_slope": 1.0192148332894562,
+            "mean_probability": 0.10438427509700472
+          },
+          "rodents": {
+            "prevalence": 0.09660249948501587,
+            "auc": 0.6400116332924677,
+            "average_precision": 0.1598271480104269,
+            "log_loss": 0.30673271731994894,
+            "log_loss_prevalence": 0.3175531181739257,
+            "log_loss_skill": 0.03407430201346762,
+            "ece": 0.0071660699176866955,
+            "calibration_intercept": 0.02228746052127434,
+            "calibration_slope": 1.050282365272189,
+            "mean_probability": 0.10376671924200695
+          },
+          "vertebrates": {
+            "prevalence": 0.04053749889135361,
+            "auc": 0.6184089426129292,
+            "average_precision": 0.06058953752124585,
+            "log_loss": 0.16627464580413465,
+            "log_loss_prevalence": 0.16964860590769232,
+            "log_loss_skill": 0.01988793297478364,
+            "ece": 0.0008564685978837248,
+            "calibration_intercept": 0.11957311254795054,
+            "calibration_slope": 1.031809056661275,
+            "mean_probability": 0.0397444757108573
+          },
+          "viruses": {
+            "prevalence": 0.03591499850153923,
+            "auc": 0.6029947760040184,
+            "average_precision": 0.05413666562132889,
+            "log_loss": 0.15243579055205375,
+            "log_loss_prevalence": 0.15473704136928898,
+            "log_loss_skill": 0.014872009939385866,
+            "ece": 0.0011195849457379524,
+            "calibration_intercept": 0.4766946308961775,
+            "calibration_slope": 1.158371627135952,
+            "mean_probability": 0.03699489608595577
+          },
+          "mean": {
+            "prevalence": 0.10603000074625016,
+            "auc": 0.6274066292962848,
+            "average_precision": 0.16020240105991493,
+            "log_loss": 0.2856709434293633,
+            "log_loss_prevalence": 0.29602666807229244,
+            "log_loss_skill": 0.029629807651717986,
+            "ece": 0.00611050011092549,
+            "calibration_intercept": 0.14234445452631755,
+            "calibration_slope": 1.0768379515009856,
+            "mean_probability": 0.10878845862645554
+          }
+        },
+        "summary_auc": {
+          "n_pathogen_only": 173072.0,
+          "n_self_only": 70638.0,
+          "sum_ratio": 0.7110629167743403,
+          "max_ratio": 0.7104427394526125,
+          "sum_difference": 0.7091390343500282
+        }
+      }
+    },
+    "legacy_baseline": {
+      "n": 600000,
+      "metrics": {
+        "archaea": {
+          "prevalence": 0.036383334547281265,
+          "auc": 0.6422953572271892,
+          "average_precision": 0.06436772044808772,
+          "log_loss": 0.7057148500072283,
+          "log_loss_prevalence": 0.15638568631881697,
+          "log_loss_skill": -3.5126562834434667,
+          "ece": 0.47053815287913503,
+          "calibration_intercept": -3.868108340455112,
+          "calibration_slope": 18.04577709920057,
+          "mean_probability": 0.506921486774087
+        },
+        "bacteria": {
+          "prevalence": 0.3859499990940094,
+          "auc": 0.6539477794179251,
+          "average_precision": 0.5273359004028395,
+          "log_loss": 0.7433053011735625,
+          "log_loss_prevalence": 0.6676538305046171,
+          "log_loss_skill": -0.11330942355526896,
+          "ece": 0.21283740819743524,
+          "calibration_intercept": -2.1675344581251044,
+          "calibration_slope": 4.143188990627404,
+          "mean_probability": 0.5987449590732157
+        },
+        "fungi": {
+          "prevalence": 0.1450316607952118,
+          "auc": 0.579274800214767,
+          "average_precision": 0.1861207607034827,
+          "log_loss": 0.7421031260939703,
+          "log_loss_prevalence": 0.4147378552905446,
+          "log_loss_skill": -0.7893305774417192,
+          "ece": 0.3885517587530241,
+          "calibration_intercept": -2.886703188711929,
+          "calibration_slope": 8.063902813171733,
+          "mean_probability": 0.5335834201483428
+        },
+        "human": {
+          "prevalence": 0.1003766655921936,
+          "auc": 0.6254666859796723,
+          "average_precision": 0.16136062131661066,
+          "log_loss": 0.7300919308956646,
+          "log_loss_prevalence": 0.3261085197928812,
+          "log_loss_skill": -1.2388005420997965,
+          "ece": 0.4231524991411343,
+          "calibration_intercept": -3.0447252656626067,
+          "calibration_slope": 8.289381665438192,
+          "mean_probability": 0.5235291686266661
+        },
+        "invertebrates": {
+          "prevalence": 0.09013666957616806,
+          "auc": 0.6030177549479637,
+          "average_precision": 0.14026607094310817,
+          "log_loss": 0.7303603060150032,
+          "log_loss_prevalence": 0.3029792082362273,
+          "log_loss_skill": -1.4105954671501904,
+          "ece": 0.4325781030713767,
+          "calibration_intercept": -3.1458908602541538,
+          "calibration_slope": 8.73301435585109,
+          "mean_probability": 0.5227147711662948
+        },
+        "mammals": {
+          "prevalence": 0.042213331907987595,
+          "auc": 0.5975348235490922,
+          "average_precision": 0.05950367289640825,
+          "log_loss": 0.7126733273683028,
+          "log_loss_prevalence": 0.1749189035175636,
+          "log_loss_skill": -3.074307081948655,
+          "ece": 0.4684656249735256,
+          "calibration_intercept": -3.7189484391213776,
+          "calibration_slope": 12.909585906872179,
+          "mean_probability": 0.5106789585438868
+        },
+        "plants": {
+          "prevalence": 0.09527833014726639,
+          "auc": 0.5648315726789429,
+          "average_precision": 0.11637352875881314,
+          "log_loss": 0.7341443835480693,
+          "log_loss_prevalence": 0.3147993404463892,
+          "log_loss_skill": -1.332102673744627,
+          "ece": 0.42954150112037853,
+          "calibration_intercept": -3.0854344519776475,
+          "calibration_slope": 8.184488279969548,
+          "mean_probability": 0.5248198330115279
+        },
+        "rodents": {
+          "prevalence": 0.10012666881084442,
+          "auc": 0.6237688305077729,
+          "average_precision": 0.1575915106440702,
+          "log_loss": 0.7316320249392889,
+          "log_loss_prevalence": 0.3254219519717569,
+          "log_loss_skill": -1.24825651897874,
+          "ece": 0.42421579988792535,
+          "calibration_intercept": -3.106066268589811,
+          "calibration_slope": 8.630991520308179,
+          "mean_probability": 0.5243424643306931
+        },
+        "vertebrates": {
+          "prevalence": 0.041146665811538696,
+          "auc": 0.5985930772874464,
+          "average_precision": 0.05765657615234192,
+          "log_loss": 0.7187288846816184,
+          "log_loss_prevalence": 0.17162026774124503,
+          "log_loss_skill": -3.1879021291661127,
+          "ece": 0.47266573283026614,
+          "calibration_intercept": -4.511462083210091,
+          "calibration_slope": 23.799982654108202,
+          "mean_probability": 0.5138123986418048
+        },
+        "viruses": {
+          "prevalence": 0.03765000030398369,
+          "auc": 0.5775162080836944,
+          "average_precision": 0.049169559512563236,
+          "log_loss": 0.71149330676701,
+          "log_loss_prevalence": 0.16084056352627837,
+          "log_loss_skill": -3.42359372019214,
+          "ece": 0.47221516737832375,
+          "calibration_intercept": -4.1706982076672565,
+          "calibration_slope": 22.753214806656946,
+          "mean_probability": 0.5098651658535004
+        },
+        "mean": {
+          "prevalence": 0.10742933265864849,
+          "auc": 0.6066246889894467,
+          "average_precision": 0.15197459217783255,
+          "log_loss": 0.7260247441489718,
+          "log_loss_prevalence": 0.301546612734632,
+          "log_loss_skill": -1.9330854417720715,
+          "ece": 0.41947617482325245,
+          "calibration_intercept": -3.370557156377509,
+          "calibration_slope": 12.355352809220404,
+          "mean_probability": 0.5269012626170019
+        }
+      },
+      "summary_auc": {
+        "n_pathogen_only": 253867.0,
+        "n_self_only": 106390.0,
+        "sum_ratio": 0.683493650841364,
+        "max_ratio": 0.6778296691492601,
+        "sum_difference": 0.6855635666110456
+      }
+    }
+  }
+}
