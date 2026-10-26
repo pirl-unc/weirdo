@@ -29,7 +29,7 @@ from weirdo import predict_peptide_content
 
 result = predict_peptide_content(
     ["SIINFEKL", "GILGFVFTL"],
-    self_categories=("mammals", "human"),
+    score_policy="human-microbial-content-v1",
 )
 ```
 
@@ -39,6 +39,8 @@ The score is useful for ranking peptide content, but it did not add a validated
 T-cell immunogenicity signal beyond MHC presentation or affinity. See
 [docs/peptide-content.md](docs/peptide-content.md) for the split, model comparison,
 host-specific guidance, and evaluation.
+[docs/score-policies.md](docs/score-policies.md) defines the versioned human,
+mouse, dog, generic-mammal, and stable human-complement scoring contracts.
 
 ## Quick Start
 

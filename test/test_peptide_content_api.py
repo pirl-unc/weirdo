@@ -30,10 +30,15 @@ class FakeContentModel:
         "protists",
         "mammals",
         "human",
+        "mouse",
+        "dog",
     ]
 
     def predict_proba(self, peptides):
-        return np.tile([0.8, 0.1, 0.1, 0.1, 0.1, 0.2, 0.9], (len(peptides), 1))
+        return np.tile(
+            [0.8, 0.1, 0.1, 0.1, 0.1, 0.2, 0.9, 0.1, 0.3],
+            (len(peptides), 1),
+        )
 
 
 def test_predict_peptide_content_returns_named_summary_columns():
@@ -41,6 +46,8 @@ def test_predict_peptide_content_returns_named_summary_columns():
     assert result.loc[0, "microbial_like"] == pytest.approx(0.8)
     assert result.loc[0, "self_like"] == pytest.approx(0.2)
     assert result.loc[0, "microbial_foreign_like"] == pytest.approx(0.64)
+    assert result.attrs["score_policy"] == "mammal-microbial-content-v1"
+    assert result.attrs["host_taxon_id"] == 40674
 
 
 def test_predict_peptide_content_supports_species_augmented_self_bundle():
@@ -51,6 +58,33 @@ def test_predict_peptide_content_supports_species_augmented_self_bundle():
     )
     assert result.loc[0, "self_like"] == pytest.approx(0.9)
     assert result.loc[0, "microbial_foreign_like"] == pytest.approx(0.08)
+    assert result.attrs["score_policy"] == "custom-unversioned"
+
+
+def test_predict_peptide_content_supports_named_human_and_mouse_policies():
+    human = predict_peptide_content(
+        "SIINFEKL", model=FakeContentModel(), score_policy="human-microbial-content-v1"
+    )
+    mouse = predict_peptide_content(
+        "SIINFEKL", model=FakeContentModel(), score_policy="mouse-microbial-content-v1"
+    )
+    assert human.loc[0, "microbial_foreign_like"] == pytest.approx(0.08)
+    assert mouse.loc[0, "microbial_foreign_like"] == pytest.approx(0.64)
+    assert human.attrs["host_taxon_id"] == 9606
+    assert mouse.attrs["host_taxon_id"] == 10090
+    assert human.attrs["score_policy_definition"]["formula"] == (
+        "source_times_one_minus_self"
+    )
+
+
+def test_named_policy_cannot_be_mixed_with_custom_categories():
+    with pytest.raises(ValueError, match="cannot be combined"):
+        predict_peptide_content(
+            "SIINFEKL",
+            model=FakeContentModel(),
+            score_policy="human-microbial-content-v1",
+            self_categories=("human",),
+        )
 
 
 def test_exact_self_hit_overrides_learned_foreignness():
@@ -62,6 +96,7 @@ def test_exact_self_hit_overrides_learned_foreignness():
     assert result.loc[0, "exact_self_hit"]
     assert result.loc[0, "self_like"] == 1.0
     assert result.loc[0, "microbial_foreign_like"] == 0.0
+    assert result.loc[0, "self_like"] == 1.0
 
 
 def test_exact_self_hit_length_must_match_peptides():
@@ -102,3 +137,4 @@ def test_bundled_peptide_content_model_is_self_contained_and_usable():
     assert result.shape == (3, 17)
     assert result.drop(columns="peptide").to_numpy().min() >= 0.0
     assert result.drop(columns="peptide").to_numpy().max() <= 1.0
+    assert result.attrs["score_policy"] == "custom-unversioned"

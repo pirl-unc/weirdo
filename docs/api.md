@@ -37,9 +37,10 @@ def predict_peptide_content(
     peptides: Union[str, Sequence[str]],
     model: Optional[Union[str, BaseScorer]] = None,
     model_dir: Optional[str] = None,
-    self_categories: Sequence[str] = ("mammals",),
-    microbial_categories: Sequence[str] = MICROBIAL_CATEGORIES,
+    self_categories: Optional[Sequence[str]] = None,
+    microbial_categories: Optional[Sequence[str]] = None,
     exact_self_hits: Optional[Sequence[bool]] = None,
+    score_policy: Optional[Union[str, ScorePolicy]] = None,
 ) -> pandas.DataFrame
 ```
 
@@ -51,6 +52,19 @@ probabilities and need not sum to one. The final columns are
 [Variable-length peptide content](peptide-content.md). If an exact lookup in a
 pinned host reference is available, `exact_self_hits` marks those rows and
 forces their learned foreignness summary to zero.
+
+With no overrides, `mammal-microbial-content-v1` preserves the original
+numeric default. Pass `human-microbial-content-v1`,
+`mouse-microbial-content-v1`, or `dog-microbial-content-v1` for an explicit
+species-aware policy. The result's `attrs` contain the complete policy
+definition. See [Versioned score policies](score-policies.md).
+
+### Score-policy API
+
+- `get_score_policy(policy_id)` → Immutable `ScorePolicy`
+- `list_score_policies(model_id=None)` → JSON-compatible policy definitions
+- `apply_score_policy(probabilities, categories, policy, exact_self_hits=None)`
+  → source, self, and scalar score arrays
 
 ### `weirdo.list_bundled_models`
 

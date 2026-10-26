@@ -32,6 +32,10 @@ of processing, presentation or immune recognition. It has no independently estab
 immune-response ranking benefit and is intended only for opt-in experimental ranking.
 `prediction_identity` includes the artifact, input and feature contract, policy and host;
 downstream caches must retain the complete identity.
+`model.score_policy_definition` and the returned frame's
+`attrs["score_policy_definition"]` expose the complete host, category, formula,
+overlap, direction, and validation contract. See
+[Versioned score policies](score-policies.md).
 
 The older `predict_categories(...)` and `MLPScorer.foreignness(...)` APIs below expose the
 configurable pathogen/mammalian ratio. That ratio and the human-category complement answer

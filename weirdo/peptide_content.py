@@ -6,14 +6,10 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from .score_policies import MICROBIAL_CONTENT_CATEGORIES
 
-MICROBIAL_CATEGORIES = (
-    "viruses",
-    "bacteria",
-    "archaea",
-    "fungi",
-    "protists",
-)
+
+MICROBIAL_CATEGORIES = MICROBIAL_CONTENT_CATEGORIES
 
 
 def summarize_peptide_content(
