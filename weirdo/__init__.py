@@ -90,7 +90,7 @@ from .scorers import (
 # ML scorer
 from .scorers import MLPScorer
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 
 __all__ = [
     "DEFAULT_PRETRAINED_MODEL", "DEFAULT_SCORE_POLICY", "PretrainedModel",
