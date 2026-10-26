@@ -9,12 +9,30 @@ from .amino_acid_alphabet import (
 )
 from .peptide_vectorizer import PeptideVectorizer
 from .distances import hamming
+from .peptide_content import MICROBIAL_CATEGORIES, summarize_peptide_content
+from .reference_proteomes import (
+    REFERENCE_PROTEOMES,
+    DownloadedReferenceProteome,
+    ReferenceProteome,
+    ReferenceProteomeManifest,
+    ReferenceProteomeManifestEntry,
+    fetch_reference_proteome,
+    get_reference_proteome,
+    iter_fasta_sequences,
+    list_reference_proteome_manifests,
+    list_reference_proteomes,
+    load_reference_proteome_manifest,
+    reference_proteome_manifest_path,
+    reference_proteome_from_uniprot,
+    reference_proteome_metadata_url,
+)
 
 # High-level scoring API
 from .api import (
     score_peptide,
     score_peptides,
     predict_categories,
+    predict_peptide_content,
     create_scorer,
     clear_cache,
     get_available_presets,
@@ -65,7 +83,7 @@ from .scorers import (
 # ML scorer
 from .scorers import MLPScorer
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 
 __all__ = [
     "DEFAULT_PRETRAINED_MODEL", "DEFAULT_SCORE_POLICY", "PretrainedModel",
@@ -82,10 +100,27 @@ __all__ = [
     "PeptideVectorizer",
     # Distances
     "hamming",
+    "MICROBIAL_CATEGORIES",
+    "summarize_peptide_content",
+    "ReferenceProteome",
+    "ReferenceProteomeManifest",
+    "ReferenceProteomeManifestEntry",
+    "DownloadedReferenceProteome",
+    "REFERENCE_PROTEOMES",
+    "list_reference_proteomes",
+    "list_reference_proteome_manifests",
+    "load_reference_proteome_manifest",
+    "reference_proteome_manifest_path",
+    "get_reference_proteome",
+    "reference_proteome_from_uniprot",
+    "reference_proteome_metadata_url",
+    "fetch_reference_proteome",
+    "iter_fasta_sequences",
     # High-level scoring API
     "score_peptide",
     "score_peptides",
     "predict_categories",
+    "predict_peptide_content",
     "create_scorer",
     "clear_cache",
     "get_available_presets",

@@ -51,6 +51,12 @@ from test_uniprot import make_release  # noqa: E402
 from weirdo import data_manager  # noqa: E402
 from weirdo.cli import run  # noqa: E402
 from weirdo.uniprot import SWISSPROT_DIVISIONS  # noqa: E402
+from weirdo.reference_proteomes import (  # noqa: E402
+    DownloadedReferenceProteome,
+    ReferenceProteome,
+    get_reference_proteome,
+    reference_proteome_filename,
+)
 
 
 @pytest.fixture
@@ -142,3 +148,92 @@ class TestDownloadFromUniProt:
     def test_the_command_line_only_offers_known_datasets(self):
         with pytest.raises(SystemExit):
             run(["data", "download", "everything"])
+
+
+def _fake_host_reference(directory, host, force=False, show_progress=False):
+    proteome = get_reference_proteome(host)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / reference_proteome_filename(proteome)
+    path.write_bytes(b"fake compressed fasta")
+    return DownloadedReferenceProteome(
+        proteome=proteome,
+        path=path,
+        sha256="a" * 64,
+        proteins=2,
+        amino_acids=9,
+        source_url="file:///fake.fasta.gz",
+    )
+
+
+class TestHostReferenceProteomes:
+    def test_download_records_a_complete_host_reference(self, tmp_path, monkeypatch):
+        dm = DataManager(data_dir=tmp_path / "data", verbose=False)
+        monkeypatch.setattr(
+            "weirdo.reference_proteomes.fetch_reference_proteome", _fake_host_reference
+        )
+        path = dm.download_host_reference("dog")
+        assert path.exists()
+        record = dm._metadata["downloads"]["reference-proteome:dog"]
+        assert record["proteome_id"] == "UP000805418"
+        assert record["n_proteins"] == 2 and record["amino_acids"] == 9
+        assert dm.get_host_reference_path("dog") == path
+        assert dm.status()["host_reference_proteomes"]["dog"]["metadata"] == record
+
+    def test_cli_lists_and_downloads_host_references(self, tmp_path, monkeypatch, capsys):
+        dm = DataManager(data_dir=tmp_path / "data", verbose=False)
+        monkeypatch.setattr(data_manager, "_default_manager", dm)
+        monkeypatch.setattr(
+            "weirdo.reference_proteomes.fetch_reference_proteome", _fake_host_reference
+        )
+        assert run(["data", "reference-proteome", "--list"]) == 0
+        assert "dog\tCanis lupus familiaris\ttaxon:9615\tUP000805418" in capsys.readouterr().out
+        assert run(["data", "reference-proteome", "dog"]) == 0
+        assert dm.get_host_reference_path("dog").exists()
+
+    def test_cli_accepts_an_arbitrary_reference_proteome_accession(self, tmp_path, monkeypatch):
+        dm = DataManager(data_dir=tmp_path / "data", verbose=False)
+        cattle = ReferenceProteome("cattle", "Bos taurus", 9913, "UP000009136")
+        monkeypatch.setattr(data_manager, "_default_manager", dm)
+        monkeypatch.setattr(
+            "weirdo.reference_proteomes.fetch_reference_proteome", _fake_host_reference
+        )
+        monkeypatch.setattr(
+            "weirdo.reference_proteomes.reference_proteome_from_uniprot", lambda upid: cattle
+        )
+        assert run(["data", "reference-proteome", "--proteome", "UP000009136"]) == 0
+        assert "reference-proteome:cattle" in dm._metadata["downloads"]
+
+    def test_manifest_downloads_use_the_same_verified_reference_path(self, tmp_path, monkeypatch):
+        dm = DataManager(data_dir=tmp_path / "data", verbose=False)
+        monkeypatch.setattr(
+            "weirdo.reference_proteomes.fetch_reference_proteome", _fake_host_reference
+        )
+        paths = dm.download_reference_proteome_manifest(groups=("cattle",))
+        assert len(paths) == 1 and paths[0].exists()
+        record = dm._metadata["downloads"]["reference-proteome-manifest:reference-proteomes-v1"]
+        assert record["groups"] == ["cattle"]
+        assert record["proteome_ids"] == ["UP000009136"]
+        status = dm.status()["reference_proteome_manifests"]["reference-proteomes-v1"]
+        assert status["selected_proteomes"] == 544
+        assert status["downloaded_proteomes"] == 1
+
+    def test_cli_downloads_a_manifest_group_and_supports_dry_run(self, tmp_path, monkeypatch, capsys):
+        dm = DataManager(data_dir=tmp_path / "data", verbose=False)
+        monkeypatch.setattr(data_manager, "_default_manager", dm)
+        monkeypatch.setattr(
+            "weirdo.reference_proteomes.fetch_reference_proteome", _fake_host_reference
+        )
+        assert run(["data", "reference-proteome", "--manifest", "--group", "cattle"]) == 0
+        assert dm.get_host_reference_path("cattle").exists()
+        assert run(["data", "reference-proteome", "--manifest", "--group", "viruses", "--dry-run"]) == 0
+        assert "512 selected" in capsys.readouterr().out
+
+    def test_clear_all_removes_host_references(self, tmp_path, monkeypatch):
+        dm = DataManager(data_dir=tmp_path / "data", verbose=False)
+        monkeypatch.setattr(
+            "weirdo.reference_proteomes.fetch_reference_proteome", _fake_host_reference
+        )
+        dm.download_host_reference("cat")
+        assert dm.clear_all() == 1
+        assert not dm.reference_proteomes_dir.exists()
+        assert "reference-proteome:cat" not in dm._metadata["downloads"]

@@ -1,4 +1,4 @@
-"""Command-line interface for WEIRDO.
+"""Command-line interface for Weirdo.
 
 Usage:
     weirdo score PEPTIDE...     # Species-category probabilities and foreignness
@@ -32,7 +32,7 @@ def create_parser():
     """Create argument parser."""
     parser = argparse.ArgumentParser(
         prog='weirdo',
-        description='WEIRDO: Widely Estimated Immunological Recognition and Detection of Outliers',
+        description='Weirdo: Widely Estimated Immunological Recognition and Detection of Outliers',
     )
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
@@ -73,6 +73,50 @@ def create_parser():
         '-f', '--force',
         action='store_true',
         help='Force re-download even if already present',
+    )
+
+    host_reference_parser = data_subparsers.add_parser(
+        'reference-proteome',
+        help='Download a complete UniProt reference proteome for exact host-self lookup',
+    )
+    host_reference_parser.add_argument(
+        'host',
+        nargs='?',
+        help='Host name (human, dog, cat, mouse, rat, or cattle)',
+    )
+    host_reference_parser.add_argument(
+        '--list',
+        action='store_true',
+        help='List built-in host aliases and packaged frozen selections',
+    )
+    host_reference_parser.add_argument(
+        '--proteome',
+        metavar='UPID',
+        help='Resolve and download any UniProt reference-proteome accession (for example UP000009136)',
+    )
+    host_reference_parser.add_argument(
+        '--manifest',
+        nargs='?',
+        const='reference-proteomes-v1',
+        metavar='NAME',
+        help='Download every verified reference in a frozen selection (default: reference-proteomes-v1)',
+    )
+    host_reference_parser.add_argument(
+        '--group',
+        action='append',
+        default=[],
+        metavar='GROUP',
+        help='Limit --manifest to a group, e.g. mammals, viruses, primates, or carnivora; repeatable',
+    )
+    host_reference_parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='Show the number of selected manifest proteomes without downloading',
+    )
+    host_reference_parser.add_argument(
+        '-f', '--force',
+        action='store_true',
+        help='Re-download even if a verified local copy exists',
     )
 
     # data clear
@@ -289,6 +333,65 @@ def cmd_data_download(args):
     return 0
 
 
+def cmd_data_reference_proteome(args):
+    """Handle: weirdo data reference-proteome [HOST]."""
+    from .data_manager import get_data_manager
+    from .reference_proteomes import (
+        list_reference_proteome_manifests,
+        list_reference_proteomes,
+        load_reference_proteome_manifest,
+        reference_proteome_from_uniprot,
+    )
+
+    if args.list:
+        if args.host or args.proteome or args.manifest or args.group or args.dry_run:
+            print("Provide a host, --proteome, --manifest, or --list; these options cannot be combined.")
+            return 1
+        for proteome in list_reference_proteomes():
+            print(
+                f"{proteome.key}\t{proteome.scientific_name}\t"
+                f"taxon:{proteome.taxon_id}\t{proteome.proteome_id}"
+            )
+        print("\nFrozen selections:")
+        for name in list_reference_proteome_manifests():
+            selection = load_reference_proteome_manifest(name)
+            print(f"{name}\t{len(selection.entries)} proteomes\tgroups: {', '.join(selection.groups)}")
+        return 0
+    targets = sum(bool(value) for value in (args.host, args.proteome, args.manifest))
+    if targets > 1:
+        print("Provide exactly one of a host, --proteome, or --manifest.")
+        return 1
+    if args.group and not args.manifest:
+        print("--group requires --manifest.")
+        return 1
+    if args.dry_run and not args.manifest:
+        print("--dry-run requires --manifest.")
+        return 1
+    if not args.host and not args.proteome and not args.manifest:
+        print("Provide a host, --proteome, or --manifest, or use --list to see the available references.")
+        return 1
+    try:
+        if args.manifest:
+            selection = load_reference_proteome_manifest(args.manifest)
+            entries = selection.select(tuple(args.group))
+            print(
+                f"{selection.name}: {len(entries):,} selected reference proteomes"
+                + (f" for {', '.join(args.group)}" if args.group else "")
+            )
+            if args.dry_run:
+                return 0
+            get_data_manager().download_reference_proteome_manifest(
+                selection.name, groups=tuple(args.group), force=args.force
+            )
+            return 0
+        target = reference_proteome_from_uniprot(args.proteome) if args.proteome else args.host
+        get_data_manager().download_host_reference(target, force=args.force)
+    except (ConnectionError, RuntimeError, ValueError) as error:
+        print(f"Error: {error}")
+        return 1
+    return 0
+
+
 def cmd_data_clear(args):
     """Handle: weirdo data clear"""
     if args.downloads and args.all:
@@ -429,7 +532,7 @@ def cmd_setup(args):
     from .data_manager import get_data_manager
     dm = get_data_manager()
 
-    print("WEIRDO Setup")
+    print("Weirdo Setup")
     print("=" * 60)
     print()
 
@@ -778,6 +881,8 @@ def run(args_list=None):
             return cmd_data_list(args)
         elif args.data_command == 'download':
             return cmd_data_download(args)
+        elif args.data_command == 'reference-proteome':
+            return cmd_data_reference_proteome(args)
         elif args.data_command == 'clear':
             return cmd_data_clear(args)
         elif args.data_command == 'path':

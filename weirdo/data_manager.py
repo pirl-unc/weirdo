@@ -1,15 +1,16 @@
 """Data management for WEIRDO reference data.
 
-The reference data are built from UniProtKB/Swiss-Prot. ``DataManager.download`` fetches the
-SwissProt taxonomic-division files from UniProt with :mod:`datacache` (checking the sizes and
-MD5s UniProt lists), builds the protein-sequence table from them and, on request, the k-mer
-reference table. Data is stored in ~/.weirdo/ by default.
+``DataManager.download`` builds the reviewed SwissProt taxonomy corpus from
+UniProt's taxonomic-division files. ``download_host_reference`` separately
+fetches complete, pinned UniProt reference proteomes for exact host-self
+lookup. Both use :mod:`datacache`; data is stored in ~/.weirdo/ by default.
 
 Example
 -------
 >>> from weirdo.data_manager import DataManager
 >>> dm = DataManager()
->>> dm.download('swissprot-8mers')  # Download SwissProt from UniProt and build the table
+>>> dm.download('swissprot-8mers')  # Build the SwissProt taxonomy table
+>>> dm.download_host_reference('dog')  # Complete dog proteome for exact self lookup
 >>> dm.status()  # Show what's downloaded
 >>> dm.clear_all()  # Remove all data
 
@@ -17,18 +18,18 @@ UniProt data are licensed CC BY 4.0 (https://www.uniprot.org/help/license).
 """
 
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 # Default data directory
-DEFAULT_DATA_DIR = Path.home() / '.weirdo'
+DEFAULT_DATA_DIR = Path(os.environ.get('WEIRDO_DATA_DIR', Path.home() / '.weirdo'))
 
-# Available datasets with their metadata. Both are built from the UniProt SwissProt
-# taxonomic-division files (see weirdo.uniprot); there is nothing to download from anywhere
-# else.
+# Fixed taxonomy datasets, built from the UniProt SwissProt taxonomic-division
+# files. Complete host reference proteomes are dynamic per-host downloads.
 DATASETS = {
     'swissprot-sequences': {
         'description': 'SwissProt protein sequences with their UniProt taxonomic division (~570k proteins)',
@@ -50,7 +51,7 @@ DATASETS = {
 
 
 class DataManager:
-    """Manages WEIRDO reference data.
+    """Manages Weirdo reference data.
 
     Parameters
     ----------
@@ -86,6 +87,7 @@ class DataManager:
         # Subdirectories
         self.downloads_dir = self.data_dir / 'downloads'
         self.uniprot_dir = self.downloads_dir / 'uniprot'  # raw UniProt files, one directory per release
+        self.reference_proteomes_dir = self.downloads_dir / 'reference-proteomes'
         self.metadata_file = self.data_dir / 'metadata.json'
 
         # Ensure directories exist
@@ -284,6 +286,128 @@ class DataManager:
             'n_proteins': n_proteins,
         }
 
+    # -------------------------------------------------------------------------
+    # Complete host proteomes
+    # -------------------------------------------------------------------------
+
+    def download_host_reference(self, host: Union[str, "ReferenceProteome"], force: bool = False) -> Path:
+        """Download a complete, pinned UniProt reference proteome for ``host``.
+
+        This is intentionally separate from the reviewed SwissProt taxonomy
+        corpus. The complete FASTA is for exact host-self lookup; learned
+        taxonomy training should sample it by species and category rather than
+        let a large host proteome determine class weight.
+        """
+        from .reference_proteomes import fetch_reference_proteome
+
+        try:
+            downloaded = fetch_reference_proteome(
+                self.reference_proteomes_dir,
+                host,
+                force=force,
+                show_progress=self.verbose,
+            )
+        except (ConnectionError, OSError, ValueError) as error:
+            raise RuntimeError(
+                f"Failed to download host reference {host!r}: {error}"
+            ) from error
+
+        key = f"reference-proteome:{downloaded.proteome.key}"
+        self._metadata.setdefault('downloads', {})[key] = {
+            'path': str(downloaded.path),
+            'downloaded_at': datetime.now().isoformat(),
+            'size_bytes': downloaded.path.stat().st_size,
+            'taxon_id': downloaded.proteome.taxon_id,
+            'proteome_id': downloaded.proteome.proteome_id,
+            'source_url': downloaded.source_url,
+            'sha256': downloaded.sha256,
+            'n_proteins': downloaded.proteins,
+            'amino_acids': downloaded.amino_acids,
+        }
+        self._save_metadata()
+        self._log(
+            f"  Host reference {downloaded.proteome.key}: "
+            f"{downloaded.proteins:,} proteins, {downloaded.amino_acids:,} amino acids"
+        )
+        return downloaded.path
+
+    def download_reference_proteome_manifest(
+        self,
+        manifest: str = 'reference-proteomes-v1',
+        *,
+        groups: tuple[str, ...] = (),
+        force: bool = False,
+    ) -> List[Path]:
+        """Download a frozen reference-proteome selection through datacache.
+
+        Every file has the same checksum/content-summary validation as a named
+        host reference. Re-running after an interruption skips verified files,
+        so a large manifest is safely resumable. ``groups`` can select a broad
+        group such as ``mammals`` or ``viruses`` or a leaf such as ``primates``.
+        """
+        from .reference_proteomes import load_reference_proteome_manifest
+
+        selection = load_reference_proteome_manifest(manifest)
+        entries = selection.select(groups)
+        if not entries:
+            raise ValueError(
+                f"Reference-proteome manifest {manifest!r} has no entries for "
+                f"groups {groups!r}."
+            )
+        paths = []
+        for index, entry in enumerate(entries, start=1):
+            self._log(
+                f"[{index}/{len(entries)}] {entry.proteome.key} "
+                f"({', '.join(entry.labels)})"
+            )
+            paths.append(self.download_host_reference(entry.proteome, force=force))
+        key = f"reference-proteome-manifest:{selection.name}"
+        self._metadata.setdefault('downloads', {})[key] = {
+            'path': str(self.reference_proteomes_dir),
+            'downloaded_at': datetime.now().isoformat(),
+            'manifest': selection.name,
+            'groups': list(groups),
+            'selected_proteomes': len(entries),
+            'proteome_ids': [entry.proteome.proteome_id for entry in entries],
+        }
+        self._save_metadata()
+        self._log(
+            f"Downloaded {len(paths):,} verified reference proteomes from "
+            f"manifest {selection.name!r}."
+        )
+        return paths
+
+    def get_host_reference_path(
+        self, host: str, auto_download: Optional[bool] = None
+    ) -> Path:
+        """Return a complete host FASTA, optionally fetching it when absent."""
+        from .reference_proteomes import get_reference_proteome, reference_proteome_filename
+
+        proteome = get_reference_proteome(host)
+        path = self.reference_proteomes_dir / reference_proteome_filename(proteome)
+        if path.exists():
+            return path
+        should_download = auto_download if auto_download is not None else self.auto_download
+        if should_download:
+            return self.download_host_reference(proteome.key)
+        raise FileNotFoundError(
+            f"Host reference {proteome.key!r} not found. Run: "
+            f"weirdo data reference-proteome {proteome.key}"
+        )
+
+    def delete_all_host_references(self) -> int:
+        """Remove cached complete host FASTAs and their metadata."""
+        count = 0
+        if self.reference_proteomes_dir.exists():
+            count = len(list(self.reference_proteomes_dir.glob("*.fasta.gz")))
+            shutil.rmtree(self.reference_proteomes_dir)
+            self._log(f"Deleted: {self.reference_proteomes_dir}")
+        downloads = self._metadata.setdefault('downloads', {})
+        for key in [key for key in downloads if key.startswith('reference-proteome:')]:
+            del downloads[key]
+        self._save_metadata()
+        return count
+
     def _build_kmer_table(self, name: str, filepath: Path, force: bool) -> Dict[str, Any]:
         from .kmer_table import build_kmer_table
 
@@ -378,6 +502,8 @@ class DataManager:
         status = {
             'data_dir': str(self.data_dir),
             'downloads': {},
+            'host_reference_proteomes': {},
+            'reference_proteome_manifests': {},
             'total_size_bytes': 0,
         }
 
@@ -394,6 +520,48 @@ class DataManager:
                 status['total_size_bytes'] += size
             else:
                 status['downloads'][name] = {'downloaded': False}
+
+        from .reference_proteomes import list_reference_proteomes, reference_proteome_filename
+
+        for proteome in list_reference_proteomes():
+            path = self.reference_proteomes_dir / reference_proteome_filename(proteome)
+            key = f"reference-proteome:{proteome.key}"
+            if path.exists():
+                size = path.stat().st_size
+                status['host_reference_proteomes'][proteome.key] = {
+                    'path': str(path),
+                    'size_bytes': size,
+                    'size_mb': size / (1024 * 1024),
+                    'metadata': self._metadata.get('downloads', {}).get(key, {}),
+                }
+            else:
+                status['host_reference_proteomes'][proteome.key] = {'downloaded': False}
+
+        from .reference_proteomes import list_reference_proteome_manifests, load_reference_proteome_manifest
+
+        for manifest_name in list_reference_proteome_manifests():
+            selection = load_reference_proteome_manifest(manifest_name)
+            paths = [
+                self.reference_proteomes_dir / reference_proteome_filename(entry.proteome)
+                for entry in selection.entries
+            ]
+            downloaded = sum(path.is_file() for path in paths)
+            status['reference_proteome_manifests'][manifest_name] = {
+                'selected_proteomes': len(paths),
+                'downloaded_proteomes': downloaded,
+                'downloaded': downloaded == len(paths),
+                'metadata': self._metadata.get(
+                    f"reference-proteome-manifest:{manifest_name}", {}
+                ),
+            }
+
+        reference_bytes = sum(
+            path.stat().st_size
+            for path in self.reference_proteomes_dir.rglob('*')
+            if path.is_file()
+        ) if self.reference_proteomes_dir.exists() else 0
+        status['reference_proteome_bytes'] = reference_bytes
+        status['total_size_bytes'] += reference_bytes
 
         raw_bytes = sum(
             path.stat().st_size for path in self.uniprot_dir.rglob('*') if path.is_file()
@@ -425,6 +593,25 @@ class DataManager:
                 print(f"      {ds_info.get('description', '')}")
                 print(f"      Status: Not downloaded (~{ds_info.get('size_mb', '?')} MB on disk)")
 
+        print("\nComplete Host Reference Proteomes:")
+        print("-" * 70)
+        for host, info in status['host_reference_proteomes'].items():
+            if info.get('downloaded', True) and 'size_mb' in info:
+                meta = info.get('metadata', {})
+                proteins = meta.get('n_proteins', '?')
+                protein_text = f"{proteins:,}" if isinstance(proteins, int) else str(proteins)
+                print(f"  [x] {host}: {protein_text} proteins ({info['size_mb']:.0f} MB)")
+            else:
+                print(f"  [ ] {host}")
+
+        print("\nFrozen Reference-Proteome Manifests:")
+        print("-" * 70)
+        for name, info in status['reference_proteome_manifests'].items():
+            print(
+                f"  [{'x' if info['downloaded'] else ' '}] {name}: "
+                f"{info['downloaded_proteomes']:,}/{info['selected_proteomes']:,} proteomes"
+            )
+
         print()
 
     def clear_all(self, include_metadata: bool = False) -> int:
@@ -440,7 +627,7 @@ class DataManager:
         count : int
             Number of downloads deleted.
         """
-        count = self.delete_all_downloads()
+        count = self.delete_all_downloads() + self.delete_all_host_references()
         if self.uniprot_dir.exists():
             shutil.rmtree(self.uniprot_dir)
             self._log(f"Deleted: {self.uniprot_dir}")

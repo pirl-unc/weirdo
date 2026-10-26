@@ -1,0 +1,48 @@
+{
+  "description": "Experimental variable-length 8-15mer peptide-content classifier trained on SwissProt 2023 protein-family splits.",
+  "experimental": true,
+  "format": "pickle-free NumPy MLP weights",
+  "length_range": [8, 15],
+  "categories": [
+    "viruses",
+    "bacteria",
+    "archaea",
+    "fungi",
+    "plants",
+    "protists",
+    "invertebrates",
+    "fish",
+    "non_mammalian_tetrapods",
+    "mammals",
+    "human",
+    "mouse",
+    "dog"
+  ],
+  "output_semantics": "Independent sigmoid probabilities; categories may overlap and do not sum to one.",
+  "summary_scores": {
+    "microbial_like": "max(viruses, bacteria, archaea, fungi, protists)",
+    "self_like": "max(caller-selected self categories)",
+    "microbial_foreign_like": "microbial_like * (1 - self_like)"
+  },
+  "training": {
+    "source": "UniProtKB/Swiss-Prot 2023",
+    "split": "70/15/15 by protein mnemonic family; exact peptides crossing folds removed",
+    "n_train": 799357,
+    "n_validation": 153159,
+    "n_test": 150807,
+    "n_proteins": 569516,
+    "n_amino_acids": 205866895,
+    "loss": "independent binary cross-entropy",
+    "best_epoch": 2
+  },
+  "held_out_evaluation": {
+    "mean_category_auc": 0.6129318997414348,
+    "microbial_foreign_like_auc": 0.6589205184370625,
+    "note": "Balanced training means the outputs and summary score are ranking signals, not calibrated biological priors."
+  },
+  "immunogenicity_evaluation": {
+    "conclusion": "No validated incremental T-cell immunogenicity signal beyond MHC presentation or binding.",
+    "registered_viral_validation_delta_auc_vs_presentation": 0.002828,
+    "registered_viral_validation_bootstrap_ci": [-0.005238, 0.011138]
+  }
+}

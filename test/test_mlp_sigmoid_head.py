@@ -91,6 +91,34 @@ class TestObjective:
         with pytest.raises(ValueError, match="loss must be"):
             MLPScorer(loss='hinge')
 
+    def test_whole_peptide_prediction_preserves_variable_length(self, tmp_path):
+        peptides = ["ACDEFGHI", "KLMNPQRST", "VWYACDEFGHIKLMN"] * 12
+        labels = np.asarray([[1, 0], [0, 1], [1, 1]] * 12, dtype=np.float32)
+        scorer = MLPScorer(
+            k=15,
+            hidden_layer_sizes=(8,),
+            random_state=0,
+            loss="bce",
+            whole_peptide=True,
+            early_stopping=False,
+        )
+        scorer.train(
+            peptides,
+            labels,
+            epochs=1,
+            target_categories=["a", "b"],
+            verbose=False,
+        )
+
+        query = ["ACDEFGHI", "KLMNPQRST"]
+        expected = scorer._predict_kmer_probabilities(query)
+        np.testing.assert_allclose(scorer.predict_proba(query), expected)
+
+        scorer.save(tmp_path / "whole-peptide")
+        loaded = MLPScorer.load(tmp_path / "whole-peptide")
+        assert loaded._params["whole_peptide"] is True
+        np.testing.assert_allclose(loaded.predict_proba(query), expected, atol=1e-6)
+
     def test_probabilities_cover_the_unit_interval_and_separate_the_classes(self, trained_scorer):
         scorer, peptides, labels = trained_scorer
         probs = scorer.predict_proba(peptides)

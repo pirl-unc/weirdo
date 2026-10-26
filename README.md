@@ -19,6 +19,27 @@ WEIRDO trains a multi-layer perceptron (MLP) on k-mer presence data from SwissPr
 
 [docs/category-predictor.md](docs/category-predictor.md) explains what the numbers mean, how the model was evaluated and what its limits are. A typical peptide scores about 0.81 on the foreignness scale (peptides found only in mammalian proteins: median 0.76; only in bacteria/viruses: 0.84), so compare a score with those reference distributions rather than with 0.5. Nothing here has been shown to predict T-cell immunogenicity. The bundled weights derive from UniProtKB/Swiss-Prot sequences (CC BY 4.0).
 
+For complete MHC-length peptides, the experimental `peptide-content-v1` model is
+the better entry point. It was trained directly on variable-length 8--15mers and
+uses independent heads for viruses, bacteria, archaea, fungi, plants, protists,
+invertebrates, fish, non-mammalian tetrapods, mammals, human, mouse, and dog:
+
+```python
+from weirdo import predict_peptide_content
+
+result = predict_peptide_content(
+    ["SIINFEKL", "GILGFVFTL"],
+    self_categories=("mammals", "human"),
+)
+```
+
+Its primary summary is
+`microbial_foreign_like = max(microbial heads) * (1 - max(selected self heads))`.
+The score is useful for ranking peptide content, but it did not add a validated
+T-cell immunogenicity signal beyond MHC presentation or affinity. See
+[docs/peptide-content.md](docs/peptide-content.md) for the split, model comparison,
+host-specific guidance, and evaluation.
+
 ## Quick Start
 
 ```python
@@ -85,10 +106,20 @@ scorers, build the reference data from UniProt:
 ```bash
 weirdo data download swissprot-sequences   # ~670 MB from UniProt, builds a ~230 MB table
 weirdo data download                       # also builds the 8-mer table (several GB, some minutes)
+weirdo data reference-proteome dog          # complete dog proteome for exact self lookup
+weirdo data reference-proteome cattle       # Bos taurus / UP000009136
+weirdo data reference-proteome --proteome UP000009136  # any UniProt reference proteome
+weirdo data reference-proteome --manifest --dry-run  # inspect the 544-proteome frozen corpus
+weirdo data reference-proteome --manifest --group mammals  # resumably fetch its 32 mammals
 ```
 The files are fetched with [datacache](https://github.com/openvax/datacache) from UniProt's FTP site
 (`WEIRDO_UNIPROT_URL` selects a mirror), checked against the sizes and MD5s UniProt lists and kept
 in `~/.weirdo/downloads/uniprot/release-<version>/`, so they are downloaded once per UniProt release.
+Complete host references (`human`, `dog`, `cat`, `mouse`, `rat`, and `cattle`) are separately fetched as pinned
+UniProt reference-proteome FASTAs, with a local SHA-256/content summary.
+The same command also handles frozen multi-proteome selections. `--manifest`
+downloads every selected FASTA through datacache, skips verified local files on
+re-run, and supports `--group mammals`, `--group viruses`, or a specific leaf.
 
 ## Training Data
 
@@ -228,6 +259,8 @@ scorer = load_model('my-foreignness-model')
 ```bash
 # Data management
 weirdo data download        # Download SwissProt from UniProt and build the reference data
+weirdo data reference-proteome dog  # Complete host proteome for exact self lookup
+weirdo data reference-proteome cattle  # Bos taurus; `cow` is also accepted
 weirdo data list            # Show data status
 
 # Model management

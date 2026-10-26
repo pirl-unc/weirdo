@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 import numpy as np
 
 from .scorers import ScorerConfig, BaseScorer, TrainableScorer
+from .peptide_content import MICROBIAL_CATEGORIES, summarize_peptide_content
 
 
 # Cache for scorer instances by preset
@@ -321,6 +322,75 @@ def predict_categories(
         aggregate=aggregate,
         combine=combine,
     )
+
+
+def predict_peptide_content(
+    peptides: Union[str, Sequence[str]],
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    self_categories: Sequence[str] = ("mammals",),
+    microbial_categories: Sequence[str] = MICROBIAL_CATEGORIES,
+    exact_self_hits: Optional[Sequence[bool]] = None,
+):
+    """Score complete 8--15mers with independent taxonomy outputs.
+
+    The returned ``microbial_foreign_like`` value is
+    ``max(microbial categories) * (1 - max(self categories))``.  It is a
+    bounded ranking score, not a posterior probability of foreignness.
+
+    ``exact_self_hits`` may be supplied by a caller that has searched a
+    pinned host reference proteome. Those exact matches are marked explicitly
+    and override the learned summary (``self_like=1`` and
+    ``microbial_foreign_like=0``); this API does not silently choose a host
+    proteome or infer exact matches from model probabilities.
+    """
+    import pandas as pd
+
+    from .model_manager import DEFAULT_PEPTIDE_CONTENT_MODEL
+
+    if isinstance(peptides, str):
+        peptides = [peptides]
+    peptides = list(peptides)
+    invalid = [peptide for peptide in peptides if not 8 <= len(peptide) <= 15]
+    if invalid:
+        raise ValueError(
+            "predict_peptide_content supports complete peptides of length 8--15; "
+            f"received lengths {sorted({len(peptide) for peptide in invalid})}"
+        )
+
+    if model is None:
+        model = DEFAULT_PEPTIDE_CONTENT_MODEL
+    scorer = load_model(model, model_dir) if isinstance(model, str) else model
+    if isinstance(scorer, TrainableScorer) and not scorer.is_trained:
+        raise RuntimeError(
+            "Scorer is not trained. Train it or load a trained model before predicting."
+        )
+    categories = getattr(scorer, 'target_categories', None)
+    if not categories:
+        raise ValueError(
+            "predict_peptide_content needs a model trained with target_categories."
+        )
+
+    probabilities = np.asarray(scorer.predict_proba(peptides), dtype=float)
+    summary = summarize_peptide_content(
+        probabilities,
+        categories,
+        self_categories=self_categories,
+        microbial_categories=microbial_categories,
+    )
+    frame = pd.DataFrame(probabilities, columns=list(categories))
+    frame.insert(0, "peptide", peptides)
+    frame["microbial_like"] = summary["microbial_like"]
+    frame["self_like"] = summary["self_like"]
+    frame["microbial_foreign_like"] = summary["microbial_foreign_like"]
+    if exact_self_hits is not None:
+        exact = np.asarray(list(exact_self_hits), dtype=bool)
+        if len(exact) != len(peptides):
+            raise ValueError("exact_self_hits must have one value per peptide")
+        frame["exact_self_hit"] = exact
+        frame.loc[exact, "self_like"] = 1.0
+        frame.loc[exact, "microbial_foreign_like"] = 0.0
+    return frame
 
 
 def clear_cache() -> None:

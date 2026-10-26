@@ -30,6 +30,28 @@ category, `pathogen_<combine>`, `self_<combine>` and `foreignness`; `combine` is
 (default), `'sum'` or a function that maps an (n_peptides, n_categories_in_group) array to one
 value per peptide. See [Species-category predictor](category-predictor.md).
 
+### `weirdo.predict_peptide_content`
+
+```python
+def predict_peptide_content(
+    peptides: Union[str, Sequence[str]],
+    model: Optional[Union[str, BaseScorer]] = None,
+    model_dir: Optional[str] = None,
+    self_categories: Sequence[str] = ("mammals",),
+    microbial_categories: Sequence[str] = MICROBIAL_CATEGORIES,
+    exact_self_hits: Optional[Sequence[bool]] = None,
+) -> pandas.DataFrame
+```
+
+Scores each complete 8--15mer with the bundled experimental
+`peptide-content-v1` model. The category columns are independent sigmoid
+probabilities and need not sum to one. The final columns are
+`microbial_like`, `self_like`, and
+`microbial_foreign_like = microbial_like * (1 - self_like)`. See
+[Variable-length peptide content](peptide-content.md). If an exact lookup in a
+pinned host reference is available, `exact_self_hits` marks those rows and
+forces their learned foreignness summary to zero.
+
 ### `weirdo.list_bundled_models`
 
 - `list_bundled_models()` → Models that ship inside the package (name, path, metadata including their evaluation)
@@ -175,13 +197,16 @@ class MLPScorer(TrainableScorer):
         batch_size: int = 256,
         random_state: Optional[int] = None,
         loss: str = 'auto',
-        positional: bool = False
+        positional: bool = False,
+        whole_peptide: bool = False
     )
 ```
 
 Parametric neural network scorer for category probabilities and foreignness. With binary
 multi-label targets (`loss='auto'`) it has one sigmoid output per label trained with binary
 cross-entropy.
+Set `whole_peptide=True` to extract one feature vector for each complete input
+instead of windowing longer sequences into `k`-mers.
 
 **Methods:**
 
