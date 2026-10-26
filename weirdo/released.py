@@ -11,10 +11,14 @@ import numpy as np
 import pandas as pd
 
 from .scorers.mlp import MLPScorer
+from .score_policies import (
+    DEFAULT_SCORE_POLICY,
+    apply_score_policy,
+    get_score_policy,
+)
 
 
 DEFAULT_PRETRAINED_MODEL = "swissprot-categories-v1"
-DEFAULT_SCORE_POLICY = "human-self-complement-v1"
 MODEL_DIRECTORY = Path(__file__).parent / "pretrained" / "swissprot-categories"
 MANIFEST_SHA256 = "716e931ecb88ab6f042e01c886ac4e929bccf1c8d8c762e3f20ee0b9623fd5f9"
 CANONICAL_RESIDUES = frozenset("ACDEFGHIKLMNPQRSTVWY")
@@ -68,10 +72,16 @@ class PretrainedModel:
 
     def __init__(self, model=DEFAULT_PRETRAINED_MODEL, *, model_dir=None,
                  score_policy=DEFAULT_SCORE_POLICY, host_taxon_id=9606):
-        if score_policy != DEFAULT_SCORE_POLICY:
-            raise ValueError(f"Unsupported score policy: {score_policy!r}")
-        if type(host_taxon_id) is not int or host_taxon_id != 9606:
-            raise ValueError("Only human host_taxon_id=9606 is supported by this score policy")
+        policy = get_score_policy(score_policy)
+        if policy.model_id != model:
+            raise ValueError(
+                f"Score policy {policy.policy_id!r} is for {policy.model_id!r}, not {model!r}"
+            )
+        if type(host_taxon_id) is not int or host_taxon_id != policy.host_taxon_id:
+            raise ValueError(
+                f"Score policy {policy.policy_id!r} requires "
+                f"host_taxon_id={policy.host_taxon_id}"
+            )
         manifest = get_model_manifest(model, model_dir)
         directory = Path(model_dir) if model_dir is not None else MODEL_DIRECTORY
         expected = {"config.json", "model.pt", "metadata.json"}
@@ -96,8 +106,9 @@ class PretrainedModel:
             raise ValueError("Released model smoke prediction does not match its manifest")
         self._scorer = scorer
         self._manifest = copy.deepcopy(manifest)
-        self._score_policy = score_policy
-        self._host_taxon_id = 9606
+        self._policy = policy
+        self._score_policy = policy.policy_id
+        self._host_taxon_id = policy.host_taxon_id
         self._package_version = version("weirdo")
 
     @property
@@ -109,6 +120,11 @@ class PretrainedModel:
     def score_policy(self):
         """Versioned definition of the scalar score."""
         return self._score_policy
+
+    @property
+    def score_policy_definition(self):
+        """Return the complete JSON-compatible scoring contract."""
+        return self._policy.to_dict()
 
     @property
     def host_taxon_id(self):
@@ -178,6 +194,7 @@ class PretrainedModel:
             model_id=self._manifest["model_id"],
             artifact_id=self._manifest["artifact_id"],
             score_policy=self._score_policy,
+            score_policy_definition=self.score_policy_definition,
             host_taxon_id=self._host_taxon_id,
         )
         return frame
@@ -200,7 +217,12 @@ class PretrainedModel:
             retained so adapters need not repeat normalization or score logic.
         """
         frame = self.predict_categories(peptides, batch_size)
-        frame["foreignness"] = 1.0 - frame["human"]
+        summary = apply_score_policy(
+            frame[self._manifest["categories"]].to_numpy(),
+            self._manifest["categories"],
+            self._policy,
+        )
+        frame["foreignness"] = summary["score"]
         return frame
 
     def score(self, peptides, batch_size=1024):

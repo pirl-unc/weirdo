@@ -39,6 +39,9 @@ def test_load_and_score_offline_without_user_cache(loader, monkeypatch, tmp_path
     )
     np.testing.assert_allclose(model.score(frame.peptide), 1 - frame.human)
     assert frame.attrs["prediction_identity"] == model.prediction_identity
+    assert frame.attrs["score_policy_definition"] == model.score_policy_definition
+    assert model.score_policy_definition["host_taxon_id"] == 9606
+    assert model.score_policy_definition["formula"] == "one_minus_self"
     assert not (tmp_path / "missing-home").exists()
 
 

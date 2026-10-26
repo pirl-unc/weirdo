@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Immutable, inspectable score-policy definitions for the stable human
+  complement and variable-length mammal, human, mouse, and dog content scores.
+  `list_score_policies()` exposes the complete host/category/formula/overlap/
+  validation contract, and prediction frames retain it in `DataFrame.attrs`.
+
 ## [2.3.0] - 2026-10-25
 
 ### Added

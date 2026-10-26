@@ -19,6 +19,12 @@ import numpy as np
 
 from .scorers import ScorerConfig, BaseScorer, TrainableScorer
 from .peptide_content import MICROBIAL_CATEGORIES, summarize_peptide_content
+from .score_policies import (
+    DEFAULT_PEPTIDE_CONTENT_SCORE_POLICY,
+    ScorePolicy,
+    apply_score_policy,
+    get_score_policy,
+)
 
 
 # Cache for scorer instances by preset
@@ -328,15 +334,25 @@ def predict_peptide_content(
     peptides: Union[str, Sequence[str]],
     model: Optional[Union[str, BaseScorer]] = None,
     model_dir: Optional[str] = None,
-    self_categories: Sequence[str] = ("mammals",),
-    microbial_categories: Sequence[str] = MICROBIAL_CATEGORIES,
+    self_categories: Optional[Sequence[str]] = None,
+    microbial_categories: Optional[Sequence[str]] = None,
     exact_self_hits: Optional[Sequence[bool]] = None,
+    score_policy: Optional[Union[str, ScorePolicy]] = None,
 ):
-    """Score complete 8--15mers with independent taxonomy outputs.
+    """Score complete 8--15mers under an explicit content-score policy.
 
     The returned ``microbial_foreign_like`` value is
     ``max(microbial categories) * (1 - max(self categories))``.  It is a
     bounded ranking score, not a posterior probability of foreignness.
+
+    With no category overrides, the versioned
+    ``mammal-microbial-content-v1`` policy preserves the original numeric
+    default and records its full definition in ``DataFrame.attrs``. Select
+    ``human-microbial-content-v1``, ``mouse-microbial-content-v1``, or
+    ``dog-microbial-content-v1`` for a species-aware learned self bundle.
+    Explicit category arguments remain available for backward compatibility
+    and are labeled ``custom-unversioned``; they cannot be mixed with a named
+    policy.
 
     ``exact_self_hits`` may be supplied by a caller that has searched a
     pinned host reference proteome. Those exact matches are marked explicitly
@@ -347,6 +363,27 @@ def predict_peptide_content(
     import pandas as pd
 
     from .model_manager import DEFAULT_PEPTIDE_CONTENT_MODEL
+
+    custom_categories = self_categories is not None or microbial_categories is not None
+    if score_policy is not None and custom_categories:
+        raise ValueError(
+            "score_policy cannot be combined with self_categories or microbial_categories"
+        )
+    resolved_policy = None
+    if not custom_categories:
+        resolved_policy = get_score_policy(
+            score_policy or DEFAULT_PEPTIDE_CONTENT_SCORE_POLICY
+        )
+        if resolved_policy.model_id != DEFAULT_PEPTIDE_CONTENT_MODEL:
+            raise ValueError(
+                f"Score policy {resolved_policy.policy_id!r} is for "
+                f"{resolved_policy.model_id!r}, not {DEFAULT_PEPTIDE_CONTENT_MODEL!r}"
+            )
+    else:
+        if self_categories is None:
+            self_categories = ("mammals",)
+        if microbial_categories is None:
+            microbial_categories = MICROBIAL_CATEGORIES
 
     if isinstance(peptides, str):
         peptides = [peptides]
@@ -372,24 +409,72 @@ def predict_peptide_content(
         )
 
     probabilities = np.asarray(scorer.predict_proba(peptides), dtype=float)
-    summary = summarize_peptide_content(
-        probabilities,
-        categories,
-        self_categories=self_categories,
-        microbial_categories=microbial_categories,
-    )
+    if resolved_policy is not None:
+        summary = apply_score_policy(
+            probabilities,
+            categories,
+            resolved_policy,
+            exact_self_hits=exact_self_hits,
+        )
+        microbial_like = summary["source_like"]
+        self_like = summary["self_like"]
+        microbial_foreign_like = summary["score"]
+        policy_definition = resolved_policy.to_dict()
+    else:
+        summary = summarize_peptide_content(
+            probabilities,
+            categories,
+            self_categories=self_categories,
+            microbial_categories=microbial_categories,
+        )
+        microbial_like = summary["microbial_like"]
+        self_like = summary["self_like"]
+        microbial_foreign_like = summary["microbial_foreign_like"]
+        policy_definition = {
+            "schema_version": None,
+            "policy_id": "custom-unversioned",
+            "model_id": DEFAULT_PEPTIDE_CONTENT_MODEL,
+            "host_taxon_id": None,
+            "host_name": "Unspecified custom host",
+            "source_categories": list(microbial_categories),
+            "self_categories": list(self_categories),
+            "category_combiner": "max",
+            "formula": "source_times_one_minus_self",
+            "output_name": "microbial_foreign_like",
+            "exact_self_override": True,
+            "overlap_handling": (
+                "Independent multi-label outputs may overlap; max selects the strongest "
+                "source and self heads, and an exact supplied self hit overrides the score."
+            ),
+            "direction": (
+                "Higher means more source-like and less self-like under the model; "
+                "not a biological probability."
+            ),
+            "interpretation": "Unversioned caller-selected sequence-content contrast.",
+            "content_validation": "Not established for this custom category selection.",
+            "immune_response_validation": (
+                "No independently confirmed incremental T-cell-response benefit."
+            ),
+        }
     frame = pd.DataFrame(probabilities, columns=list(categories))
     frame.insert(0, "peptide", peptides)
-    frame["microbial_like"] = summary["microbial_like"]
-    frame["self_like"] = summary["self_like"]
-    frame["microbial_foreign_like"] = summary["microbial_foreign_like"]
-    if exact_self_hits is not None:
+    frame["microbial_like"] = microbial_like
+    frame["self_like"] = self_like
+    frame["microbial_foreign_like"] = microbial_foreign_like
+    if resolved_policy is not None and "exact_self_hit" in summary:
+        frame["exact_self_hit"] = summary["exact_self_hit"]
+    elif exact_self_hits is not None:
         exact = np.asarray(list(exact_self_hits), dtype=bool)
         if len(exact) != len(peptides):
             raise ValueError("exact_self_hits must have one value per peptide")
         frame["exact_self_hit"] = exact
         frame.loc[exact, "self_like"] = 1.0
         frame.loc[exact, "microbial_foreign_like"] = 0.0
+    frame.attrs.update(
+        score_policy=policy_definition["policy_id"],
+        score_policy_definition=policy_definition,
+        host_taxon_id=policy_definition["host_taxon_id"],
+    )
     return frame
 
 

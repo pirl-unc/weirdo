@@ -41,9 +41,16 @@ from weirdo import predict_peptide_content
 
 scores = predict_peptide_content(
     ["SIINFEKL", "GILGFVFTL"],
-    self_categories=("mammals", "human"),
+    score_policy="human-microbial-content-v1",
 )
 ```
+
+For mouse analyses, use `score_policy="mouse-microbial-content-v1"`.
+Each result records the complete host, category, formula, overlap, direction,
+and validation contract in `scores.attrs["score_policy_definition"]`; see
+[Versioned score policies](score-policies.md). Explicit category tuples remain
+available for custom exploratory definitions and are labeled
+`custom-unversioned`.
 
 After an exact lookup against a pinned host reference, pass the resulting
 boolean flags to `exact_self_hits=[...]`; exact hits are returned as

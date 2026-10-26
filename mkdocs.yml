@@ -32,6 +32,7 @@ nav:
     - Foreignness Scorers: scorers.md
     - Species-Category Predictor: category-predictor.md
     - Variable-Length Peptide Content: peptide-content.md
+    - Versioned Score Policies: score-policies.md
     - Viral Host-Range Study: viral-host-foreignness-study.md
     - Amino Acid Data: amino-acids.md
   - API Reference: api.md

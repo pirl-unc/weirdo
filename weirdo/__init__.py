@@ -10,6 +10,13 @@ from .amino_acid_alphabet import (
 from .peptide_vectorizer import PeptideVectorizer
 from .distances import hamming
 from .peptide_content import MICROBIAL_CATEGORIES, summarize_peptide_content
+from .score_policies import (
+    DEFAULT_PEPTIDE_CONTENT_SCORE_POLICY,
+    ScorePolicy,
+    apply_score_policy,
+    get_score_policy,
+    list_score_policies,
+)
 from .reference_proteomes import (
     REFERENCE_PROTEOMES,
     DownloadedReferenceProteome,
@@ -87,6 +94,8 @@ __version__ = "2.3.0"
 
 __all__ = [
     "DEFAULT_PRETRAINED_MODEL", "DEFAULT_SCORE_POLICY", "PretrainedModel",
+    "DEFAULT_PEPTIDE_CONTENT_SCORE_POLICY", "ScorePolicy",
+    "apply_score_policy", "get_score_policy", "list_score_policies",
     "get_model_manifest", "load_pretrained_model",
     # Amino acid data
     "AminoAcid",
