@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.3.0] - 2026-10-25
+
+### Added
+
+- `peptide-content-v1`, `weirdo.predict_peptide_content()`, and the
+  `microbial_foreign_like` score for complete 8--15mer ligands. The bundled
+  composition MLP has independent multi-label taxonomy heads; separately retained
+  CNN, transformer, frozen ESM-2 8M, and fine-tuned ESM-2 8M artifacts support the
+  architecture comparison. Protein-family held-out evaluation and grouped
+  immunogenicity analyses are documented in `docs/peptide-content.md`.
+- Complete, pinned UniProt reference-proteome downloads for exact host-self
+  lookup, plus a frozen manifest of 32 mammalian and 512 viral proteomes.
+- A reproducible negative-result study of mammalian-host viral peptide labels,
+  including Swiss-Prot `OH`/NCBI taxonomy construction, nested experimental
+  heads, held-out host discrimination, and patient-grouped IMPROVE evaluation;
+  see `docs/viral-host-foreignness-study.md`. The released `p_viruses` score is
+  unchanged because the host-aware heads did not improve neoepitope AUC.
+
+### Changed
+
+- `MLPScorer(whole_peptide=True)` scores one complete variable-length peptide
+  feature vector rather than aggregating fixed-length windows.
+
 ## [2.2.0] - 2026-10-21
 
 ### Release contract

@@ -33,7 +33,7 @@ dependencies = {file = ["requirements.txt"]}
 exclude = ["test", "test.*", "examples"]
 
 [tool.setuptools.package-data]
-weirdo = ["logging.conf", "matrices/*", "pretrained/*/*"]
+weirdo = ["logging.conf", "matrices/*", "pretrained/*/*", "reference_proteome_manifests/*.yaml"]
 
 [project.urls]
 "Homepage" = "https://github.com/pirl-unc/weirdo"

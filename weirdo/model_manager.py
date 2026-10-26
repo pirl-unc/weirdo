@@ -22,6 +22,10 @@ BUNDLED_MODEL_DIR = Path(__file__).resolve().parent / 'pretrained'
 # Name of the bundled species-category predictor.
 DEFAULT_CATEGORY_MODEL = 'swissprot-categories'
 
+# Variable-length 8--15mer model with the coarse taxonomy used by
+# ``predict_peptide_content``.
+DEFAULT_PEPTIDE_CONTENT_MODEL = 'peptide-content-v1'
+
 # Public registry of downloadable pretrained model artifacts.
 # These URLs should point to .tar.gz archives containing model files
 # (config.json, model.pt, optional metadata.json).

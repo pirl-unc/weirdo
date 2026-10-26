@@ -1,0 +1,744 @@
+# Frozen seed selections for future Weirdo variable-length taxonomy training.
+#
+# These accessions identify UniProt *reference proteomes*, a selected set of
+# UniProtKB records.  They are not independent files to combine with SwissProt:
+# create a new corpus from these selected reference proteomes, deduplicate exact
+# sequences while retaining multi-leaf membership, then balance at species and
+# leaf level.  Exact host-self lookup searches the selected host proteome alone.
+schema_version: 1
+name: reference-proteomes-v1
+created: 2026-10-23
+source:
+  catalog: UniProt reference-proteome REST catalog
+  reference_only: true
+  mammals_query: 'taxonomy_id:40674 AND proteome_type:REFERENCE'
+  viruses_query: 'taxonomy_id:10239 AND proteome_type:REFERENCE'
+  catalog_counts_at_freeze:
+    mammals: 158
+    viruses: 15030
+selection_policy:
+  mammals: Diverse, complete vertebrate hosts; use primates, glires, carnivora, and other_mammals as mutually exclusive training leaves; retain every selected sequence for exact self lookup.
+  viruses: 128 accessions per major viral realm, sorted by UPID at freeze time.
+  training: Do not weight raw protein or amino-acid totals equally; deduplicate and cap/sample balance species and leaves.
+  provenance: Record each downloaded FASTA SHA-256 and the catalog modified time with every training run.
+
+mammals:
+  # The six entries with exact_self_host_alias are CLI-ready host aliases.
+  - key: human
+    scientific_name: Homo sapiens
+    taxon_id: 9606
+    proteome_id: UP000005640
+    proteins_catalog: 147520
+    taxonomy_leaf: primates
+    exact_self_host_alias: human
+  - key: chimpanzee
+    scientific_name: Pan troglodytes
+    taxon_id: 9598
+    proteome_id: UP000002277
+    proteins_catalog: 48769
+    taxonomy_leaf: primates
+  - key: gorilla
+    scientific_name: Gorilla gorilla gorilla
+    taxon_id: 9595
+    proteome_id: UP000001519
+    proteins_catalog: 44723
+    taxonomy_leaf: primates
+  - key: orangutan
+    scientific_name: Pongo abelii
+    taxon_id: 9601
+    proteome_id: UP000001595
+    proteins_catalog: 39473
+    taxonomy_leaf: primates
+  - key: rhesus_macaque
+    scientific_name: Macaca mulatta
+    taxon_id: 9544
+    proteome_id: UP000006718
+    proteins_catalog: 44389
+    taxonomy_leaf: primates
+  - key: marmoset
+    scientific_name: Callithrix jacchus
+    taxon_id: 9483
+    proteome_id: UP000008225
+    proteins_catalog: 48338
+    taxonomy_leaf: primates
+  - key: mouse
+    scientific_name: Mus musculus
+    taxon_id: 10090
+    proteome_id: UP000000589
+    proteins_catalog: 54855
+    taxonomy_leaf: glires
+    exact_self_host_alias: mouse
+  - key: rat
+    scientific_name: Rattus norvegicus
+    taxon_id: 10116
+    proteome_id: UP000002494
+    proteins_catalog: 52824
+    taxonomy_leaf: glires
+    exact_self_host_alias: rat
+  - key: rabbit
+    scientific_name: Oryctolagus cuniculus
+    taxon_id: 9986
+    proteome_id: UP000001811
+    proteins_catalog: 41466
+    taxonomy_leaf: glires
+  - key: guinea_pig
+    scientific_name: Cavia porcellus
+    taxon_id: 10141
+    proteome_id: UP000005447
+    proteins_catalog: 25047
+    taxonomy_leaf: glires
+  - key: chinese_hamster
+    scientific_name: Cricetulus griseus
+    taxon_id: 10029
+    proteome_id: UP001108280
+    proteins_catalog: 38999
+    taxonomy_leaf: glires
+  - key: beaver
+    scientific_name: Castor canadensis
+    taxon_id: 51338
+    proteome_id: UP001732720
+    proteins_catalog: 48533
+    taxonomy_leaf: glires
+  - key: dog
+    scientific_name: Canis lupus familiaris
+    taxon_id: 9615
+    proteome_id: UP000805418
+    proteins_catalog: 43615
+    taxonomy_leaf: carnivora
+    exact_self_host_alias: dog
+  - key: cat
+    scientific_name: Felis catus
+    taxon_id: 9685
+    proteome_id: UP000823872
+    proteins_catalog: 58973
+    taxonomy_leaf: carnivora
+    exact_self_host_alias: cat
+  - key: ferret
+    scientific_name: Mustela putorius furo
+    taxon_id: 9669
+    proteome_id: UP000000715
+    proteins_catalog: 46261
+    taxonomy_leaf: carnivora
+  - key: giant_panda
+    scientific_name: Ailuropoda melanoleuca
+    taxon_id: 9646
+    proteome_id: UP000008912
+    proteins_catalog: 38536
+    taxonomy_leaf: carnivora
+  - key: little_brown_bat
+    scientific_name: Myotis lucifugus
+    taxon_id: 59463
+    proteome_id: UP000001074
+    proteins_catalog: 20651
+    taxonomy_leaf: other_mammals
+  - key: cattle
+    scientific_name: Bos taurus
+    taxon_id: 9913
+    proteome_id: UP000009136
+    proteins_catalog: 51611
+    taxonomy_leaf: other_mammals
+    exact_self_host_alias: cattle
+  - key: sheep
+    scientific_name: Ovis aries
+    taxon_id: 9940
+    proteome_id: UP000809102
+    proteins_catalog: 44722
+    taxonomy_leaf: other_mammals
+  - key: goat
+    scientific_name: Capra hircus
+    taxon_id: 9925
+    proteome_id: UP000291000
+    proteins_catalog: 32605
+    taxonomy_leaf: other_mammals
+  - key: pig
+    scientific_name: Sus scrofa
+    taxon_id: 9823
+    proteome_id: UP000008227
+    proteins_catalog: 46004
+    taxonomy_leaf: other_mammals
+  - key: horse
+    scientific_name: Equus caballus
+    taxon_id: 9796
+    proteome_id: UP000002281
+    proteins_catalog: 69432
+    taxonomy_leaf: other_mammals
+  - key: donkey
+    scientific_name: Equus asinus
+    taxon_id: 9793
+    proteome_id: UP000694387
+    proteins_catalog: 48973
+    taxonomy_leaf: other_mammals
+  - key: dromedary
+    scientific_name: Camelus dromedarius
+    taxon_id: 9838
+    proteome_id: UP000299084
+    proteins_catalog: 31080
+    taxonomy_leaf: other_mammals
+  - key: blue_whale
+    scientific_name: Balaenoptera musculus
+    taxon_id: 9771
+    proteome_id: UP000694857
+    proteins_catalog: 42275
+    taxonomy_leaf: other_mammals
+  - key: african_elephant
+    scientific_name: Loxodonta africana
+    taxon_id: 9785
+    proteome_id: UP000007646
+    proteins_catalog: 25615
+    taxonomy_leaf: other_mammals
+  - key: lesser_hedgehog_tenrec
+    scientific_name: Echinops telfairi
+    taxon_id: 9371
+    proteome_id: UP000694863
+    proteins_catalog: 28957
+    taxonomy_leaf: other_mammals
+  - key: gray_short_tailed_opossum
+    scientific_name: Monodelphis domestica
+    taxon_id: 13616
+    proteome_id: UP000002280
+    proteins_catalog: 36220
+    taxonomy_leaf: other_mammals
+  - key: platypus
+    scientific_name: Ornithorhynchus anatinus
+    taxon_id: 9258
+    proteome_id: UP000002279
+    proteins_catalog: 32824
+    taxonomy_leaf: other_mammals
+  - key: cheetah
+    scientific_name: Acinonyx jubatus
+    taxon_id: 32536
+    proteome_id: UP001652583
+    proteins_catalog: 49690
+    taxonomy_leaf: carnivora
+  - key: common_minke_whale
+    scientific_name: Balaenoptera acutorostrata
+    taxon_id: 9767
+    proteome_id: UP001652580
+    proteins_catalog: 42806
+    taxonomy_leaf: other_mammals
+  - key: plains_bison
+    scientific_name: Bison bison bison
+    taxon_id: 43346
+    proteome_id: UP000515208
+    proteins_catalog: 29505
+    taxonomy_leaf: other_mammals
+
+viruses:
+  # Viral accessions resolve to the organism/taxon at download time.  The four
+  # realm groups are mutually exclusive in the frozen selection below.
+  riboviria:
+  - UP000000277
+  - UP000000278
+  - UP000000281
+  - UP000000288
+  - UP000000337
+  - UP000000348
+  - UP000000349
+  - UP000000350
+  - UP000000351
+  - UP000000352
+  - UP000000353
+  - UP000000354
+  - UP000000355
+  - UP000000356
+  - UP000000357
+  - UP000000358
+  - UP000000359
+  - UP000000360
+  - UP000000394
+  - UP000000395
+  - UP000000396
+  - UP000000398
+  - UP000000399
+  - UP000000400
+  - UP000000401
+  - UP000000402
+  - UP000000403
+  - UP000000404
+  - UP000000405
+  - UP000000407
+  - UP000000408
+  - UP000000409
+  - UP000000410
+  - UP000000411
+  - UP000000412
+  - UP000000413
+  - UP000000414
+  - UP000000471
+  - UP000000472
+  - UP000000476
+  - UP000000477
+  - UP000000478
+  - UP000000515
+  - UP000000518
+  - UP000000519
+  - UP000000520
+  - UP000000521
+  - UP000000522
+  - UP000000568
+  - UP000000569
+  - UP000000570
+  - UP000000571
+  - UP000000572
+  - UP000000573
+  - UP000000574
+  - UP000000575
+  - UP000000668
+  - UP000000670
+  - UP000000672
+  - UP000000675
+  - UP000000676
+  - UP000000677
+  - UP000000678
+  - UP000000679
+  - UP000000680
+  - UP000000681
+  - UP000000733
+  - UP000000734
+  - UP000000825
+  - UP000000826
+  - UP000000831
+  - UP000000832
+  - UP000000835
+  - UP000000837
+  - UP000001028
+  - UP000001046
+  - UP000001051
+  - UP000001061
+  - UP000001063
+  - UP000001065
+  - UP000001098
+  - UP000001099
+  - UP000001100
+  - UP000001101
+  - UP000001102
+  - UP000001103
+  - UP000001104
+  - UP000001105
+  - UP000001119
+  - UP000001182
+  - UP000001398
+  - UP000001440
+  - UP000001461
+  - UP000001649
+  - UP000001650
+  - UP000001663
+  - UP000001664
+  - UP000001665
+  - UP000001666
+  - UP000001667
+  - UP000001668
+  - UP000001669
+  - UP000001670
+  - UP000001671
+  - UP000001672
+  - UP000001673
+  - UP000001674
+  - UP000001675
+  - UP000001676
+  - UP000001677
+  - UP000001832
+  - UP000002126
+  - UP000002127
+  - UP000002138
+  - UP000002238
+  - UP000002239
+  - UP000002240
+  - UP000002241
+  - UP000002242
+  - UP000002243
+  - UP000002244
+  - UP000002245
+  - UP000002246
+  - UP000002317
+  - UP000002319
+  - UP000002325
+  - UP000002326
+  - UP000002327
+  duplodnaviria:
+  - UP000000227
+  - UP000000228
+  - UP000000241
+  - UP000000258
+  - UP000000264
+  - UP000000290
+  - UP000000296
+  - UP000000303
+  - UP000000330
+  - UP000000331
+  - UP000000335
+  - UP000000339
+  - UP000000367
+  - UP000000368
+  - UP000000369
+  - UP000000371
+  - UP000000375
+  - UP000000384
+  - UP000000455
+  - UP000000456
+  - UP000000457
+  - UP000000458
+  - UP000000460
+  - UP000000461
+  - UP000000463
+  - UP000000489
+  - UP000000523
+  - UP000000524
+  - UP000000525
+  - UP000000527
+  - UP000000587
+  - UP000000615
+  - UP000000616
+  - UP000000617
+  - UP000000618
+  - UP000000619
+  - UP000000620
+  - UP000000621
+  - UP000000633
+  - UP000000691
+  - UP000000693
+  - UP000000694
+  - UP000000695
+  - UP000000697
+  - UP000000698
+  - UP000000699
+  - UP000000701
+  - UP000000714
+  - UP000000725
+  - UP000000726
+  - UP000000729
+  - UP000000730
+  - UP000000731
+  - UP000000744
+  - UP000000786
+  - UP000000839
+  - UP000000840
+  - UP000000842
+  - UP000000846
+  - UP000000847
+  - UP000000850
+  - UP000000853
+  - UP000000855
+  - UP000000857
+  - UP000000875
+  - UP000000876
+  - UP000000878
+  - UP000000879
+  - UP000000881
+  - UP000000901
+  - UP000000903
+  - UP000000904
+  - UP000000905
+  - UP000000906
+  - UP000000907
+  - UP000000909
+  - UP000000910
+  - UP000000911
+  - UP000000912
+  - UP000000913
+  - UP000000915
+  - UP000000916
+  - UP000000918
+  - UP000000919
+  - UP000000920
+  - UP000000921
+  - UP000000922
+  - UP000000923
+  - UP000000924
+  - UP000000938
+  - UP000000941
+  - UP000000942
+  - UP000000944
+  - UP000000945
+  - UP000000946
+  - UP000000957
+  - UP000000963
+  - UP000000964
+  - UP000000967
+  - UP000000968
+  - UP000000969
+  - UP000000971
+  - UP000000972
+  - UP000000973
+  - UP000000975
+  - UP000000976
+  - UP000000977
+  - UP000000980
+  - UP000000981
+  - UP000000983
+  - UP000000984
+  - UP000000985
+  - UP000000986
+  - UP000000987
+  - UP000000988
+  - UP000000990
+  - UP000000991
+  - UP000000992
+  - UP000000993
+  - UP000000994
+  - UP000000995
+  - UP000000997
+  - UP000001000
+  - UP000001034
+  - UP000001040
+  - UP000001042
+  - UP000001043
+  - UP000001057
+  varidnaviria:
+  - UP000000344
+  - UP000000516
+  - UP000000624
+  - UP000000858
+  - UP000000859
+  - UP000000860
+  - UP000000861
+  - UP000000862
+  - UP000000863
+  - UP000000864
+  - UP000000866
+  - UP000000867
+  - UP000000868
+  - UP000000869
+  - UP000000870
+  - UP000000871
+  - UP000000872
+  - UP000001134
+  - UP000001242
+  - UP000001324
+  - UP000001358
+  - UP000001359
+  - UP000001470
+  - UP000001594
+  - UP000001863
+  - UP000002060
+  - UP000002136
+  - UP000002143
+  - UP000002379
+  - UP000002550
+  - UP000002609
+  - UP000004992
+  - UP000004993
+  - UP000008028
+  - UP000008030
+  - UP000008089
+  - UP000008167
+  - UP000008240
+  - UP000008437
+  - UP000008596
+  - UP000008597
+  - UP000008770
+  - UP000008773
+  - UP000009247
+  - UP000011300
+  - UP000015547
+  - UP000018625
+  - UP000028667
+  - UP000029780
+  - UP000029781
+  - UP000096054
+  - UP000096584
+  - UP000097612
+  - UP000097688
+  - UP000097807
+  - UP000098205
+  - UP000099345
+  - UP000099494
+  - UP000099964
+  - UP000100187
+  - UP000100237
+  - UP000100588
+  - UP000100733
+  - UP000101090
+  - UP000101269
+  - UP000101521
+  - UP000101523
+  - UP000101561
+  - UP000101566
+  - UP000101745
+  - UP000102282
+  - UP000102399
+  - UP000104372
+  - UP000105007
+  - UP000105286
+  - UP000105586
+  - UP000105860
+  - UP000106699
+  - UP000107001
+  - UP000107383
+  - UP000107385
+  - UP000108393
+  - UP000108481
+  - UP000108614
+  - UP000108903
+  - UP000109192
+  - UP000110325
+  - UP000110401
+  - UP000110521
+  - UP000110857
+  - UP000110868
+  - UP000111157
+  - UP000111745
+  - UP000111829
+  - UP000111933
+  - UP000112308
+  - UP000112894
+  - UP000112896
+  - UP000113061
+  - UP000113319
+  - UP000113541
+  - UP000113783
+  - UP000113800
+  - UP000113833
+  - UP000114278
+  - UP000114612
+  - UP000115215
+  - UP000115749
+  - UP000116231
+  - UP000117145
+  - UP000117635
+  - UP000118097
+  - UP000118285
+  - UP000118593
+  - UP000118842
+  - UP000119663
+  - UP000120020
+  - UP000120888
+  - UP000121920
+  - UP000122874
+  - UP000123387
+  - UP000123897
+  - UP000124527
+  - UP000124949
+  - UP000125411
+  - UP000125745
+  - UP000126130
+  - UP000126278
+  monodnaviria:
+  - UP000000266
+  - UP000000338
+  - UP000000372
+  - UP000000373
+  - UP000000469
+  - UP000000473
+  - UP000000732
+  - UP000000848
+  - UP000000880
+  - UP000000889
+  - UP000000890
+  - UP000000892
+  - UP000000899
+  - UP000000978
+  - UP000001001
+  - UP000001044
+  - UP000001049
+  - UP000001244
+  - UP000001252
+  - UP000001295
+  - UP000001448
+  - UP000001536
+  - UP000001612
+  - UP000001707
+  - UP000001719
+  - UP000001764
+  - UP000001771
+  - UP000001783
+  - UP000001786
+  - UP000001787
+  - UP000001833
+  - UP000001836
+  - UP000002087
+  - UP000002088
+  - UP000002094
+  - UP000002101
+  - UP000002111
+  - UP000002113
+  - UP000002115
+  - UP000002121
+  - UP000002122
+  - UP000002125
+  - UP000002130
+  - UP000002137
+  - UP000002140
+  - UP000002142
+  - UP000002259
+  - UP000002321
+  - UP000002323
+  - UP000002338
+  - UP000002339
+  - UP000002418
+  - UP000002545
+  - UP000002548
+  - UP000002557
+  - UP000002560
+  - UP000002577
+  - UP000002578
+  - UP000002728
+  - UP000005232
+  - UP000005883
+  - UP000005893
+  - UP000006367
+  - UP000006372
+  - UP000006541
+  - UP000006542
+  - UP000006567
+  - UP000006572
+  - UP000006624
+  - UP000006634
+  - UP000006636
+  - UP000006828
+  - UP000006831
+  - UP000006885
+  - UP000006913
+  - UP000006914
+  - UP000006915
+  - UP000006916
+  - UP000006917
+  - UP000006918
+  - UP000006932
+  - UP000007018
+  - UP000007019
+  - UP000007022
+  - UP000007023
+  - UP000007068
+  - UP000007078
+  - UP000007079
+  - UP000007080
+  - UP000007210
+  - UP000007405
+  - UP000007432
+  - UP000007453
+  - UP000007528
+  - UP000007547
+  - UP000007548
+  - UP000007553
+  - UP000007569
+  - UP000007570
+  - UP000007571
+  - UP000007572
+  - UP000007612
+  - UP000007613
+  - UP000007621
+  - UP000007622
+  - UP000007665
+  - UP000007666
+  - UP000007667
+  - UP000007668
+  - UP000007670
+  - UP000007671
+  - UP000007672
+  - UP000007673
+  - UP000007674
+  - UP000007676
+  - UP000007677
+  - UP000007705
+  - UP000007706
+  - UP000007710
+  - UP000007711
+  - UP000007781
+  - UP000007896
+  - UP000008169
+  - UP000008222
+  - UP000008226
+  - UP000008230
+  - UP000008232
+  - UP000008246

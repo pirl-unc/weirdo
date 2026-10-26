@@ -1,2 +1,3 @@
 include requirements.txt
 recursive-include weirdo/pretrained *
+recursive-include weirdo/reference_proteome_manifests *.yaml

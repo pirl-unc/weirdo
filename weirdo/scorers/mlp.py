@@ -158,6 +158,12 @@ class MLPScorer(TrainableScorer):
         sequences better. Peptides longer than ``k`` are scored per k-mer, as
         usual. Models trained with ``positional=True`` store the option and load
         with it.
+    whole_peptide : bool, default=False
+        Extract one feature vector from each complete input peptide instead of
+        padding short peptides and windowing long ones to ``k``.  This is useful
+        for models trained directly on variable-length peptides (for example,
+        MHC-length 8--15mers).  ``k`` still controls the positional feature width
+        when ``positional=True``.
     loss : {'auto', 'bce', 'squared'}, default='auto'
         Training objective. ``'bce'`` trains one independent sigmoid output per
         label with binary cross-entropy, so outputs are probabilities
@@ -189,6 +195,7 @@ class MLPScorer(TrainableScorer):
         random_state: Optional[int] = None,
         loss: str = 'auto',
         positional: bool = False,
+        whole_peptide: bool = False,
         **kwargs
     ):
         if loss not in ('auto', 'bce', 'squared'):
@@ -207,6 +214,7 @@ class MLPScorer(TrainableScorer):
             'random_state': random_state,
             'loss': loss,
             'positional': bool(positional),
+            'whole_peptide': bool(whole_peptide),
         })
         self._model: Optional[Union[MLPClassifier, MLPRegressor, _NumpyMLP]] = None
         self._scaler: Optional[Union[StandardScaler, _NumpyScaler]] = None
@@ -1306,6 +1314,13 @@ class MLPScorer(TrainableScorer):
             )
         if not peptides:
             return np.zeros((0, n_outputs), dtype=np.float64)
+
+        if self._params.get('whole_peptide', False):
+            step = 65536
+            return np.vstack([
+                self._predict_kmer_probabilities(peptides[start:start + step])
+                for start in range(0, len(peptides), step)
+            ]).astype(np.float64, copy=False)
 
         windows: List[str] = []
         counts: List[int] = []
