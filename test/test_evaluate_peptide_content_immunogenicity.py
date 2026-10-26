@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "evaluate_peptide_content_immunogenicity.py"
@@ -75,7 +76,7 @@ def test_registered_transfer_excludes_discovery_peptide_from_validation():
 
 
 def test_load_predictor_runs_a_self_contained_torch_artifact(tmp_path):
-    import torch
+    torch = pytest.importorskip("torch")
 
     artifact = tmp_path / "cnn"
     artifact.mkdir()

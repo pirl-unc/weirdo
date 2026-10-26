@@ -16,6 +16,7 @@ REFERENCE_DATA_SCRIPT = Path(__file__).parents[1] / "scripts" / "reference_prote
 
 
 def test_encode_variable_length_peptides():
+    pytest.importorskip("torch")
     tokens, mask = module.encode_peptides(["SIINFEKL", "ABCDEFGHIJKLMNO"])
     assert tokens.shape == (2, 15)
     assert mask.sum(dim=1).tolist() == [8, 15]
@@ -36,6 +37,7 @@ def test_microbe_times_one_minus_mammal_summary():
 
 
 def test_cnn_accepts_8_to_15mers():
+    pytest.importorskip("torch")
     model = module.build_torch_model("cnn", len(module.CATEGORIES))
     tokens, mask = module.encode_peptides(["SIINFEKL", "ABCDEFGHIJKLMNO"])
     result = model(tokens, mask)
@@ -43,6 +45,7 @@ def test_cnn_accepts_8_to_15mers():
 
 
 def test_collator_is_pickle_safe_for_spawned_data_loader_workers():
+    pytest.importorskip("torch")
     collator = module.make_collate("cnn")
     assert "<locals>" not in type(collator).__qualname__
     features, labels = collator(
@@ -53,7 +56,7 @@ def test_collator_is_pickle_safe_for_spawned_data_loader_workers():
 
 
 def test_predict_torch_weights_validation_loss_by_elements():
-    import torch
+    torch = pytest.importorskip("torch")
 
     class FixedModel(torch.nn.Module):
         def forward(self, tokens):
