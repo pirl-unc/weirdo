@@ -1,0 +1,191 @@
+{
+  "bootstrap_draws": 1000,
+  "cohorts": {
+    "Basket": [
+      "IMPROVE basket",
+      "tumor"
+    ],
+    "bladder": [
+      "IMPROVE bladder",
+      "tumor"
+    ],
+    "melanoma": [
+      "IMPROVE melanoma",
+      "tumor"
+    ],
+    "multivirus_concise_set": [
+      "Multi-virus panel",
+      "viral"
+    ],
+    "yellow_fever_17d": [
+      "Yellow fever 17D",
+      "viral"
+    ]
+  },
+  "inputs": {
+    "reports/taxonomy-objective-tcell-v1/raw/balanced-unique-softmax-tcell-scores.csv.gz": {
+      "bytes": 10662332,
+      "sha256": "cbf7d1e13278403eeaa1d906c8f4b50256bf78118efd6d4e317124bd522c136b"
+    },
+    "reports/tcr-visible-nonself-v1/raw/hla-conditioned-self-features.csv.gz": {
+      "bytes": 1136577,
+      "sha256": "66e66de9a209d852fff3d9bafcfbaa8e35ddc69e92c96df2bedb10f09cb45c64"
+    },
+    "reports/tcr-visible-nonself-v1/raw/human-self-features.csv.gz": {
+      "bytes": 275225,
+      "sha256": "1129448c19ffbf6333ca33c98bfe74609ac662a22844921b90f41bf56e8e78e0"
+    },
+    "reports/tcr-visible-nonself-v1/raw/pseudo-haplotype-self-features.csv.gz": {
+      "bytes": 1072483,
+      "sha256": "469685b698098e0f81c70b9cd1fb6d6f8dafb0e51ed8dcd07c6919435e47a368"
+    }
+  },
+  "models": [
+    {
+      "include_prime": false,
+      "label": "MHC baseline",
+      "model_id": "mhc_baseline",
+      "numeric_extra": null,
+      "regularization_C": 1.0,
+      "sequence_representation": null
+    },
+    {
+      "include_prime": false,
+      "label": "+ host-virus taxonomy",
+      "model_id": "taxonomy",
+      "numeric_extra": "taxonomy",
+      "regularization_C": 1.0,
+      "sequence_representation": null
+    },
+    {
+      "include_prime": true,
+      "label": "+ PRIME 2.1",
+      "model_id": "prime",
+      "numeric_extra": null,
+      "regularization_C": 1.0,
+      "sequence_representation": null
+    },
+    {
+      "include_prime": false,
+      "label": "+ length + HLA family",
+      "model_id": "hla_length",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "calibration"
+    },
+    {
+      "include_prime": false,
+      "label": "+ HLA family + anchors",
+      "model_id": "hla_anchors",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "anchors"
+    },
+    {
+      "include_prime": false,
+      "label": "+ TCR-face composition + HLA family",
+      "model_id": "tcr_face_composition",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "face_composition"
+    },
+    {
+      "include_prime": false,
+      "label": "+ TCR-face composition + exact HLA",
+      "model_id": "tcr_face_exact_allele",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "allele_face_composition"
+    },
+    {
+      "include_prime": false,
+      "label": "+ TCR-face \u00d7 exact-HLA interactions",
+      "model_id": "tcr_face_exact_allele_interactions",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "allele_face_interactions"
+    },
+    {
+      "include_prime": false,
+      "label": "+ TCR-face positions",
+      "model_id": "tcr_face_positions",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "face_positions"
+    },
+    {
+      "include_prime": false,
+      "label": "+ face \u00d7 HLA interactions",
+      "model_id": "tcr_face_hla_interactions",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "face_hla_interactions"
+    },
+    {
+      "include_prime": false,
+      "label": "+ nearest human (ungated)",
+      "model_id": "ungated_self",
+      "numeric_extra": "ungated",
+      "regularization_C": 0.003,
+      "sequence_representation": null
+    },
+    {
+      "include_prime": false,
+      "label": "+ same-HLA human self",
+      "model_id": "same_hla_self",
+      "numeric_extra": "same_hla",
+      "regularization_C": 0.003,
+      "sequence_representation": null
+    },
+    {
+      "include_prime": false,
+      "label": "+ observed-HLA pseudo-haplotype",
+      "model_id": "pseudo_haplotype_self",
+      "numeric_extra": "haplotype",
+      "regularization_C": 0.003,
+      "sequence_representation": null
+    },
+    {
+      "include_prime": false,
+      "label": "+ face/HLA + same-HLA self",
+      "model_id": "tcr_face_same_hla",
+      "numeric_extra": "same_hla",
+      "regularization_C": 0.003,
+      "sequence_representation": "allele_face_composition"
+    },
+    {
+      "include_prime": true,
+      "label": "+ PRIME + face/HLA",
+      "model_id": "prime_tcr_face",
+      "numeric_extra": null,
+      "regularization_C": 0.003,
+      "sequence_representation": "allele_face_composition"
+    },
+    {
+      "include_prime": true,
+      "label": "+ PRIME + face/HLA + same-HLA self",
+      "model_id": "prime_tcr_face_same_hla",
+      "numeric_extra": "same_hla",
+      "regularization_C": 0.003,
+      "sequence_representation": "allele_face_composition"
+    },
+    {
+      "include_prime": false,
+      "label": "+ positive-response similarity kernel",
+      "model_id": "response_kernel",
+      "numeric_extra": "response_kernel",
+      "regularization_C": 0.003,
+      "sequence_representation": null
+    },
+    {
+      "include_prime": false,
+      "label": "+ response kernel (1-mutation purge)",
+      "model_id": "response_kernel_strict",
+      "numeric_extra": "response_kernel_strict",
+      "regularization_C": 0.003,
+      "sequence_representation": null
+    }
+  ],
+  "split_rule": "held out cohort; train on other same-domain cohorts; purge all training rows with an exact held-out peptide",
+  "status": "exploratory feature-family sweep"
+}

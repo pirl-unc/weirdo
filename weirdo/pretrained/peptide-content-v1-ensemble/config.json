@@ -1,0 +1,127 @@
+{
+  "format": "weirdo-peptide-content-v1-ensemble",
+  "scorer_type": "StackedPeptideContentModel",
+  "architecture": "stacked_ensemble",
+  "categories": [
+    "viruses",
+    "bacteria",
+    "archaea",
+    "fungi",
+    "plants",
+    "protists",
+    "invertebrates",
+    "fish",
+    "non_mammalian_tetrapods",
+    "mammals",
+    "human",
+    "mouse",
+    "dog"
+  ],
+  "length_range": [8, 15],
+  "members": [
+    {"name": "composition_mlp", "path": "members/composition_mlp"},
+    {"name": "cnn", "path": "members/cnn"},
+    {"name": "transformer", "path": "members/transformer"}
+  ],
+  "stacking": {
+    "method": "per-category logistic regression on member logits and normalized peptide length",
+    "fit_split": "validation protein families only",
+    "regularization_c": 0.1,
+    "class_weight": null,
+    "length_center": 11.5,
+    "length_scale": 3.5,
+    "coefficients": {
+      "viruses": {
+        "composition_mlp": 0.3639411926269531,
+        "cnn": 0.3112333118915558,
+        "transformer": 0.41252103447914124,
+        "length": -0.01889776811003685,
+        "intercept": 0.14866437017917633
+      },
+      "bacteria": {
+        "composition_mlp": 0.3779692053794861,
+        "cnn": 0.3810793459415436,
+        "transformer": 0.2248067706823349,
+        "length": -0.004718564450740814,
+        "intercept": -0.0887739509344101
+      },
+      "archaea": {
+        "composition_mlp": 0.3414686918258667,
+        "cnn": 0.379262775182724,
+        "transformer": 0.2904369533061981,
+        "length": -0.010556047782301903,
+        "intercept": 0.004183751065284014
+      },
+      "fungi": {
+        "composition_mlp": 0.34340813755989075,
+        "cnn": 0.43797609210014343,
+        "transformer": 0.3666158616542816,
+        "length": 0.017262892797589302,
+        "intercept": 0.3488776683807373
+      },
+      "plants": {
+        "composition_mlp": 0.21539238095283508,
+        "cnn": 0.4578303098678589,
+        "transformer": 0.43248453736305237,
+        "length": 0.04610320180654526,
+        "intercept": 0.18405401706695557
+      },
+      "protists": {
+        "composition_mlp": 0.2422594577074051,
+        "cnn": 0.31022214889526367,
+        "transformer": 0.478608638048172,
+        "length": 0.04434531182050705,
+        "intercept": 0.1733509749174118
+      },
+      "invertebrates": {
+        "composition_mlp": 0.3669455945491791,
+        "cnn": 0.3839169144630432,
+        "transformer": 0.2576625347137451,
+        "length": 0.014208454638719559,
+        "intercept": -0.05056368559598923
+      },
+      "fish": {
+        "composition_mlp": 0.3118510842323303,
+        "cnn": 0.21402238309383392,
+        "transformer": 0.42106351256370544,
+        "length": 0.04181567206978798,
+        "intercept": -0.14687015116214752
+      },
+      "non_mammalian_tetrapods": {
+        "composition_mlp": 0.37796691060066223,
+        "cnn": 0.21409058570861816,
+        "transformer": 0.3485710620880127,
+        "length": 0.027195217087864876,
+        "intercept": -0.1156344786286354
+      },
+      "mammals": {
+        "composition_mlp": 0.35579413175582886,
+        "cnn": 0.47662174701690674,
+        "transformer": 0.24849680066108704,
+        "length": 0.023766253143548965,
+        "intercept": 0.09255116432905197
+      },
+      "human": {
+        "composition_mlp": 0.3075278699398041,
+        "cnn": 0.5058923959732056,
+        "transformer": 0.26189929246902466,
+        "length": -0.005018217954784632,
+        "intercept": 0.0901867225766182
+      },
+      "mouse": {
+        "composition_mlp": 0.32963064312934875,
+        "cnn": 0.4631081521511078,
+        "transformer": 0.2887134850025177,
+        "length": 0.0018106900388374925,
+        "intercept": 0.1396470069885254
+      },
+      "dog": {
+        "composition_mlp": 0.07226647436618805,
+        "cnn": 0.4762934446334839,
+        "transformer": 0.4206460416316986,
+        "length": 0.0862090140581131,
+        "intercept": -0.1578081101179123
+      }
+    }
+  }
+}

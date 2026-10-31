@@ -1,0 +1,10 @@
+{
+  "pairs": 14569,
+  "pmids": 148,
+  "after_unused_pmids": 3970,
+  "after_peptide_purge": 2344,
+  "final_pairs": 1222,
+  "final_pmids": 21,
+  "positives": 483,
+  "unique_peptides": 1199
+}

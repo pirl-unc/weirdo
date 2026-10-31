@@ -1,0 +1,10 @@
+{
+  "candidate_evidence": "sqrt(mhcflurry_presentation * (1 - netmhcpan_ba_rank / 100))",
+  "candidate_input": "reports/braun-mutation-aware-candidates-v1/raw/scored-candidates-taxonomy.csv.gz",
+  "netmhcpan_ba_rank_gate": 2.0,
+  "presentation_percentile_gate": 5.0,
+  "response_labels_used_only_for": "descriptive evaluation",
+  "response_labels_used_to_construct_scores": false,
+  "schema": "braun-mutation-aware-pmhc-aggregation-v1",
+  "top_k": 3
+}

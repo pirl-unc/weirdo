@@ -1,0 +1,69 @@
+{
+  "format": "weirdo-peptide-content-v1",
+  "architecture": "transformer",
+  "categories": [
+    "viruses",
+    "bacteria",
+    "archaea",
+    "fungi",
+    "plants",
+    "protists",
+    "invertebrates",
+    "fish",
+    "non_mammalian_tetrapods",
+    "mammals",
+    "human",
+    "mouse",
+    "dog"
+  ],
+  "length_range": [
+    8,
+    15
+  ],
+  "esm_model": null,
+  "training": {
+    "seed": 42,
+    "epochs": 6,
+    "batch_size": 2048,
+    "learning_rate": 0.001,
+    "best_val_loss": 0.31459687336495046,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 0.32727481144741455,
+        "val_loss": 0.31745816845642894,
+        "seconds": 8.305724620819092
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.32083290933390957,
+        "val_loss": 0.3155210959283929,
+        "seconds": 8.059866189956665
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.3200646522202448,
+        "val_loss": 0.31459687336495046,
+        "seconds": 8.089410543441772
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.31973886398499035,
+        "val_loss": 0.31524125212117243,
+        "seconds": 8.11926794052124
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.3194216682212113,
+        "val_loss": 0.31467788940981817,
+        "seconds": 8.121589183807373
+      },
+      {
+        "epoch": 6,
+        "train_loss": 0.3191322849799357,
+        "val_loss": 0.31493512031279114,
+        "seconds": 8.077944993972778
+      }
+    ]
+  }
+}

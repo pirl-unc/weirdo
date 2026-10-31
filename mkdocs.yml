@@ -36,6 +36,7 @@ nav:
     - Viral Host-Range Study: viral-host-foreignness-study.md
     - Amino Acid Data: amino-acids.md
   - API Reference: api.md
+  - Evaluation data sources: data-sources.md
   - Development:
     - Contributing: contributing.md
     - Changelog: changelog.md
