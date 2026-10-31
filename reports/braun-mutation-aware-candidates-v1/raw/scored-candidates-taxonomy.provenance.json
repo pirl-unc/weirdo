@@ -1,0 +1,94 @@
+{
+  "input_sha256": "dfe18b59c0cfe831e8a7466a7dd5e6bc3efe0a851edaa5e902a308037f9506ee",
+  "models": {
+    "esm_10k": {
+      "categories": [
+        "viruses",
+        "bacteria",
+        "archaea",
+        "fungi",
+        "plants",
+        "protists",
+        "invertebrates",
+        "non_mammalian_vertebrates",
+        "mammals"
+      ],
+      "config_sha256": "328883195849b48fea3bdd86a42857603d72ac86b7368222d1d0b263f82535bf",
+      "path": "/artifacts/peptide-content-broad9-scaling-v1/quota-10000/esm_finetune",
+      "weights_sha256": "a8243a08c0707d40ec864e6eb9d19ff48fff32a84373f37e50527db95100f4de"
+    },
+    "esm_160k": {
+      "categories": [
+        "viruses",
+        "bacteria",
+        "archaea",
+        "fungi",
+        "plants",
+        "protists",
+        "invertebrates",
+        "non_mammalian_vertebrates",
+        "mammals"
+      ],
+      "config_sha256": "2c5003900734fa8518a0da71341af0fa60b9825b72b6e35658a8ab38895a14df",
+      "path": "/artifacts/peptide-content-broad9-scaling-v1/quota-160000/esm_finetune",
+      "weights_sha256": "dd046689292014ad34329ce18498ccc1fe11279255f24812f23e3f8ac0bc1a68"
+    },
+    "esm_20k": {
+      "categories": [
+        "viruses",
+        "bacteria",
+        "archaea",
+        "fungi",
+        "plants",
+        "protists",
+        "invertebrates",
+        "non_mammalian_vertebrates",
+        "mammals"
+      ],
+      "config_sha256": "e88e83363ca08dd1c25a6c54453e1fa2d6d541c2335a23a6e84393aed0dfc434",
+      "path": "/artifacts/peptide-content-broad9-scaling-v1/quota-20000/esm_finetune",
+      "weights_sha256": "2d5b74ced2ca0c17c360c3d914fe596d0300786a74faead02e04bb72e65e577a"
+    },
+    "esm_40k": {
+      "categories": [
+        "viruses",
+        "bacteria",
+        "archaea",
+        "fungi",
+        "plants",
+        "protists",
+        "invertebrates",
+        "non_mammalian_vertebrates",
+        "mammals"
+      ],
+      "config_sha256": "2c825091e74e50a95dfde500007feae7a7ee47546021a8ccc7ece3acf7d2a138",
+      "path": "/artifacts/peptide-content-broad9-scaling-v1/quota-40000/esm_finetune",
+      "weights_sha256": "9e461ccd248158743c3853ea1bd9c0c4a698d91c7de44a54cab1909fceef5972"
+    },
+    "esm_80k": {
+      "categories": [
+        "viruses",
+        "bacteria",
+        "archaea",
+        "fungi",
+        "plants",
+        "protists",
+        "invertebrates",
+        "non_mammalian_vertebrates",
+        "mammals"
+      ],
+      "config_sha256": "d89b133475837f6d6db98d52eb68a8c33e0a9ce51cf298b306612422701f8eff",
+      "path": "/artifacts/peptide-content-broad9-scaling-v1/quota-80000/esm_finetune",
+      "weights_sha256": "1e93b6ed9ba5e6a1ab8c627ecdda7e8dab2da2c2fd1b505619f50716c55a22ae"
+    }
+  },
+  "n_rows": 3995,
+  "n_unique_peptides": 3487,
+  "outputs_per_model": {
+    "microbial_like": "max independent P(virus, bacteria, archaea, fungi, protists)",
+    "one_minus_mammals": "1 - independent P(mammals)",
+    "viruses": "independent P(viruses)"
+  },
+  "response_labels_used": false,
+  "schema": "braun-candidate-frozen-taxonomy-v1"
+}

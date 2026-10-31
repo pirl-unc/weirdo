@@ -461,6 +461,25 @@ Ensure reference data is available, optionally downloading.
 
 ---
 
+### `weirdo.pmhc_weirdo_score`
+
+```python
+pmhc_weirdo_score(peptides, mhcflurry_presentation_scores, netmhcpan_ba_ranks,
+                  weirdo_weight=0.1, weirdo_scores=None, face_weight=0.1) -> pandas.DataFrame
+```
+
+Rank-normalised mean of MHCflurry presentation and NetMHCpan BA rank against a
+frozen label-free reference, plus `weirdo_weight` times the centred rank of the
+packaged ensemble's `virus_foreign_like` head and `face_weight` times the centred
+rank of a self-relative TCR-face surprise. Weights of `0` disable a term
+(`weirdo_weight=0` needs no torch). The measured gain over the core is small; see
+the 2.5.0 changelog entry.
+
+### `weirdo.evaluation_cohorts`
+
+`EVALUATION_COHORTS` and `cohort_status(root, with_checksums=False)` describe the
+T-cell evaluation datasets; see [Evaluation data sources](data-sources.md).
+
 ## UniProt Data and K-mer Tables
 
 ### `weirdo.uniprot`
@@ -497,6 +516,7 @@ weirdo data list              # List datasets (alias: ls, status)
 weirdo data download          # Build swissprot-8mers from UniProt (or: data download swissprot-sequences)
 weirdo data clear             # Clear data
 weirdo data path              # Show data directory
+weirdo data cohorts           # T-cell evaluation datasets: sources, builders, local status (--checksums)
 
 # Model training + scoring
 weirdo models train --data train.csv --name my-model

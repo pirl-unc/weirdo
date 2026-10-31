@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.5.0] - 2026-10-31
+
+### Added
+
+- `weirdo.pmhc_weirdo_score`: a frozen, rank-normalised combination of MHCflurry
+  presentation, NetMHCpan BA rank, the packaged `peptide-content-v1-ensemble`
+  `virus_foreign_like` head and a zero-fit self-relative TCR-face surprise term.
+  Rank tables ship as `pretrained/pmhc-rank-reference-v1.json`; with
+  `weirdo_weight=0` it needs no torch. The 23-head ensemble ships in the wheel.
+- `weirdo data cohorts` and `weirdo.evaluation_cohorts`: a registry of the T-cell
+  evaluation datasets (source, reference, builder script, reports, local file
+  status, optional SHA-256), documented in `docs/data-sources.md`. The tables are
+  rebuilt by the scripts, not downloaded by Weirdo.
+- The T-cell evaluation scripts, tests and reports behind the combination
+  (`reports/auto-weirdo-v1`, `reports/iedb-grouped-learning-v1`, sealed fresh
+  IEDB cohorts v1/v2 and the empty CEDAR funnel, among others).
+
+### Measured effect (read before relying on it)
+
+Within-study AUC over the presentation + BA core: +0.0066 macro on the seven
+development datasets (not independent of the choice of terms), +0.0156
+(interval -0.007 to +0.039) and +0.0045 (-0.003 to +0.012) on two sealed IEDB
+cohorts. Study-grouped learning, a same-HLA self-ligand neighbourhood, source
+protein context and a short-list metric gave no reliable additional gain. This is
+a small, not a major, improvement; the score is not a replacement for the pMHC
+core. See `reports/auto-weirdo-v1/analysis.md` and
+`reports/iedb-grouped-learning-v1/analysis.md`.
+
 ## [2.4.0] - 2026-10-25
 
 ### Added

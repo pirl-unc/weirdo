@@ -17,6 +17,20 @@ from .score_policies import (
     get_score_policy,
     list_score_policies,
 )
+from .peptide_content_models import (
+    STANDARD_SCORE_CATEGORIES,
+    STANDARD_SCORE_NAMES,
+    TorchPeptideContentModel,
+    geometric_mean_scores,
+    load_peptide_content_model,
+    predict_taxonomy_scores,
+    presentation_geometric_mean_scores,
+    select_best_peptide_content_model,
+    standard_peptide_content_scores,
+)
+
+# Rank-normalized pMHC + Weirdo score
+from .pmhc_score import pmhc_weirdo_score
 from .reference_proteomes import (
     REFERENCE_PROTEOMES,
     DownloadedReferenceProteome,
@@ -90,9 +104,19 @@ from .scorers import (
 # ML scorer
 from .scorers import MLPScorer
 
-__version__ = "2.4.0"
+__version__ = "2.5.0"
 
 __all__ = [
+    "pmhc_weirdo_score",
+    "STANDARD_SCORE_CATEGORIES",
+    "STANDARD_SCORE_NAMES",
+    "TorchPeptideContentModel",
+    "select_best_peptide_content_model",
+    "geometric_mean_scores",
+    "load_peptide_content_model",
+    "predict_taxonomy_scores",
+    "presentation_geometric_mean_scores",
+    "standard_peptide_content_scores",
     "DEFAULT_PRETRAINED_MODEL", "DEFAULT_SCORE_POLICY", "PretrainedModel",
     "DEFAULT_PEPTIDE_CONTENT_SCORE_POLICY", "ScorePolicy",
     "apply_score_policy", "get_score_policy", "list_score_policies",

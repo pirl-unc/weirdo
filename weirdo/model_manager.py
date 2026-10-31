@@ -247,6 +247,11 @@ class ModelManager:
 
         scorer_type = config.get('scorer_type', '')
 
+        if config.get('architecture') == 'stacked_ensemble':
+            from .peptide_content_models import load_peptide_content_model
+
+            return load_peptide_content_model(path)
+
         # Map to scorer class
         scorer_classes = {
             'MLPScorer': MLPScorer,

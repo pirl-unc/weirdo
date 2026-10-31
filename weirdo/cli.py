@@ -47,6 +47,14 @@ def create_parser():
     data_subparsers.add_parser('ls', help='Alias for list')
     data_subparsers.add_parser('status', help='Alias for list')
 
+    # data cohorts
+    cohorts_parser = data_subparsers.add_parser(
+        'cohorts',
+        help='List the T-cell evaluation datasets with sources, builders and local status',
+    )
+    cohorts_parser.add_argument('--root', default='.', help='Repository root holding data/ and reports/')
+    cohorts_parser.add_argument('--checksums', action='store_true', help='Print SHA-256 of local files')
+
     # data download
     download_parser = data_subparsers.add_parser(
         'download',
@@ -310,6 +318,25 @@ def cmd_data_list(args):
     from .data_manager import get_data_manager
     dm = get_data_manager()
     dm.print_status()
+    return 0
+
+
+def cmd_data_cohorts(args):
+    """Handle: weirdo data cohorts"""
+    from pathlib import Path
+    from .evaluation_cohorts import cohort_status
+    for row in cohort_status(Path(args.root), with_checksums=args.checksums):
+        print(f"{row['name']}  [{row['role']}]")
+        print(f"  {row['description']}")
+        print(f"  source:  {row['source']}")
+        if row['reference']:
+            print(f"  ref:     {row['reference']}")
+        if row['builder']:
+            print(f"  builder: {row['builder']}")
+        print(f"  reports: {', '.join(row['reports'])}")
+        for rel, state in row['present'].items():
+            label = state if isinstance(state, str) else ('present' if state else 'missing')
+            print(f"  file:    {rel}  {label}")
     return 0
 
 
@@ -879,6 +906,8 @@ def run(args_list=None):
             return cmd_data_list(args)
         elif args.data_command in ('list', 'ls', 'status'):
             return cmd_data_list(args)
+        elif args.data_command == 'cohorts':
+            return cmd_data_cohorts(args)
         elif args.data_command == 'download':
             return cmd_data_download(args)
         elif args.data_command == 'reference-proteome':
