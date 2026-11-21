@@ -33,8 +33,12 @@ def reference_present(candidates: set[str], reference_sequences: list[str]) -> s
     """Find candidate strings occurring anywhere in the reference proteome."""
     try:
         import ahocorasick
-    except ImportError as error:  # pragma: no cover - environment dependency
-        raise RuntimeError("Install pyahocorasick to scan the reference proteome") from error
+    except ImportError:  # pragma: no cover - optional speedup dependency
+        return {
+            candidate
+            for candidate in candidates
+            if any(candidate in sequence for sequence in reference_sequences)
+        }
     automaton = ahocorasick.Automaton()
     for candidate in candidates:
         automaton.add_word(candidate, candidate)

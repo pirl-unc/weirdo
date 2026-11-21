@@ -19,12 +19,6 @@ import subprocess
 import numpy as np
 import pandas as pd
 
-from mhctools import NetMHCpan, PRIME
-from mhctools.allele_normalization import normalize_allele_name
-from mhctools.pred import Kind
-from mhcflurry import Class1PresentationPredictor
-from mhcflurry.downloads import get_model_release_dir
-
 from weirdo import (
     geometric_mean_scores,
     load_peptide_content_model,
@@ -54,6 +48,8 @@ def sha256(path: Path) -> str:
 
 
 def load_assays() -> pd.DataFrame:
+    from mhctools.allele_normalization import normalize_allele_name
+
     improve = pd.read_csv(IMPROVE_INPUT)
     improve_rows = pd.DataFrame(
         {
@@ -92,6 +88,9 @@ def load_assays() -> pd.DataFrame:
 
 
 def score_netmhcpan(pairs: pd.DataFrame, process_limit: int) -> tuple[pd.DataFrame, dict]:
+    from mhctools import NetMHCpan
+    from mhctools.pred import Kind
+
     predictor = NetMHCpan(program_name="netMHCpan", process_limit=process_limit)
     results = predictor.predict_pairs(pairs.peptide.tolist(), pairs.hla.tolist())
     records = []
@@ -118,6 +117,9 @@ def score_netmhcpan(pairs: pd.DataFrame, process_limit: int) -> tuple[pd.DataFra
 
 
 def score_mhcflurry(pairs: pd.DataFrame, release: str) -> tuple[pd.DataFrame, dict]:
+    from mhcflurry import Class1PresentationPredictor
+    from mhcflurry.downloads import get_model_release_dir
+
     model_path = Path(get_model_release_dir(release))
     predictor = Class1PresentationPredictor.load(model_path)
     allele_sets = {allele: [allele] for allele in pairs.hla.unique()}
@@ -158,6 +160,8 @@ def score_prime(
     workers: int,
 ) -> tuple[pd.DataFrame, dict]:
     """Score the observed peptide-HLA pairs with PRIME 2.1 via mhctools."""
+    from mhctools import PRIME
+
     for path in (program_name, mixmhcpred_path, mixmhcpred_python):
         if not path.is_file():
             raise FileNotFoundError(f"Required PRIME runtime file not found: {path}")

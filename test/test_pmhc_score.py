@@ -55,6 +55,28 @@ def test_inputs_are_validated():
         weirdo.pmhc_weirdo_score(["AAAAAAAAA"], [0.1], [1.0], weirdo_weight=2.0)
     with pytest.raises(ValueError):
         weirdo.pmhc_weirdo_score(["AAAAAAAAA"], [float("nan")], [1.0], weirdo_weight=0.0)
+    with pytest.raises(ValueError):
+        weirdo.pmhc_weirdo_score(
+            ["AAAAAAAAA", "BBBBBBBBB"], [0.1, 0.2], [1.0, 2.0], weirdo_scores=[0.5]
+        )
+
+
+def test_empty_input_returns_empty_dataframe_without_loading_model(monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("Weirdo model must not be called for empty input")
+
+    monkeypatch.setattr(pmhc_score, "_weirdo_head_scores", fail)
+    result = weirdo.pmhc_weirdo_score([], [], [], weirdo_weight=0.1, face_weight=0.1)
+    assert list(result.columns) == [
+        "peptide",
+        "presentation_rank",
+        "binding_rank",
+        "pmhc_core",
+        "weirdo_rank",
+        "face_rank",
+        "score",
+    ]
+    assert result.empty
 
 
 def test_face_surprise_uses_p3_to_penultimate_residues_only():

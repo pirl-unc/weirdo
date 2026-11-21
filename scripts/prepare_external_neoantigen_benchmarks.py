@@ -20,7 +20,6 @@ import sys
 
 import numpy as np
 import pandas as pd
-from mhctools.allele_normalization import normalize_allele_name
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -45,6 +44,8 @@ def sha256(path: Path) -> str:
 
 def extract_tesla(path: Path) -> pd.DataFrame:
     """Load the public TESLA derivative and remove exact duplicate pMHC rows."""
+    from mhctools.allele_normalization import normalize_allele_name
+
     frame = pd.read_excel(path, sheet_name="TESLA_dataset")
     required = {"peptide", "target_value", "allele"}
     missing = sorted(required - set(frame.columns))
@@ -74,6 +75,8 @@ def extract_tesla(path: Path) -> pd.DataFrame:
 
 def parse_braun_alleles(value: object) -> tuple[str, ...]:
     """Normalize the one or more class-I alleles annotated for a Braun epitope."""
+    from mhctools.allele_normalization import normalize_allele_name
+
     matches = BRAUN_ALLELE.findall(str(value))
     if not matches:
         raise ValueError(f"Could not parse a Braun HLA value: {value!r}")

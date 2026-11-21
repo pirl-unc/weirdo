@@ -19,16 +19,20 @@ from pathlib import Path
 import re
 import sys
 
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/weirdo-tcr-visible-nonself")
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from Bio.Align import substitution_matrices
 from scipy.sparse import csr_matrix, hstack
 from sklearn.feature_extraction import DictVectorizer
+
+
+def _pyplot():
+    os.environ.setdefault("MPLCONFIGDIR", "/tmp/weirdo-tcr-visible-nonself")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    return plt
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -52,11 +56,12 @@ COHORTS = {
     "yellow_fever_17d": ("Yellow fever 17D", "viral"),
     "multivirus_concise_set": ("Multi-virus panel", "viral"),
 }
+from weirdo.blosum import blosum62_dict as BLOSUM_SOURCE
+
 AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 AA_INDEX = {amino_acid: index for index, amino_acid in enumerate(AMINO_ACIDS)}
-BLOSUM_SOURCE = substitution_matrices.load("BLOSUM62")
 BLOSUM62 = np.asarray(
-    [[BLOSUM_SOURCE[a, b] for b in AMINO_ACIDS] for a in AMINO_ACIDS],
+    [[BLOSUM_SOURCE[a][b] for b in AMINO_ACIDS] for a in AMINO_ACIDS],
     dtype=float,
 )
 
@@ -612,6 +617,7 @@ def style_axis(axis) -> None:
 
 
 def plot_heatmap(results: pd.DataFrame, output: Path) -> None:
+    plt = _pyplot()
     selected = (
         "taxonomy",
         "prime",
@@ -649,6 +655,7 @@ def plot_heatmap(results: pd.DataFrame, output: Path) -> None:
 
 
 def plot_macro(macro: pd.DataFrame, output: Path) -> None:
+    plt = _pyplot()
     selected = (
         "taxonomy",
         "prime",
@@ -690,6 +697,7 @@ def plot_macro(macro: pd.DataFrame, output: Path) -> None:
 
 
 def plot_self_gating(results: pd.DataFrame, output: Path) -> None:
+    plt = _pyplot()
     selected = ("ungated_self", "same_hla_self", "pseudo_haplotype_self")
     labels = {
         "ungated_self": "Nearest human\n(no HLA gate)",
@@ -719,6 +727,7 @@ def plot_self_gating(results: pd.DataFrame, output: Path) -> None:
 
 
 def plot_roc(predictions: pd.DataFrame, output: Path) -> None:
+    plt = _pyplot()
     models = (
         ("mhc_baseline", "MHC baseline", MUTED),
         ("tcr_face_exact_allele", "+ face/exact HLA", BLUE),

@@ -24,7 +24,8 @@ from typing import Iterable
 
 import numpy as np
 import pandas as pd
-from Bio.Align import substitution_matrices
+
+from weirdo.blosum import blosum62_dict
 
 
 AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
@@ -107,10 +108,9 @@ def binary_one_hot(values: np.ndarray) -> tuple[np.ndarray, int]:
 
 def blosum62_array() -> np.ndarray:
     """Return BLOSUM62 in the canonical residue order used by this script."""
-    source = substitution_matrices.load("BLOSUM62")
     return np.asarray(
         [
-            [float(source[left, right]) for right in AMINO_ACIDS]
+            [float(blosum62_dict[left][right]) for right in AMINO_ACIDS]
             for left in AMINO_ACIDS
         ],
         dtype=np.float32,

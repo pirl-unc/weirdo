@@ -30,7 +30,7 @@ from .peptide_content_models import (
 )
 
 # Rank-normalized pMHC + Weirdo score
-from .pmhc_score import pmhc_weirdo_score
+from .pmhc_score import face_surprise, pmhc_weirdo_score
 from .reference_proteomes import (
     REFERENCE_PROTEOMES,
     DownloadedReferenceProteome,
@@ -150,6 +150,8 @@ __all__ = [
     "fetch_reference_proteome",
     "iter_fasta_sequences",
     # High-level scoring API
+    "pmhc_weirdo_score",
+    "face_surprise",
     "score_peptide",
     "score_peptides",
     "predict_categories",

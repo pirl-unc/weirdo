@@ -4,6 +4,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from scripts import evaluate_iedb_grouped_learning as grouped
 
@@ -32,6 +33,7 @@ def test_eligible_studies_need_size_and_both_classes():
 
 
 def test_residual_ranker_runs_in_its_own_process():
+    pytest.importorskip("xgboost")
     # xgboost and torch load different OpenMP runtimes, so fit in a subprocess.
     code = (
         "import sys; sys.path.insert(0, %r)\n"

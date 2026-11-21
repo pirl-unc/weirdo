@@ -125,6 +125,22 @@ def pmhc_weirdo_score(
         raise ValueError("Presentation scores and BA ranks must have one value per peptide")
     if not (0.0 <= weirdo_weight <= 1.0 and 0.0 <= face_weight <= 1.0):
         raise ValueError("weirdo_weight and face_weight must be between 0 and 1")
+    if weirdo_scores is not None:
+        weirdo_scores = np.asarray(list(weirdo_scores), dtype=float)
+        if weirdo_scores.shape != (len(peptides),):
+            raise ValueError("weirdo_scores must have one value per peptide")
+    if not peptides:
+        return pd.DataFrame(
+            {
+                "peptide": pd.Series(dtype=str),
+                "presentation_rank": pd.Series(dtype=float),
+                "binding_rank": pd.Series(dtype=float),
+                "pmhc_core": pd.Series(dtype=float),
+                "weirdo_rank": pd.Series(dtype=float),
+                "face_rank": pd.Series(dtype=float),
+                "score": pd.Series(dtype=float),
+            }
+        )
     presentation_rank = _rank(presentation, "presentation")
     binding_rank = _rank(-ba_rank, "negative_ba_rank")
     core = (presentation_rank + binding_rank) / 2.0

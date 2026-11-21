@@ -17,17 +17,22 @@ import os
 from pathlib import Path
 import sys
 
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/weirdo-taxonomy-response-20")
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, log_loss, roc_auc_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+
+
+def _pyplot():
+    os.environ.setdefault("MPLCONFIGDIR", "/tmp/weirdo-taxonomy-response-20")
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    return plt
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -294,6 +299,7 @@ def external_evaluation(train: pd.DataFrame, external: pd.DataFrame, draws: int)
 
 def plot_internal(results: pd.DataFrame, path: Path) -> None:
     """Draw the response-screen result only for the neoantigen/tumor cohorts."""
+    plt = _pyplot()
     values = (
         results.loc[results["domain"].eq("tumor")]
         .groupby(["experiment_id", "description"], as_index=False)["delta_auc"]
@@ -314,6 +320,7 @@ def plot_internal(results: pd.DataFrame, path: Path) -> None:
 
 def plot_external(results: pd.DataFrame, path: Path) -> None:
     """Plot raw external AUC changes without selecting a winner."""
+    plt = _pyplot()
     benchmarks = tuple(results["benchmark"].drop_duplicates())
     figure, axes = plt.subplots(1, len(benchmarks), figsize=(16, 7), sharey=True)
     for axis, benchmark in zip(np.atleast_1d(axes), benchmarks):

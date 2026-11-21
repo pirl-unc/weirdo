@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from scripts.prepare_external_neoantigen_benchmarks import (
     extract_braun,
@@ -9,10 +10,13 @@ from scripts.prepare_external_neoantigen_benchmarks import (
 
 
 def test_parse_braun_alleles_accepts_compound_annotation():
+    pytest.importorskip("mhctools")
     assert parse_braun_alleles("C0602, A6601") == ("HLA-A*66:01", "HLA-C*06:02")
 
 
 def test_extract_tesla_removes_nonconflicting_duplicate_rows(tmp_path):
+    pytest.importorskip("mhctools")
+    pytest.importorskip("openpyxl")
     path = tmp_path / "tesla.xlsx"
     with pd.ExcelWriter(path) as writer:
         pd.DataFrame(
@@ -28,6 +32,8 @@ def test_extract_tesla_removes_nonconflicting_duplicate_rows(tmp_path):
 
 
 def test_extract_braun_collapses_vaccine_construct_repeats(tmp_path):
+    pytest.importorskip("mhctools")
+    pytest.importorskip("openpyxl")
     path = tmp_path / "braun.xlsx"
     base = {
         "Patient_ID": [101, 101, 102],
@@ -49,6 +55,8 @@ def test_extract_braun_collapses_vaccine_construct_repeats(tmp_path):
 
 
 def test_extract_braun_constructs_retains_overlapping_vaccine_constructs(tmp_path):
+    pytest.importorskip("mhctools")
+    pytest.importorskip("openpyxl")
     path = tmp_path / "braun.xlsx"
     frame = pd.DataFrame(
         {
