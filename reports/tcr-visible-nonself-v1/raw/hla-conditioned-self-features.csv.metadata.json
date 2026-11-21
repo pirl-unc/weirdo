@@ -1,0 +1,13 @@
+{
+  "binding_thresholds_nm": [
+    50,
+    500,
+    5000
+  ],
+  "candidate_rows": 296095,
+  "candidates": "reports/tcr-visible-nonself-v1/raw/human-self-candidates.csv.gz",
+  "mhcflurry_version": [],
+  "scores": "reports/taxonomy-objective-tcell-v1/raw/balanced-unique-softmax-tcell-scores.csv.gz",
+  "unique_query_peptide_hla_pairs": 18576,
+  "unique_self_peptide_hla_pairs_scored": 274557
+}

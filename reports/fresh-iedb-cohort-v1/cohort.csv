@@ -1,0 +1,1223 @@
+pmid,peptide,hla,outcome,source_organism
+16247014,KIFSEVTLK,HLA-A*03:01,1,
+16247014,TLDWLLQTPK,HLA-A*03:01,1,
+16247014,KILDAVVAQK,HLA-A*03:01,1,
+16247014,RPHVPESAF,HLA-B*07:02,1,
+16247014,SHETVIIEL,HLA-B*38:01,1,
+16247014,KIFSEVTPK,HLA-A*03:01,1,
+16247014,TLGWLLQTPK,HLA-A*03:01,0,
+16247014,KILDAVVAQE,HLA-A*03:01,0,
+16247014,GPHVPESAF,HLA-B*07:02,0,
+16247014,SHETVTIEL,HLA-B*38:01,0,
+16247014,QCSGNFMGF,HLA-A*26:01,1,
+16247014,LHHAFVDSIF,HLA-B*38:01,1,
+16247014,SSPGCQPPA,HLA-B*38:01,1,
+18753217,ESEYYPRRY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,WSEFSRNGVY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,ALDLTTSAGY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,AMEQGVKDY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,SVDSEAVREY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,DLDQFRMIAY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,YGEFTMLGIY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,PADAQSSCY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,QPDVATCRFY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,FIDRRTQVRY,HLA-A*01:01,0,Coxsackievirus B3
+18753217,SLFCQMVSSV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,KLNSSVYSL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,AIADLLKSV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,SLAEKLNSSV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,IMIKSLPAL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,SILEKSLKAL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,LLESQIATI,HLA-A*02:01,0,Coxsackievirus B3
+18753217,FLAKEEVEV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,ALVKIISAL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,DLITVTATL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,KIISALVIV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,NLELTLLKL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,CLKMLLEKL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,GLNLPMVTYV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,WLKVKILPEV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,KLPDALSNL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,LMNDQEVGVL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,SLSPVWFACL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,EVREKHEFL,HLA-A*02:01,0,Coxsackievirus B3
+18753217,ILMNEQEVGV,HLA-A*02:01,1,Coxsackievirus B3
+18753217,ILMNDHEVGV,HLA-A*02:01,1,Coxsackievirus B3
+18753217,ILMNDQKVGV,HLA-A*02:01,0,Coxsackievirus B3
+18753217,ILMNDQEIGV,HLA-A*02:01,1,Coxsackievirus B3
+18753217,ILMNDQEVSV,HLA-A*02:01,1,Coxsackievirus B3
+18753217,ILMNDQEVGI,HLA-A*02:01,1,Coxsackievirus B3
+22508927,ATDALMTGF,HLA-A*01:01,1,Orthohepacivirus hominis
+22508927,GPRLGVRTT,HLA-B*07:02,1,Orthohepacivirus hominis
+22508927,RLWHYPCTV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,CINGVCWTI,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,HSKKKCDDL,HLA-B*08:01,1,Orthohepacivirus hominis
+22508927,HSKKKCDEF,HLA-B*08:01,1,Orthohepacivirus hominis
+22508927,YLLPRRGPRL,HLA-A*02:01,0,Orthohepacivirus hominis
+22508927,GPRLGVRAT,HLA-B*07:02,1,Orthohepacivirus hominis
+22508927,RLGVRATRK,HLA-A*03:01,0,Orthohepacivirus hominis
+22508927,KTSERSQPR,HLA-A*03:01,0,Orthohepacivirus hominis
+22508927,DLMGYIPLV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,LLALLSCLTV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,FLVGQLFTF,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,SLLAPGAKQNV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,RMYVGGVEHR,HLA-A*03:01,1,Orthohepacivirus hominis
+22508927,LEDRDRSEL,HLA-B*40:01,1,Orthohepacivirus hominis
+22508927,HPALVFDIT,HLA-B*07:02,1,Orthohepacivirus hominis
+22508927,RPALVFDIT,HLA-B*07:02,0,Orthohepacivirus hominis
+22508927,CINGVCWTV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,CTCGSSDLY,HLA-A*01:01,0,Orthohepacivirus hominis
+22508927,YLVTRHADV,HLA-A*02:01,0,Orthohepacivirus hominis
+22508927,TLGFGAYMSK,HLA-A*03:01,0,Orthohepacivirus hominis
+22508927,LGFGAYMSK,HLA-A*03:01,0,Orthohepacivirus hominis
+22508927,GIDPNIRTGV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,GVDPNIRTGV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,HPNIEEVAL,HLA-B*35:01,1,Orthohepacivirus hominis
+22508927,IPFYGKAI,HLA-B*07:02,0,Orthohepacivirus hominis
+22508927,HSKKKCDEL,HLA-B*08:01,1,Orthohepacivirus hominis
+22508927,KLVALGINAV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,ATDALMTGY,HLA-A*01:01,1,Orthohepacivirus hominis
+22508927,SLMAFTAAV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,LLFNILGGWV,HLA-A*02:01,0,Orthohepacivirus hominis
+22508927,ILAGYGAGV,HLA-A*02:01,0,Orthohepacivirus hominis
+22508927,GVAGALVAFK,HLA-A*03:01,0,Orthohepacivirus hominis
+22508927,VAGALVAFK,HLA-A*03:01,0,Orthohepacivirus hominis
+22508927,VLSDFKTWL,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,DVVCCSMSY,HLA-A*26:01,0,Orthohepacivirus hominis
+22508927,RLIVFPDLGV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,RVCEKMALY,HLA-A*03:01,1,Orthohepacivirus hominis
+22508927,GLQDCTMLV,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,RLGVRATRK,HLA-A*11:01,0,Orthohepacivirus hominis
+22508927,RLGVRATRK,HLA-A*31:01,0,Orthohepacivirus hominis
+22508927,KTSERSQPR,HLA-A*11:01,0,Orthohepacivirus hominis
+22508927,KTSERSQPR,HLA-A*31:01,0,Orthohepacivirus hominis
+22508927,RMYVGGVEHR,HLA-A*11:01,0,Orthohepacivirus hominis
+22508927,RMYVGGVEHR,HLA-A*31:01,0,Orthohepacivirus hominis
+22508927,LEDRDRSEL,HLA-B*40:02,1,Orthohepacivirus hominis
+22508927,LGFGAYMSK,HLA-A*11:01,0,Orthohepacivirus hominis
+22508927,HPNIEEVAL,HLA-B*35:03,1,Orthohepacivirus hominis
+22508927,GVAGALVAFK,HLA-A*11:01,0,Orthohepacivirus hominis
+22508927,VAGALVAFK,HLA-A*11:01,0,Orthohepacivirus hominis
+22508927,RLWHYPCTI,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,RLWHYPCTA,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,RLWHYPCTT,HLA-A*02:01,1,Orthohepacivirus hominis
+22508927,KLVALMGINAV,HLA-A*02:01,1,Orthohepacivirus hominis
+23152369,ELKSRYWAI,HLA-B*08:01,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,RRSGAAGAAMK,HLA-B*27:05,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,VLRGSVAHK,HLA-A*03:01,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,AVMEKNIVL,HLA-A*02:01,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,LPFERATVL,HLA-B*35:01,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,RKSGAAGAAVK,HLA-B*27:05,0,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,RRSGAAGAAVE,HLA-B*27:05,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,AIMEKNIIL,HLA-A*02:01,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+23152369,CTELKLNDY,HLA-A*01:01,1,Influenza A virus (A/Indiana/08/2011(H3N2))
+26092843,LYPSLIFDI,HLA-A*02:01,1,Hepatitis C virus subtype 3a
+26092843,LVRSVMGGKY,HLA-A*03:01,1,Hepatitis C virus subtype 3a
+26092843,FQMIILSIGR,HLA-B*27:05,1,Hepatitis C virus subtype 3a
+26092843,LVTRDADVI,HLA-A*03:01,1,Hepatitis C virus subtype 3a
+26092843,IPFYGKAIPI,HLA-B*51:01,1,Hepatitis C virus subtype 3a
+26092843,RVLLDILAGY,HLA-A*26:01,1,Hepatitis C virus subtype 3a
+26092843,VLDDHYKTAL,HLA-A*02:01,1,Hepatitis C virus subtype 3a
+26092843,RVKARMLTI,HLA-B*08:01,1,Hepatitis C virus subtype 3a
+26092843,LYPSLIFDI,HLA-A*24:02,1,Hepatitis C virus subtype 3a
+26092843,ATDALMTGY,HLA-A*01:01,1,Hepatitis C virus subtype 3a
+26092843,LLHPSLVFDI,HLA-A*24:02,1,Hepatitis C virus subtype 3a
+26092843,VVHPTLVFDI,HLA-A*24:02,0,Hepatitis C virus subtype 3a
+26092843,MVHPELIFTI,HLA-A*24:02,0,Hepatitis C virus subtype 3a
+26092843,KVLLDILAGY,HLA-A*24:02,0,Hepatitis C virus subtype 3a
+26092843,ATDALMTGF,HLA-A*01:01,1,Hepatitis C virus subtype 3a
+26092843,LHPSLIFDI,HLA-A*02:01,0,Hepatitis C virus subtype 3a
+26092843,LLHPSLIFDI,HLA-A*24:02,0,Hepatitis C virus subtype 3a
+26092843,LVRSAMGGKY,HLA-A*03:01,0,Hepatitis C virus subtype 3a
+26092843,VLDDHYKIAL,HLA-A*02:01,0,Hepatitis C virus subtype 3a
+26092843,RVKARMLTM,HLA-B*08:01,0,Hepatitis C virus subtype 3a
+26107956,RDAVILLM,HLA-B*37:01,1,Hepatitis C virus genotype 1
+26107956,ARMILLTHF,HLA-B*27:05,1,Hepatitis C virus genotype 1
+26107956,ARMILMTHF,HLA-B*27:05,1,Hepatitis C virus genotype 1
+26107956,VRMILLTHF,HLA-B*27:05,1,Hepatitis C virus genotype 1
+26107956,VRMILMTHF,HLA-B*27:05,1,Hepatitis C virus genotype 1
+26107956,VVLFGLMAL,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,VLFGLMALTL,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,KLYISWCLW,HLA-A*01:01,1,Hepatitis C virus genotype 1
+26107956,QMAMIKLGAL,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,KLVALGLNAV,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,ATDALMTGY,HLA-A*01:01,1,Hepatitis C virus genotype 1
+26107956,IMSGEVPSM,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,GEVPSTEDL,HLA-B*40:01,1,Hepatitis C virus genotype 1
+26107956,VPSMEDLVNL,HLA-B*07:02,1,Hepatitis C virus genotype 1
+26107956,ILDSFDPLV,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,KFPLAMPVW,HLA-A*24:02,1,Hepatitis C virus genotype 1
+26107956,FAPALPIWAR,HLA-A*11:01,1,Hepatitis C virus genotype 1
+26107956,VLTESSVSTA,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,SSVSTALAEL,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,GVQEDAASLR,HLA-A*11:01,1,Hepatitis C virus genotype 1
+26107956,QLEQALDCEIY,HLA-A*01:01,1,Hepatitis C virus genotype 1
+26107956,DLPLIIQRL,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,AICGKYLFNW,HLA-B*44:02,1,Hepatitis C virus genotype 1
+26107956,YFLTRVEAQL,HLA-C*04:01,1,Hepatitis C virus genotype 1
+26107956,LETTMRSPVF,HLA-B*44:02,1,Hepatitis C virus genotype 1
+26107956,GAYMSKAHGI,HLA-A*11:01,1,Hepatitis C virus genotype 1
+26107956,YRFVAPGER,HLA-B*27:01,1,Hepatitis C virus genotype 1
+26107956,KQSGENFPYL,HLA-B*27:01,1,Hepatitis C virus genotype 1
+26107956,TLTHPVTK,HLA-A*11:01,1,Hepatitis C virus genotype 1
+26107956,SQLSAPSLK,HLA-B*27:05,1,Hepatitis C virus genotype 1
+26107956,ARDQLEQAL,HLA-B*27:01,1,Hepatitis C virus genotype 1
+26107956,QRLHGLSAF,HLA-B*27:01,1,Hepatitis C virus genotype 1
+26107956,SPGEINRVAA,HLA-B*55:01,1,Hepatitis C virus genotype 1
+26107956,ARSVRAKLL,HLA-B*44:01,1,Hepatitis C virus genotype 1
+26107956,GRAAICGRY,HLA-B*27:01,1,Hepatitis C virus genotype 1
+26107956,GILVLFGFF,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,ILVLFGFFTL,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,KLRGMGLNAV,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,ATDALMTGF,HLA-A*01:01,1,Hepatitis C virus genotype 1
+26107956,IMGGELPTA,HLA-A*02:01,1,Hepatitis C virus genotype 1
+26107956,ILDSFEPLR,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,KYPPALPIW,HLA-A*24:02,0,Hepatitis C virus genotype 1
+26107956,YPPALPIWAR,HLA-A*11:01,0,Hepatitis C virus genotype 1
+26107956,QLDGSNVSAA,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,SNVSAALAAL,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,VRMVMMTHF,HLA-B*27:01,0,Hepatitis C virus genotype 1
+26107956,KICGLYLFNW,HLA-B*44:01,0,Hepatitis C virus genotype 1
+26107956,YTICRCEAAL,HLA-C*04:01,0,Hepatitis C virus genotype 1
+26107956,GSFMSRAYGT,HLA-C*04:01,0,Hepatitis C virus genotype 1
+26107956,SQLSAPSLK,HLA-B*27:01,1,Hepatitis C virus genotype 1
+26107956,ARAVRAKLI,HLA-B*44:01,0,Hepatitis C virus genotype 1
+26107956,VVLVGLMAL,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,VVLAGLMAL,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,VVLVGLMVL,HLA-A*02:01,0,Hepatitis C virus genotype 1
+26107956,GVLVLFGFF,HLA-A*02:01,0,Hepatitis C virus genotype 1
+28031159,SASPLPVV,HLA-B*51:02,0,Homo sapiens
+28031159,STPSASPLPV,HLA-C*15:02,0,Homo sapiens
+28031159,STPSASPLPVV,HLA-C*15:02,1,Homo sapiens
+28031159,AFGSAHLYR,HLA-A*31:01,0,Homo sapiens
+28031159,VIAFGSAHLYR,HLA-A*31:01,0,Homo sapiens
+28031159,ISANAVERIV,HLA-C*15:02,0,Homo sapiens
+28031159,SASPLSVV,HLA-B*51:02,1,Homo sapiens
+28031159,STPSASPLSV,HLA-C*15:02,1,Homo sapiens
+28031159,AFGSAHLFR,HLA-A*31:01,1,Homo sapiens
+28031159,VIAFGSAHLFR,HLA-A*31:01,1,Homo sapiens
+28031159,ISANAVEQIV,HLA-C*15:02,1,Homo sapiens
+28031159,SVKSCKHKEK,HLA-A*30:01,1,Homo sapiens
+28031159,KSCKHTEK,HLA-A*30:01,1,Homo sapiens
+28031159,YGRKMHQICVL,HLA-C*12:03,1,Homo sapiens
+28031159,RMNFFGLLNFR,HLA-A*31:01,1,Homo sapiens
+28031159,MNFFGLLNFR,HLA-A*31:01,1,Homo sapiens
+28031159,RQWPQRAIRR,HLA-A*31:01,1,Homo sapiens
+28031159,RQWPQRAIR,HLA-A*31:01,1,Homo sapiens
+28031159,AFLSCICFR,HLA-A*31:01,1,Homo sapiens
+28031159,SAFLSCICFR,HLA-A*31:01,1,Homo sapiens
+28031159,LLQKLDYYGR,HLA-A*31:01,1,Homo sapiens
+28031159,LGYTGYRLR,HLA-C*15:02,1,Homo sapiens
+28031159,KARMNNLLL,HLA-C*12:02,1,Homo sapiens
+28031159,LGYTGYRLR,HLA-C*12:02,1,Homo sapiens
+28031159,STPSASPLSV,HLA-C*12:02,1,Homo sapiens
+28031159,STPSASPLPV,HLA-C*12:02,0,Homo sapiens
+29296522,CYMEAVAL,HLA-C*14:03,1,
+29296522,FWYTHNLIF,HLA-C*14:03,1,
+29296522,FQETHLPI,HLA-B*39:01,1,
+29296522,HLLSVEYQI,HLA-A*02:01,1,
+29296522,IHYTAQIIL,HLA-B*39:01,1,
+29296522,IHSTAQIIL,HLA-B*39:01,1,
+29296522,CYMEALAL,HLA-C*14:03,1,
+29296522,FWYTHNLFF,HLA-C*14:03,0,
+29296522,FQETHKNNPI,HLA-B*39:01,0,
+29296522,HLLSVGYQI,HLA-A*02:01,0,
+30714987,HMTEVVRHC,HLA-A*02:01,1,
+30714987,HMTEVVRRC,HLA-A*02:01,0,
+30714987,VVPYEPPEV,HLA-A*02:01,0,
+30714987,VVPCEPPEV,HLA-A*02:01,1,
+30737354,HQLDPAFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,ASTNRQSGRK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TSLNFLGGAPK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SLNFLGGAPK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TSCPPICPGYR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,LIFLLVLLDY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,STTSTGPCK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TTSTGPCK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,TSMFPSCCCTK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,IPIPSSWAFAK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,PIPSSWAFAK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,IPSSWAFAK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,PSSWAFAK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSWAFAKY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,MMWFWGPSLY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,NLNVSIPWTHK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,NVSIPWTHK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,VSIPWTHK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,KVGNFTGLY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YSSTVPCFNPK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSTVPCFNPK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,STVPCFNPK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,TVPCFNPK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,QTPSFPHIHLK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TPSFPHIHLK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,PSFPHIHLK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,SFPHIHLK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YVGPLTVNEK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,KLIMPARFY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,LVMPARFY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,NVTKYLPLDK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RHYLHTLWK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,STRSASFY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RLVFQTSK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,CSQSSGILSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SQSSGILSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,QSSGILSR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,GILPRSSVGPR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,SCIQSQLRK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RSQFKQSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SQLRKSRLGPK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,QQGSMASGK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SIRARVHPTSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,ASSASSCLY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSASSCLY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YQSAVRKK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SLISTSKR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TSKGHSSSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSSRHAVELR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RQFPPNTSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSARSQSER,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,WLQFRNSK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,LVVDFSQFSR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,VVDFSQFSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AAFYHLPLH,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSTSRNINY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RIINNQHR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,MQNLHSSCSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSCSRNLY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YSHPIILGFRK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,PIILGFRK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,FTSAICSVVRR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AICSVVRR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SVVRRAFPH,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,RAFPHCLAFSY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SYMDDVVLGAK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YMDDVVLGAK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SVYAAVTNFLL,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YSLNFMGY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,HIVQKIKMCFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,PVNRPIDWK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,AFTFSPTYK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,FTFSPTYK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AACFARSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,NSVVLSRK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,CAANWILR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SALNPADDPSR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,LVYRPTTGR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,TTGRTSLY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,FASPLHVAWK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,ASPLHVAWK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SPLHVAWK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RVCCQLDPAR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,STGPCALR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,VNAHWNLPK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,ALGNLPKVLHK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,VLPKVLHK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,EAYFKDCVFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AYFKDCVFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RLMIFVLGGCR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YVLGGCRHK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,CSTVQASK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TVQASKLCLGR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TVQASKLY,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RLWGMDIDPYK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,VVSYVNVNMR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,VSYVNVNMR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RQLLWFHISCR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,HISCLTFGR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TVIRRRGR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,RTQSPRRR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,RTQSPRRRR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,RSQSPRRRRSK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,SQSPRRRRSK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,STNPKPQK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,DLAQCFFCFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AVDLSHFLK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,NTLEQTVKK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,QIMYNYPAM,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,ANTMAMMAR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AMLTAFFLR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,STFWPCLLR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SSAYVFSVK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AVVSLLRLLK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,SQIGAGVYK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,KTFDSEYVK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,RIYSDPLALK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,ATVLMGLGK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,TVMDIISRR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,RTTWSIHAK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,RQMEGEGVFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AVQTKPGLFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,GAMLFLISGK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,KSGAIKVLK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,KTFVDLMRR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,MANEMGFLEK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,MSYTMCSGK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,MVSRLLLNR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,RQLANAIFK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TSGSPIIDK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,TTKRDLGMSK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,VTRGAVLMHK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,YVSAIAQTEK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,LVTFLLLCGR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,LVSFLLLAGR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,FTNDSIISH,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TTYLGPLSCK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AINSEMFLR,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,TLALEVAQQK,HLA-A*11:01,0,Human betaherpesvirus 5
+30737354,AMGDAGGYK,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,STLPETAVVRR,HLA-A*11:01,1,Human betaherpesvirus 5
+30737354,KTAYSHLSTSK,HLA-A*11:01,1,Human betaherpesvirus 5
+31921104,ILWIFSIYL,HLA-A*02:01,1,
+31921104,FLLDSCTKL,HLA-A*02:01,1,
+31921104,RLDAVLMEV,HLA-A*02:01,1,
+31921104,FMFVNSLLL,HLA-A*02:01,1,
+31921104,VLWDYVYQL,HLA-A*02:01,1,
+31921104,VLWDYVYQLL,HLA-A*02:01,1,
+31921104,AIDAALTFV,HLA-A*02:01,1,
+31921104,ILWTFSIYL,HLA-A*02:01,0,
+31921104,SLLDSCTKL,HLA-A*02:01,0,
+31921104,RPDAVLMEV,HLA-A*02:01,0,
+31921104,YLTDEDFEF,HLA-A*02:01,0,
+31921104,YLTDEDFEFA,HLA-A*02:01,0,
+31921104,SMFVNSLLL,HLA-A*02:01,0,
+31921104,YLTDKDFEF,HLA-A*02:01,1,
+31921104,LLWDYVYQL,HLA-A*02:01,0,
+31921104,LLWDYVYQLL,HLA-A*02:01,0,
+31921104,AIDAALTSV,HLA-A*02:01,0,
+31921104,EAAGIGILTV,HLA-A*02:01,0,
+31921104,ITDQVPFSV,HLA-A*02:01,0,
+31921104,ALWDRVVDL,HLA-A*02:01,1,
+31921104,YLSELLQTV,HLA-A*02:01,1,
+31921104,ELAGIGILTV,HLA-A*02:01,1,
+31921104,IMDQVPFSV,HLA-A*02:01,1,
+31921104,YLTDKDFEFA,HLA-A*02:01,1,
+34518289,KIFNFYPRK,HLA-A*03:01,0,
+34518289,KMKNFFFTK,HLA-A*03:01,0,
+34518289,RMLRRRAQK,HLA-A*03:01,0,
+34518289,TLYSPRGEK,HLA-A*03:01,0,
+34518289,AMYQRAKLK,HLA-A*03:01,0,
+34518289,SLLTPPSTK,HLA-A*03:01,0,
+34518289,RLMFFRPIK,HLA-A*03:01,0,
+34518289,SLYLKIHLK,HLA-A*03:01,0,
+34518289,KIYAAGTFY,HLA-A*03:01,0,
+34518289,YLFFIQGYK,HLA-A*03:01,0,
+34518289,TTYSPIGEK,HLA-A*03:01,0,
+34518289,RLYKLILWR,HLA-A*03:01,0,
+34518289,KTYPCKIFY,HLA-A*03:01,0,
+34518289,SLQPRGSFK,HLA-A*03:01,0,
+34518289,KVINLSPFK,HLA-A*03:01,0,
+34518289,CLFFGIPWK,HLA-A*03:01,0,
+34518289,KQFSAMALK,HLA-A*03:01,0,
+34518289,KLKLPIIMK,HLA-A*03:01,0,
+34518289,LLINRGFSK,HLA-A*03:01,0,
+34518289,RLKCPFYGK,HLA-A*03:01,0,
+34518289,KVMTDPSRK,HLA-A*03:01,0,
+34518289,RIAGKALKK,HLA-A*03:01,0,
+34518289,KLYQCNECK,HLA-A*03:01,0,
+34518289,RRFSSLYSF,HLA-B*27:05,0,
+34518289,RRLLILGRI,HLA-B*27:05,0,
+34518289,FRMFLTQGF,HLA-B*27:05,0,
+34518289,ARWTAFFGV,HLA-B*27:05,0,
+34518289,GRWALHSAF,HLA-B*27:05,0,
+34518289,KRFLHRQPL,HLA-B*27:05,0,
+34518289,ARFAVNLRL,HLA-B*27:05,0,
+34518289,WRNSFLLRY,HLA-B*27:05,0,
+34518289,YRIYDIPPK,HLA-B*27:05,0,
+34518289,ARLFLGLAI,HLA-B*27:05,0,
+34518289,YRHLFKVFR,HLA-B*27:05,0,
+34518289,FRFFTRKSL,HLA-B*27:05,0,
+34518289,RRHCRSYNR,HLA-B*27:05,0,
+34518289,KRRLLILGR,HLA-B*27:05,0,
+34518289,FRQSLYLKI,HLA-B*27:05,0,
+34518289,RRTQRYFMK,HLA-B*27:05,0,
+34518289,FRICPIFVF,HLA-B*27:05,0,
+34518289,KRTNVGILK,HLA-B*27:05,0,
+34518289,LRILRIKLR,HLA-B*27:05,0,
+34518289,KRHEVPVPL,HLA-B*27:05,0,
+34518289,HRYFFFVAM,HLA-B*27:05,0,
+34518289,FRFFATPAL,HLA-B*27:05,0,
+34518289,LRFSIIEEF,HLA-B*27:05,0,
+34518289,SRVILFSPL,HLA-B*27:05,0,
+34518289,RLFLGLAIK,HLA-A*03:01,1,
+34518289,RLFPGLAIK,HLA-A*03:01,0,
+34518289,GRIAFFLKY,HLA-B*27:05,1,
+34518289,GRIAFSLKY,HLA-B*27:05,0,
+34518289,KLILWRGLK,HLA-A*03:01,1,
+34518289,KPILWRGLK,HLA-A*03:01,0,
+34696226,ILQDGFLYV,HLA-A*02:01,1,Homo sapiens
+34696226,ILEDGFLYV,HLA-A*02:01,1,Homo sapiens
+34696226,VLDDSETTI,HLA-A*02:01,1,Homo sapiens
+34696226,VLADSETTI,HLA-A*02:01,1,Homo sapiens
+34696226,QVTDFLAPL,HLA-A*02:01,1,Homo sapiens
+34696226,EVTDFLAPL,HLA-A*02:01,0,Homo sapiens
+34696226,FLIQTEQKL,HLA-A*02:01,1,Homo sapiens
+34696226,FLVQTEQKL,HLA-A*02:01,1,Homo sapiens
+34696226,ALPQHLIRV,HLA-A*02:01,1,Homo sapiens
+34696226,LLGPNSFEV,HLA-A*02:01,1,Homo sapiens
+34696226,ILWRQDINL,HLA-A*02:01,1,Homo sapiens
+34696226,ILWRQDIDL,HLA-A*02:01,0,Homo sapiens
+34857854,VYSTGSNVF,HLA-A*24:02,0,Human coronavirus 229E
+34857854,YFPLQSYGF,HLA-A*24:02,0,Human coronavirus 229E
+34857854,TYVPAQEKNF,HLA-A*24:02,0,Human coronavirus 229E
+34857854,NFKDQVILL,HLA-A*24:02,0,Human coronavirus 229E
+34857854,LQELGKYEQ,HLA-A*24:02,0,Human coronavirus 229E
+34857854,ELGKYEQYI,HLA-A*24:02,0,Human coronavirus 229E
+34857854,LGKYEQYIK,HLA-A*24:02,0,Human coronavirus 229E
+34857854,GKYEQYIKW,HLA-A*24:02,1,Human coronavirus 229E
+34857854,KYEQYIKWP,HLA-A*24:02,1,Human coronavirus 229E
+34857854,EQYIKWPWY,HLA-A*24:02,0,Human coronavirus 229E
+34857854,YIKWPWYIW,HLA-A*24:02,1,Human coronavirus 229E
+34857854,IKWPWYIWL,HLA-A*24:02,1,Human coronavirus 229E
+34857854,KWPWYIWLG,HLA-A*24:02,1,Human coronavirus 229E
+34857854,WPWYIWLGF,HLA-A*24:02,1,Human coronavirus 229E
+34857854,PWYIWLGFI,HLA-A*24:02,1,Human coronavirus 229E
+34857854,WYIWLGFIA,HLA-A*24:02,1,Human coronavirus 229E
+34857854,YIWLGFIAG,HLA-A*24:02,1,Human coronavirus 229E
+34857854,IWLGFIAGL,HLA-A*24:02,1,Human coronavirus 229E
+34857854,WLGFIAGLI,HLA-A*24:02,1,Human coronavirus 229E
+34857854,LGFIAGLIA,HLA-A*24:02,1,Human coronavirus 229E
+34857854,QYIKWPWYV,HLA-A*24:02,1,Human coronavirus 229E
+34857854,YYNKWPWYI,HLA-A*24:02,1,Human coronavirus 229E
+34857854,MYVKWPWYV,HLA-A*24:02,1,Human coronavirus 229E
+34857854,YYVKWPWYV,HLA-A*24:02,1,Human coronavirus 229E
+34857854,NYIKWPWWV,HLA-A*24:02,1,Human coronavirus 229E
+34857854,TYIKWPWWV,HLA-A*24:02,1,Human coronavirus 229E
+35648703,GADGVGKSA,HLA-C*08:02,1,
+35648703,GAGGVGKSA,HLA-C*08:02,0,
+35648703,GADGVGKSAL,HLA-C*08:02,1,
+35648703,GAGGVGKSAL,HLA-C*08:02,0,
+39915487,VLQVRDVLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GLVEVEKGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,HVMVELVAEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VMVELVAEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VMVELVAELE,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ETLGVLVPHV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLGVLVPHV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLVPHVGEI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,CTLSEQLDFI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLSEQLDFI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVFPLNSII,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLDGFMGRI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLPQNAVVKI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GLNDNLLEI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GLNDNLLEIL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLNEEIAII,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLNEEIAIIL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILASFSAST,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FSASTSAFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,STSAFVETV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SILSPLYAFA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILSPLYAFA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LRLIDAMMFT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLIDAMMFTS,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLIDAMMFT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AMMFTSDLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMFTSDLAT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VVMAYITGGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YITGGVVQL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,WLTNIFGTV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TVYEKLKPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLRDGWEIV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLVNKFLAL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLALCADSI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLALCADSII,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALCADSIII,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KALNLGETFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLEGETLPT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMVTNNTFTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MVTNNTFTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KSVNITFEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTVELGTEV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AVIKTLQPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLQPVSELL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLFDESGEF,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLASHMYCS,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,WLDDDSQQTV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TTIQTIVEV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TIVEVQPQL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,QLEMELTPVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,QLEMELTPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLKLTDNVYI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MQVESDDYI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLAKHCLHV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLAKHCLHVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLLAPLLSA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLAPLLSAGI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLSAGIFGA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLSAGIFGAD,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLAVFDKNL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLVSSFLEM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KIAEIPKEEV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FITESKPSV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLTENLLLYI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLYIDINGNL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLKKDAPYI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLKKDAPYIV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLTAVVIPT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLAKALRKV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SAFYILPSI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,EILGTVSWNL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLMPVCVET,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLMPVCVETK,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLINTLNDL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLNDLNETL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLVTMPLGYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLDGADVTKI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLGRYMSAL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLATALLTLQ,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALLTLQQIEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLTLQQIEL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LILAYCNKTV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILAYCNKTV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLVQQESPFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LVQQESPFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,PFVMMSAPPA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVMMSAPPA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLDGVVCTEI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVCDNIKFA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLHKPIVWHV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLACEDLKPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YVDNSSLTI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLATHGLAAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLNKVVSTT,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YMPYFFTLL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLLQLCTFT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FCLEASFNYL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLLSVCLGSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLSVCLGSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GSLIYSTAAL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LIYSTAALGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLMSNLGMPS,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLETIQITI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FGLVAEWFLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GLVAEWFLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LVAEWFLAYI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YILFTRFFYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FTRFFYVLGL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MQLFFSYFAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MQLFFSYFA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FSYFAVHFI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VQMAPISAMV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YVWKSYVHVV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YVWKSYVHV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SQLMCQPILL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,QLMCQPILL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,QLMCQPILLL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LMCQPILLL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,PILLLDQALV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLDQALVSDV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KMFDAYVNT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NTFSSTFNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLDNVLSTFI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLSTFISAA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLSHQSDIEV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KQLIKVTLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AAIFYLITPV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLITPVHVM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTNDKACPL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVVPGLPGTI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLPRVFSAVG,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLIEYTDFA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLIEYTDFAT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTDFATSACV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SIIQFPNTYL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLEGSVRVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RSLPGVFCGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLPGVFCGVD,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLLTNMFTPL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLTNMFTPLI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLTNMFTPL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NMFTPLIQPI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IVAGGIVAI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VAFNTLLFL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLMSFTVLC,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FTVLCLTPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FTVLCLTPVY,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,CLTPVYSFL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YSFLPGVYSV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SFLPGVYSVI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SFLPGVYSV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLPGVYSVI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLYLTFYLT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLTFYLTNDV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLTNDVSFL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LTNDVSFLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLAHIQWMVM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,WMVMFTPLVP,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLLNKEMYLK,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLNPNYEDLL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLNPNYEDL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLVQAGNVQL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SMQNCVLKL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RIQPGQTFSV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IQPGQTFSV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLNGSCGSVG,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YMHHMELPT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ITVNVLAWL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NVLAWLYAA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AVINGDRWFL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLNRFTTTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLNRFTTTLN,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TTLNDFNLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLNDFNLVAM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLNDFNLVA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AVLDMCASL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLLVLVQST,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLVQSTQWSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LVQSTQWSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLFFFLYENA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLYENAFLPF,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLPFAMGII,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AMSAFAMMFV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MSAFAMMFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LFLLPSLATV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLLPSLATVA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLATVAYFNM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NMVYMPASWV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YMPASWVMRI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RIMTWLDMV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,CVMYASAVV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLMNVLTLVY,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NVLTLVYKV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLARGIVFM,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLARGIVFMC,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMCVEYCPIF,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMCVEYCPI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,CLLNRYFRL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LTLGVYDYLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLGVYDYLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GVYDYLVST,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLNIKLLGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KMSDVKCTSV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLLSVLQQL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLSVLQQLRV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLWAQCVQLH,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILLAKDTTEA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLAKDTTEA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KMVSLLSVL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLLSVLLSM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLLSVLLSMQ,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLLSMQGAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLPSYAAFA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SAMQTMLFTM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AMQTMLFTML,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLFTMLRKL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLDNDALNNI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FTYASALWEI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SALWEIQQVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALWEIQQVVD,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SMDNSPNLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLAWPLIVTA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVLALLSDL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALLSDLQDL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MVLGSLAATV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TVLSFCAFAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TVLSFCAFA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLASGGQPI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FTLKNTVCTV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLNRVCGVSA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLIDSYFVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLIDSYFVVK,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YQHEETIYNL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLLKDCPAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLTKYTMADL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTMADLVYA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TMADLVYAL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TMADLVYALR,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AMRNAGIVGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YSLLMPILTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLLMPILTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLLMPILTLT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLMPILTLT,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLMPILTLTR,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,CILHCANFNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILHCANFNVL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILHCANFNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLFSTVFPP,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLFSTVFPPT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KIFVDGVPFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IFVDGVPFVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IFVDGVPFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVDGVPFVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVDGVPFVVS,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLSFKELLV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLVYAADPAM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FSVAALTNNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SVAALTNNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TMCDIRQLL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RQLLFVVEV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RQLLFVVEVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TQMNLKYAI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLLKSIAAT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NMLKTVYSDV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NMLRIMASL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NMLRIMASLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RIMASLVLA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLSHRFYRL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLANECAQV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MVMCGGSLYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VMCGGSLYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VMCGGSLYVK,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SVFNICQAV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVNEFYAYL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SMMILSDDAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SMMILSDDA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMILSDDAVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMILSDDAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MILSDDAVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SVLYYQNNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLYYQNNVFM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMSEAKCWT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLVKQGDDYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RILGAGCFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLMIERFVSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LMIERFVSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LMIERFVSLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VSLAIDAYPL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLAIDAYPL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YADVFHLYL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,HMLDMYSVM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,HMLDMYSVML,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLDMYSVML,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLDMYSVMLT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLCNSQTSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLVLSVNPYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LVLSVNPYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LVLSVNPYVC,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLGGMSYYC,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLFAAETLKA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLSYGIATV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLSYGIATVR,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLSDRELHL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLNVGDYFVL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLNVGDYFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLTSHTVMPL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LTSHTVMPL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VMPLSAPTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VMPLSAPTLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLVPQEHYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GLALYYPSA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALYYPSARIV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALYYPSARI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTACSHAAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALCEKALKYL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YVFCTVNAL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALPETTADI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALPETTADIV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VVFDEISMA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SMATNYDLSV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MATNYDLSV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IVDTVSALV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AVASKILGL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KILGLPTQTV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILGLPTQTV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLQFTSLEI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GLFKDCSKV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GLCVDIPGI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLISMMGFKM,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMGFKMNYQV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YQVNGYPNM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LQLGFSTGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLVAVPTGYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,HLIPLMYKGL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LMYKGLPWNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLSDTLKNL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLSDRVVFVL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLSDRVVFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVLWAHGFEL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ELTSMKYFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YVYNPFMIDV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMIDVQQWGF,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMIDVQQWG,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AIMTRCLAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,CLAVHECFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RVDWTIEYPI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AALLADKFPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALLADKFPVL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALLADKFPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLADKFPVL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KQLPFFYYS,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLYLDAYNM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LYLDAYNMMI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLDAYNMMI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLDAYNMMIS,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NMMISAGFSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMISAGFSLW,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMISAGFSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MISAGFSLWV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YNLWNTFTRL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NLWNTFTRL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLENVAFNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLENVAFNVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KVDGVDVEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLPVNVAFEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SQMEIDFLEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLELAMDEFI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SQLGGLHLL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLLDDFVEI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLLDDFVEII,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLDDFVEII,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMLWCKDGHV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLWCKDGHV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLPKGIMMNV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IMMNVAKYT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,QLCQYLNTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLNTLTLAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLNTLTLAVP,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLTLAVPYNM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLAVPYNMRV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,WLPTGTLLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVSDADSTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,STLIGDCATV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLIGDCATV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLIGDCATVH,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLALGGSVAI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KITEHSWNA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLMGHFAWWT,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LMGHFAWWTA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LMGHFAWWT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLIGCNYLG,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YIFWRNTNPI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLFDMSKFPL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GQINDMILSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,QINDMILSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VVISSDVLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTNSFTRGV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLPFFSNVT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VTWFHAIHV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLIVNNATNV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FQFCNDPFL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FQFCNDPFLG,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SWMESEFRV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLLALHRSYL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLALHRSYL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YLQPRTFLLK,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLYNSASFST,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KIADYNYKL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RVVVLSFEL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLSFELLHA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FELLHAPATV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ELLHAPATV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,AIPTNFTISV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FTISVTTEIL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SVTTEILPV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KQIYKTPPI,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FIEDLLFNKV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ITSGWTFGA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALQIPFAMQM,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MQMAYRFNGI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLYENQKLI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLIANQFNSA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLSSTASAL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KQLSSNFGA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SVLNDILSRL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLDKVEAEV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLITGRLQSL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GRLQSLQTYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,GVVFLHVTYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLHVTYVPA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVSNGTHWFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVSGNCDVV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IMLCCMTSC,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MDLFMRIFTI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,DLFMRIFTI,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RIFTIGTVTL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLPFGWLIV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LIVGVALLAV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALLAVFQSA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FQSASKIITL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LALSKGVHFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALSKGVHFVC,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVTVYSHLL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,HLLLVAAGL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALVYFLQSI,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YFLQSINFV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLQSINFVRI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLYDANYFLC,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YQLYSTQLST,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FVSEETGTL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TLIVNSVLL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,IVNSVLLFL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VSLVKPSFYV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLVKPSFYVY,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KKLLEQWNLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLLEQWNLVI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,WLLWPVTLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLWPVTLAC,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LMWLSYFIA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FIASFRLFA,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILLNVPLHGT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLESELVIGA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LIIMRTFKV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SIWNLDYII,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YIINLIIKNL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ALITLATCEL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ELYHYQECV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FAFACPDGV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLFIRQEEV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ELYSPIFLIV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ELYSPIFLI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLGIITTVA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YVVDDPCPI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YIDIGNYTV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YIDIGNYTVS,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTVSCLPFTI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTVSCLPFT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLEYHDVRVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLLLDRLNQL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FGMSRIGMEV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,WLTYTGAIKL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MMPTIFFAGI,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LIVTTIVYL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLQLSLLQV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLLQVMAQQV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLQVMAQQV,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLFLNMTTRL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LFLNMTTRLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FLNMTTRLVV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TVLYYTVTSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,VLYYTVTSL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,YTVTSLQTI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,TQLNVQTLV,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NMLPSSSTI,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,MLPSSSTIKL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,STIKLLMSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLIQWNQFM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,LLIQWNQFMM,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMMNRRRLL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,FMMNRRRLLA,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KLMSTNLCT,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ELSLIDFYL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLIDFYLCFL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLIDFYLCF,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KISEMHPAL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,RLVDPQIQL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,KVYPIILRL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,SLEDKAFQL,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,ILRLGSPLSL,HLA-A*02:01,0,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+39915487,NYNYLYRLFR,HLA-A*02:01,1,Severe acute respiratory syndrome coronavirus 2 Wuhan/Hu-1/2019
+40687378,QLMPFGSLL,HLA-A*02:01,1,
+40687378,LMPFGSLLDYV,HLA-A*02:01,1,
+40687378,QLMPFGCLL,HLA-A*02:01,0,
+40687378,LMPFGCLLDYV,HLA-A*02:01,1,
+41136363,AIQDLCLAV,HLA-A*02:01,1,
+41136363,YIMSDSNYV,HLA-A*02:01,1,
+41136363,HIMSDSNYV,HLA-A*02:01,1,
+41136363,AIQDLWQWR,HLA-A*02:01,0,
+41136363,DIMSDSNYV,HLA-A*02:01,0,
+41312368,SLMHVPLSL,HLA-A*02:01,1,
+41312368,YLAKLIFEM,HLA-A*02:01,1,
+41312368,SLMHVPPSL,HLA-A*02:01,0,
+41312368,KLCPWFKNH,HLA-A*03:01,1,
+41312368,KLCPWFKND,HLA-A*03:01,0,
+41312368,LPALRFIGL,HLA-B*07:02,1,
+41312368,LPALRSIGL,HLA-B*07:02,0,
+41312368,TEETLHSCF,HLA-B*18:01,1,
+41312368,TEETLHSRF,HLA-B*18:01,0,
+41312368,NEDLPIIEYY,HLA-B*44:02,1,
+41312368,NEDSPIIEYY,HLA-B*44:02,0,
+41312368,GSDEGIEYY,HLA-A*02:01,1,
+41312368,KVDTSITGI,HLA-C*05:01,1,
+41312368,AEDAYTWRLGY,HLA-B*44:02,1,
+41312368,AEDAYTSRLGY,HLA-B*44:02,0,
+41312368,VPLSQPVCF,HLA-B*35:05,1,
+41312368,VPFSQPVCF,HLA-B*35:05,0,
+41312368,FQNTQGLMF,HLA-B*15:01,1,
+41312368,KMRDYLIAK,HLA-A*03:01,1,
+41312368,DCHELWSNKR,HLA-A*68:01,1,
+41312368,SSSFTSSSF,HLA-C*03:03,1,
+41312368,ESYFIYVYK,HLA-A*68:01,1,
+41407706,VLNDIFSRL,HLA-A*02:01,1,
+41407706,GVYFASIEK,HLA-A*03:01,1,
+41407706,RLDKVEAEV,HLA-A*02:01,0,
+41407706,KIADYNYKL,HLA-A*02:01,1,
+41407706,VLNDILARL,HLA-A*02:01,1,
+41407706,NIADYNYKL,HLA-A*02:01,1,
+41407706,TIADYNYKL,HLA-A*02:01,0,
+41407706,KLQDVVNQNA,HLA-A*02:01,0,
+41407706,KLQDVVNHNA,HLA-A*02:01,0,
+41407706,KLQNVVNQNA,HLA-A*02:01,1,
+41407706,ALAKIQSVV,HLA-A*02:01,1,
+41407706,ALNSLLQQL,HLA-A*02:01,0,
+41407706,SLQEILSRL,HLA-A*02:01,1,
+41407706,RLDALEAQV,HLA-A*02:01,1,
+41407706,ALNNLLQQL,HLA-A*02:01,1,
+41407706,NLPDFKEEL,HLA-A*02:01,0,
+41407706,ALEDLLFSKV,HLA-A*02:01,0,
+41407706,ALNHLTSQL,HLA-A*02:01,1,
+41407706,ALGKLQDVV,HLA-A*02:01,1,
+41407706,ELDSFKEEL,HLA-A*02:01,0,
+41407706,FIEDLLFNKV,HLA-A*02:01,1,
+41407706,RQIAPGQTGN,HLA-A*03:01,0,
+41407706,RQIAPGQTGT,HLA-A*03:01,0,
+41407706,VLNDILSRLDK,HLA-A*03:01,0,
+41407706,VLNDILARLDK,HLA-A*03:01,0,
+41407706,VLNDIFSRLDK,HLA-A*03:01,0,
+41407706,TLVKQLSSK,HLA-A*03:01,0,
+41407706,GKIADYNYK,HLA-A*03:01,0,
+41407706,GTIADYNYK,HLA-A*03:01,0,
+41407706,GNIADYNYK,HLA-A*03:01,0,
+41407706,TTEILPVSMTK,HLA-A*03:01,0,
+41407706,DVYYHKNNK,HLA-A*03:01,0,
+41407706,AIEDILFSK,HLA-A*03:01,0,
+41407706,GVYHKNNK,HLA-A*03:01,0,
+41407706,FLDHKNNK,HLA-A*03:01,0,
+41407706,NLAPFFTFK,HLA-A*03:01,0,
+41407706,ALEDLLFSK,HLA-A*03:01,1,
+41407706,FIEDLLFNK,HLA-A*03:01,1,
+41407706,RSFIEDLLFNK,HLA-A*03:01,0,
+41407706,RSAIEDILFSK,HLA-A*03:01,0,
+41407706,AIHVSGTNGTK,HLA-A*03:01,0,
+41407706,AISGTNGTK,HLA-A*03:01,0,
+41407706,VISGTNGTK,HLA-A*03:01,1,
+41407706,YFQPRTFLL,HLA-A*02:01,1,
+41407706,YLQLRTFLL,HLA-A*02:01,1,
+41407706,YLQPRHFLL,HLA-A*02:01,1,
+41407706,YLQPRTFLF,HLA-A*02:01,1,
+41407706,ALQPRTFLL,HLA-A*02:01,1,
+41407706,RLQPRTFLL,HLA-A*02:01,1,
+41407706,NLQPRTFLL,HLA-A*02:01,1,
+41407706,DLQPRTFLL,HLA-A*02:01,1,
+41407706,CLQPRTFLL,HLA-A*02:01,1,
+41407706,ELQPRTFLL,HLA-A*02:01,1,
+41407706,QLQPRTFLL,HLA-A*02:01,1,
+41407706,GLQPRTFLL,HLA-A*02:01,1,
+41407706,HLQPRTFLL,HLA-A*02:01,1,
+41407706,ILQPRTFLL,HLA-A*02:01,1,
+41407706,LLQPRTFLL,HLA-A*02:01,1,
+41407706,KLQPRTFLL,HLA-A*02:01,1,
+41407706,MLQPRTFLL,HLA-A*02:01,1,
+41407706,FLQPRTFLL,HLA-A*02:01,1,
+41407706,PLQPRTFLL,HLA-A*02:01,1,
+41407706,SLQPRTFLL,HLA-A*02:01,1,
+41407706,TLQPRTFLL,HLA-A*02:01,1,
+41407706,WLQPRTFLL,HLA-A*02:01,1,
+41407706,VLQPRTFLL,HLA-A*02:01,1,
+41407706,YAQPRTFLL,HLA-A*02:01,1,
+41407706,YRQPRTFLL,HLA-A*02:01,1,
+41407706,YNQPRTFLL,HLA-A*02:01,1,
+41407706,YDQPRTFLL,HLA-A*02:01,1,
+41407706,YCQPRTFLL,HLA-A*02:01,1,
+41407706,YEQPRTFLL,HLA-A*02:01,1,
+41407706,YQQPRTFLL,HLA-A*02:01,1,
+41407706,YGQPRTFLL,HLA-A*02:01,1,
+41407706,YHQPRTFLL,HLA-A*02:01,1,
+41407706,YIQPRTFLL,HLA-A*02:01,1,
+41407706,YKQPRTFLL,HLA-A*02:01,1,
+41407706,YMQPRTFLL,HLA-A*02:01,1,
+41407706,YPQPRTFLL,HLA-A*02:01,1,
+41407706,YSQPRTFLL,HLA-A*02:01,1,
+41407706,YTQPRTFLL,HLA-A*02:01,1,
+41407706,YWQPRTFLL,HLA-A*02:01,1,
+41407706,YVQPRTFLL,HLA-A*02:01,1,
+41407706,YYQPRTFLL,HLA-A*02:01,1,
+41407706,YLAPRTFLL,HLA-A*02:01,1,
+41407706,YLRPRTFLL,HLA-A*02:01,1,
+41407706,YLNPRTFLL,HLA-A*02:01,1,
+41407706,YLCPRTFLL,HLA-A*02:01,1,
+41407706,YLEPRTFLL,HLA-A*02:01,1,
+41407706,YLGPRTFLL,HLA-A*02:01,1,
+41407706,YLHPRTFLL,HLA-A*02:01,1,
+41407706,YLIPRTFLL,HLA-A*02:01,1,
+41407706,YLLPRTFLL,HLA-A*02:01,1,
+41407706,YLKPRTFLL,HLA-A*02:01,1,
+41407706,YLMPRTFLL,HLA-A*02:01,1,
+41407706,YLPPRTFLL,HLA-A*02:01,1,
+41407706,YLSPRTFLL,HLA-A*02:01,1,
+41407706,YLTPRTFLL,HLA-A*02:01,1,
+41407706,YLVPRTFLL,HLA-A*02:01,1,
+41407706,YLQARTFLL,HLA-A*02:01,1,
+41407706,YLQRRTFLL,HLA-A*02:01,1,
+41407706,YLQNRTFLL,HLA-A*02:01,1,
+41407706,YLQDRTFLL,HLA-A*02:01,1,
+41407706,YLQCRTFLL,HLA-A*02:01,1,
+41407706,YLQERTFLL,HLA-A*02:01,1,
+41407706,YLQQRTFLL,HLA-A*02:01,1,
+41407706,YLQGRTFLL,HLA-A*02:01,1,
+41407706,YLQHRTFLL,HLA-A*02:01,1,
+41407706,YLQIRTFLL,HLA-A*02:01,1,
+41407706,YLQKRTFLL,HLA-A*02:01,1,
+41407706,YLQMRTFLL,HLA-A*02:01,1,
+41407706,YLQFRTFLL,HLA-A*02:01,1,
+41407706,YLQSRTFLL,HLA-A*02:01,1,
+41407706,YLQTRTFLL,HLA-A*02:01,1,
+41407706,YLQWRTFLL,HLA-A*02:01,1,
+41407706,YLQVRTFLL,HLA-A*02:01,1,
+41407706,YLQPKTFLL,HLA-A*02:01,1,
+41407706,YLQPRAFLL,HLA-A*02:01,1,
+41407706,YLQPRRFLL,HLA-A*02:01,1,
+41407706,YLQPRNFLL,HLA-A*02:01,1,
+41407706,YLQPRCFLL,HLA-A*02:01,1,
+41407706,YLQPRGFLL,HLA-A*02:01,1,
+41407706,YLQPRIFLL,HLA-A*02:01,1,
+41407706,YLQPRLFLL,HLA-A*02:01,1,
+41407706,YLQPRMFLL,HLA-A*02:01,1,
+41407706,YLQPRSFLL,HLA-A*02:01,1,
+41407706,YLQPRWFLL,HLA-A*02:01,1,
+41407706,YLQPRVFLL,HLA-A*02:01,1,
+41407706,YLQPRYFLL,HLA-A*02:01,1,
+41407706,YLQPRTALL,HLA-A*02:01,1,
+41407706,YLQPRTNLL,HLA-A*02:01,1,
+41407706,YLQPRTCLL,HLA-A*02:01,1,
+41407706,YLQPRTQLL,HLA-A*02:01,1,
+41407706,YLQPRTGLL,HLA-A*02:01,1,
+41407706,YLQPRTHLL,HLA-A*02:01,1,
+41407706,YLQPRTILL,HLA-A*02:01,1,
+41407706,YLQPRTLLL,HLA-A*02:01,1,
+41407706,YLQPRTMLL,HLA-A*02:01,1,
+41407706,YLQPRTPLL,HLA-A*02:01,1,
+41407706,YLQPRTSLL,HLA-A*02:01,1,
+41407706,YLQPRTTLL,HLA-A*02:01,1,
+41407706,YLQPRTWLL,HLA-A*02:01,1,
+41407706,YLQPRTVLL,HLA-A*02:01,1,
+41407706,YLQPRTYLL,HLA-A*02:01,1,
+41407706,YLQPRTFAL,HLA-A*02:01,1,
+41407706,YLQPRTFRL,HLA-A*02:01,1,
+41407706,YLQPRTFNL,HLA-A*02:01,1,
+41407706,YLQPRTFCL,HLA-A*02:01,1,
+41407706,YLQPRTFEL,HLA-A*02:01,1,
+41407706,YLQPRTFQL,HLA-A*02:01,1,
+41407706,YLQPRTFGL,HLA-A*02:01,1,
+41407706,YLQPRTFHL,HLA-A*02:01,1,
+41407706,YLQPRTFIL,HLA-A*02:01,1,
+41407706,YLQPRTFKL,HLA-A*02:01,1,
+41407706,YLQPRTFML,HLA-A*02:01,1,
+41407706,YLQPRTFFL,HLA-A*02:01,1,
+41407706,YLQPRTFPL,HLA-A*02:01,1,
+41407706,YLQPRTFSL,HLA-A*02:01,1,
+41407706,YLQPRTFTL,HLA-A*02:01,1,
+41407706,YLQPRTFWL,HLA-A*02:01,1,
+41407706,YLQPRTFVL,HLA-A*02:01,1,
+41407706,YLQPRTFYL,HLA-A*02:01,1,
+41407706,YLQPRTFLA,HLA-A*02:01,1,
+41407706,YLQPRTFLR,HLA-A*02:01,1,
+41407706,YLQPRTFLN,HLA-A*02:01,1,
+41407706,YLQPRTFLD,HLA-A*02:01,1,
+41407706,YLQPRTFLC,HLA-A*02:01,1,
+41407706,YLQPRTFLE,HLA-A*02:01,1,
+41407706,YLQPRTFLQ,HLA-A*02:01,1,
+41407706,YLQPRTFLG,HLA-A*02:01,1,
+41407706,YLQPRTFLH,HLA-A*02:01,1,
+41407706,YLQPRTFLI,HLA-A*02:01,1,
+41407706,YLQPRTFLK,HLA-A*02:01,1,
+41407706,YLQPRTFLM,HLA-A*02:01,1,
+41407706,YLQPRTFLP,HLA-A*02:01,1,
+41407706,YLQPRTFLS,HLA-A*02:01,1,
+41407706,YLQPRTFLT,HLA-A*02:01,1,
+41407706,YLQPRTFLW,HLA-A*02:01,1,
+41407706,YLQPRTFLV,HLA-A*02:01,1,
+41407706,YLQPGTFLL,HLA-A*02:01,1,
+41407706,YLQPWTFLL,HLA-A*02:01,1,
+41407706,YLQPCTFLL,HLA-A*02:01,1,
+41407706,YLQPSTFLL,HLA-A*02:01,1,
+41407706,YLQPFTFLL,HLA-A*02:01,1,
+41407706,YLQPATFLL,HLA-A*02:01,1,
+41407706,YLQPMTFLL,HLA-A*02:01,1,
+41407706,YLQPHTFLL,HLA-A*02:01,1,
+41407706,YLQPTTFLL,HLA-A*02:01,1,
+41407706,YLQPYTFLL,HLA-A*02:01,1,
+41407706,YLFPRTFLL,HLA-A*02:01,1,
+41407706,YLWPRTFLL,HLA-A*02:01,1,
+41528883,SCMGGMNQR,HLA-A*11:01,1,Homo sapiens
+41528883,SCMGGMNRR,HLA-A*11:01,0,Homo sapiens

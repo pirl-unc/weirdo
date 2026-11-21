@@ -1,0 +1,48 @@
+{
+  "adapters": [
+    {
+      "artifact": "tumor-adapter.joblib",
+      "artifact_bytes": 4677,
+      "cohorts": [
+        "bladder",
+        "melanoma",
+        "Basket"
+      ],
+      "domain": "tumor",
+      "n_hla_alleles": 36,
+      "n_positive": 466,
+      "n_rows": 17464,
+      "n_unique_peptides": 15247,
+      "note": "Training metrics are descriptive only. Use the held-out cohort report for performance estimates.",
+      "training_average_precision": 0.07363029446827411,
+      "training_log_loss": 0.6497893788876083,
+      "training_roc_auc": 0.6863621168256604
+    },
+    {
+      "artifact": "viral-adapter.joblib",
+      "artifact_bytes": 5173,
+      "cohorts": [
+        "yellow_fever_17d",
+        "multivirus_concise_set"
+      ],
+      "domain": "viral",
+      "n_hla_alleles": 49,
+      "n_positive": 385,
+      "n_rows": 1274,
+      "n_unique_peptides": 1076,
+      "note": "Training metrics are descriptive only. Use the held-out cohort report for performance estimates.",
+      "training_average_precision": 0.446088223808922,
+      "training_log_loss": 0.6638483723253202,
+      "training_roc_auc": 0.6791901012373455
+    }
+  ],
+  "model_version": "tcr-visible-response-adapter-v1",
+  "regularization_C": 0.003,
+  "required_input_columns": [
+    "hla",
+    "mhcflurry_2_3_0_presentation_score",
+    "netmhcpan_ba_rank",
+    "peptide"
+  ],
+  "sequence_representation": "allele_face_composition"
+}

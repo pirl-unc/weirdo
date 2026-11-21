@@ -1,0 +1,15 @@
+{
+  "pair_count": 3491,
+  "batch_pair_count": 250,
+  "netmhcpan": {
+    "package": "NetMHCpan",
+    "version": "4.2c"
+  },
+  "mhcflurry": {
+    "package": "mhcflurry",
+    "package_version": "2.3.16",
+    "model_release": "2.3.0",
+    "model_path": "/Users/iskander/Library/Application Support/mhcflurry/4/2.3.0/models_class1_presentation/models",
+    "provenance": "generated on Mon Sep 28 09:44:07 2026"
+  }
+}

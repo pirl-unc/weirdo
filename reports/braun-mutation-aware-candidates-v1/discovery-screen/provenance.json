@@ -1,0 +1,13 @@
+{
+  "candidate_input": "reports/braun-mutation-aware-candidates-v1/raw/scored-candidates-taxonomy.csv.gz",
+  "matched_control": "same pMHC gate and aggregation with taxonomy omitted",
+  "n_configurations": 18000,
+  "schema": "braun-frameshift-taxonomy-discovery-screen-v1",
+  "selection_endpoint": "Braun frameshift AUC",
+  "status": "outcome_optimized_exploratory_not_validated",
+  "taxonomy_models": {
+    "microbial_like": "broad9__esm_160k__microbial_like",
+    "one_minus_mammals": "broad9__esm_160k__one_minus_mammals",
+    "viruses": "broad9__esm_160k__viruses"
+  }
+}

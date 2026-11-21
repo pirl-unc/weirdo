@@ -1,0 +1,14 @@
+{
+  "candidate_allele_rows": 1018981,
+  "candidates": "reports/tcr-visible-nonself-v1/raw/human-self-candidates.csv.gz",
+  "caveat": "Observed assay alleles are a pseudo-haplotype. Tumor groups are patients; viral groups may not contain complete HLA genotypes.",
+  "groups": 931,
+  "observed_alleles_per_group": {
+    "maximum": 9,
+    "median": 1.0,
+    "minimum": 1
+  },
+  "query_group_peptides": 16574,
+  "scores": "reports/taxonomy-objective-tcell-v1/raw/balanced-unique-softmax-tcell-scores.csv.gz",
+  "unique_self_peptide_hla_pairs_scored": 939007
+}

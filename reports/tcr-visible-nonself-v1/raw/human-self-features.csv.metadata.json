@@ -1,0 +1,64 @@
+{
+  "anchor_positions": [
+    "P2",
+    "P-omega"
+  ],
+  "human_residues": 11384712,
+  "human_sequences": 20397,
+  "human_uniprot": "data/swissprot-dat/uniprot_sprot_human.dat",
+  "scores": "reports/taxonomy-objective-tcell-v1/raw/balanced-unique-softmax-tcell-scores.csv.gz",
+  "search": [
+    {
+      "binary_dimensions": 104,
+      "human_windows": 11241946,
+      "length": 8,
+      "nlist": 2048,
+      "nprobe": 96,
+      "query_peptides": 546,
+      "retained_candidates": 24,
+      "search_candidates": 512
+    },
+    {
+      "binary_dimensions": 120,
+      "human_windows": 11221553,
+      "length": 9,
+      "nlist": 2048,
+      "nprobe": 96,
+      "query_peptides": 9569,
+      "retained_candidates": 24,
+      "search_candidates": 512
+    },
+    {
+      "binary_dimensions": 144,
+      "human_windows": 11201161,
+      "length": 10,
+      "nlist": 2048,
+      "nprobe": 96,
+      "query_peptides": 4499,
+      "retained_candidates": 24,
+      "search_candidates": 512
+    },
+    {
+      "binary_dimensions": 160,
+      "human_windows": 11180769,
+      "length": 11,
+      "nlist": 2048,
+      "nprobe": 96,
+      "query_peptides": 1703,
+      "retained_candidates": 24,
+      "search_candidates": 512
+    },
+    {
+      "binary_dimensions": 184,
+      "human_windows": 11160380,
+      "length": 12,
+      "nlist": 2048,
+      "nprobe": 96,
+      "query_peptides": 6,
+      "retained_candidates": 24,
+      "search_candidates": 512
+    }
+  ],
+  "tcr_face": "P3 through P-1",
+  "unique_query_peptides": 16323
+}

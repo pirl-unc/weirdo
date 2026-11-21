@@ -1,0 +1,49 @@
+{
+  "description": "Experimental taxonomy-only ensemble for complete 8-15mer peptides, stacked from composition, residue-CNN, and Transformer models.",
+  "experimental": true,
+  "requires_extra": "weirdo[peptide-content]",
+  "length_range": [8, 15],
+  "categories": [
+    "viruses",
+    "bacteria",
+    "archaea",
+    "fungi",
+    "plants",
+    "protists",
+    "invertebrates",
+    "fish",
+    "non_mammalian_tetrapods",
+    "mammals",
+    "human",
+    "mouse",
+    "dog"
+  ],
+  "output_semantics": "Independent sigmoid probabilities of exact SwissProt category membership; categories may overlap and do not sum to one.",
+  "training": {
+    "source": "UniProtKB/Swiss-Prot 2023",
+    "labels": "taxonomy membership only; no MHC, neoantigen, or T-cell-response labels",
+    "split": "70/15/15 by protein mnemonic family; exact peptides crossing folds removed",
+    "n_train": 799357,
+    "n_validation": 153159,
+    "n_test": 150807,
+    "stack_fit": "per-category logistic regression on validation-family member logits plus peptide length"
+  },
+  "held_out_evaluation": {
+    "mean_category_auc": 0.6240687367263854,
+    "mean_category_auc_v1_bundled": 0.6129318997414348,
+    "mean_log_loss": 0.3129464141451396,
+    "mean_ece": 0.003925178404109816,
+    "microbial_foreign_like_auc": 0.6693030981884533,
+    "mean_auc_by_length": {
+      "8": 0.6051242145338936,
+      "9": 0.6061612298192334,
+      "10": 0.6168559258825463,
+      "11": 0.6222235304619208,
+      "12": 0.6287663978631084,
+      "13": 0.631160700961117,
+      "14": 0.6370420649593633,
+      "15": 0.6394742077364508
+    },
+    "note": "The untouched test fold was scored once after member and stack selection. This remains a weak taxonomy signal, not an immunogenicity predictor."
+  }
+}

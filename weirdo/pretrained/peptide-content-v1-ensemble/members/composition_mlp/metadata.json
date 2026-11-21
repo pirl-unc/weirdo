@@ -1,0 +1,39 @@
+{
+  "training_history": [
+    {
+      "epoch": 1,
+      "loss": 0.32021858143057497,
+      "val_loss": 0.315616637468338
+    },
+    {
+      "epoch": 2,
+      "loss": 0.3157685317638386,
+      "val_loss": 0.31469690799713135
+    },
+    {
+      "epoch": 3,
+      "loss": 0.3132439582733726,
+      "val_loss": 0.3152519762516022
+    },
+    {
+      "epoch": 4,
+      "loss": 0.31099659932205187,
+      "val_loss": 0.31539738178253174
+    },
+    {
+      "epoch": 5,
+      "loss": 0.30911606260286045,
+      "val_loss": 0.31608137488365173
+    }
+  ],
+  "n_train": 799357,
+  "n_features": 592,
+  "n_epochs": 5,
+  "final_train_loss": 0.30911606260286045,
+  "loss": "bce",
+  "best_epoch": 2,
+  "weights_restored_from_best_epoch": true,
+  "best_val_score": -0.31469690799713135,
+  "final_val_loss": 0.31608137488365173,
+  "best_val_loss": 0.31469690799713135
+}
