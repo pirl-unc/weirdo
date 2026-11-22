@@ -142,205 +142,32 @@ WEIRDO builds its 8-mer data from UniProtKB/Swiss-Prot (~100M unique k-mers) wit
 
 Each 8-mer has True/False labels for each category, indicating whether it appears in proteins from that organism group.
 
-## Feature Extraction
-
-The MLP uses **592 features** extracted from each peptide:
-
-### Amino Acid Properties (48 features)
-12 physicochemical properties × 4 statistics (mean, std, min, max):
-- Hydropathy, hydrophilicity
-- Mass, volume
-- Polarity, pK side chain
-- Accessible surface area (folded/unfolded)
-- Local flexibility, refractivity
-- Solvent exposed area, % exposed residues
-
-### Structural Features (27 features)
-- **Secondary structure propensities** (12): helix, sheet, turn × 4 stats
-- **Category fractions** (9): positive/negative charged, hydrophobic, aromatic, aliphatic, polar, tiny, small, cysteine
-- **Charge features** (4): net charge, charge transitions, max cluster, R/(R+K) ratio
-- **Disorder features** (2): disorder/order promoting fractions
-
-### Composition Features (420 features)
-- **Amino acid frequencies** (20): fraction of each amino acid
-- **Dipeptide frequencies** (400): fraction of each amino acid pair
-
-### Sequence Statistics (12 features)
-- Length, log-length, sqrt-length
-- Unknown fraction, unique AA fraction
-- Max run length, repeat fraction
-- Entropy/complexity (entropy, effective AAs, Gini, top-2/maximum frequency)
-
-### Reduced Alphabet Frequencies (80 features)
-- Composition across common reduced alphabets (Murphy, GBMR, SDM, etc.)
-
-### Dipeptide Summary (5 features)
-- Entropy, Gini, max/top2 frequency, homodipeptide fraction
-
-## API Reference
-
-### Training
-
-```python
-from weirdo.scorers import SwissProtReference, MLPScorer
-
-# Load reference
-ref = SwissProtReference().load()
-
-# Get training data
-peptides, labels = ref.get_training_data(
-    target_categories=['human', 'viruses', 'bacteria', 'mammals'],
-    multi_label=True,
-    max_samples=100000  # Optional: limit for memory
-)
-
-# Train
-scorer = MLPScorer(
-    k=8,
-    hidden_layer_sizes=(256, 128, 64),
-    activation='relu',
-    alpha=0.0001,  # L2 regularization
-)
-scorer.train(
-    peptides, labels,
-    target_categories=['human', 'viruses', 'bacteria', 'mammals'],
-    epochs=200,
-    learning_rate=0.001
-)
-```
-
-### Prediction
-
-```python
-# Category probabilities, one independent sigmoid per category
-probs = scorer.predict_proba(['MTMDKSEL'])
-# Shape: (1, n_categories)
-
-# Foreignness score
-foreign = scorer.foreignness(
-    ['MTMDKSEL'],
-    pathogen_categories=['bacteria', 'viruses'],
-    self_categories=['human', 'mammals', 'rodents'],
-    combine='max',  # default: max(pathogens) / (max(pathogens) + max(self)); 'sum' adds the probabilities
-)
-
-# Full DataFrame output (handles variable-length peptides)
-df = scorer.predict_dataframe(['MTMDKSEL', 'SIINFEKL', 'NLVPMVATV'])
-```
-
-### Feature Extraction
-
-```python
-# Extract features as DataFrame
-df = scorer.features_dataframe(['MTMDKSEL', 'SIINFEKL'])
-# Shape: (2, 593) - 592 features + peptide column
-
-# Feature names
-names = scorer.get_feature_names()
-# ['hydropathy_mean', 'hydropathy_std', ..., 'dipep_YY']
-```
-
-### Model Persistence
-
-```python
-from weirdo import save_model, load_model, list_models
-
-# Save trained model
-save_model(scorer, 'my-foreignness-model')
-
-# List saved models
-for model in list_models():
-    print(f"{model.name}: {model.scorer_type}")
-
-# Load model
-scorer = load_model('my-foreignness-model')
-```
-
-### CLI
+## CLI
 
 ```bash
-# Data management
-weirdo data download        # Download SwissProt from UniProt and build the reference data
-weirdo data reference-proteome dog  # Complete host proteome for exact self lookup
-weirdo data reference-proteome cattle  # Bos taurus; `cow` is also accepted
-weirdo data list            # Show data status
-
-# Model management
-weirdo models list          # List trained models
-weirdo models train --data train.csv --name my-model
-weirdo models info my-model # Show model details
-weirdo models available     # List built-in downloadable pretrained models
-weirdo models download NAME # Download pretrained weights by name
-weirdo models download --url https://.../model.tar.gz --save-as my-model
-
 # Scoring
 weirdo score MTMDKSEL SIINFEKL                 # bundled swissprot-categories model
-weirdo score --combine sum MTMDKSEL           # compare summed instead of maximal probabilities
-weirdo score --model my-model MTMDKSEL       # a model you trained
+weirdo score --combine sum MTMDKSEL            # compare summed instead of maximal probabilities
+weirdo score --model my-model MTMDKSEL         # a model you trained
+
+# Data & model management
+weirdo data download                           # download SwissProt from UniProt and build reference data
+weirdo data reference-proteome dog             # complete host proteome for exact self lookup
+weirdo data list                               # show data status
+weirdo models list                             # list trained models
+weirdo models download NAME                    # download pretrained weights
 ```
 
-## Long-Run Training on Modal
+## Documentation
 
-Use `scripts/train_modal_long_run.py` to run long remote training and export
-weights as a `.tar.gz` archive:
+Full guides and API reference live in `docs/`:
 
-```bash
-# One-time setup: seed the SwissProt CSV (built by `weirdo data download`) into the Modal data volume
-modal volume put weirdo-data-cache ~/.weirdo/downloads/swissprot-8mers.csv downloads/swissprot-8mers.csv --force
-```
-
-```bash
-modal run scripts/train_modal_long_run.py \
-  --model-name swissprot-mlp-modal \
-  --epochs 1000 \
-  --max-samples 2000000 \
-  --output-archive ./swissprot-mlp-modal.tar.gz
-```
-
-The script:
-- trains `MLPScorer` remotely
-- saves model files to a Modal volume
-- packages weights into `MODEL_NAME.tar.gz`
-- can return archive bytes to your local machine (`--output-archive`)
-- reads SwissProt from `--swissprot-path` (default: `/root/.weirdo/downloads/swissprot-8mers.csv`)
-- treats `--max-samples 0` (default) as "use all available rows"
-
-## Distributing Model Weights
-
-Recommended flow:
-
-1. Train and export `MODEL_NAME.tar.gz` (Modal script above).
-2. Upload archive to a GitHub Release asset (or other HTTPS hosting).
-3. Download after install via CLI:
-
-```bash
-# Direct URL (no code change needed)
-weirdo models download --url https://github.com/ORG/REPO/releases/download/vX.Y.Z/MODEL_NAME.tar.gz --save-as MODEL_NAME
-```
-
-If you want named built-in downloads (`weirdo models download MODEL_NAME`),
-add an entry to `PRETRAINED_MODELS` in `weirdo/model_manager.py` and release a
-new package version.
-
-## Architecture
-
-```
-weirdo/
-├── scorers/
-│   ├── mlp.py              # MLPScorer (sigmoid heads, foreignness)
-│   ├── peptide_features.py # The 592 peptide features (vectorised)
-│   ├── swissprot.py        # SwissProtReference (training data)
-│   ├── config.py           # Presets and configuration
-│   ├── registry.py         # Scorer registry
-│   └── trainable.py        # TrainableScorer base class
-├── pretrained/             # Models that ship in the package (weights up to 5 MB)
-├── uniprot.py              # Download SwissProt from UniProt (datacache), build sequences
-├── kmer_table.py           # Build the SwissProt k-mer reference table
-├── data_manager.py         # ~/.weirdo reference data
-├── model_manager.py        # Save/load trained models
-├── amino_acid_properties.py  # 12 AA property dictionaries
-└── api.py                  # High-level functions
-```
+- [Getting started](docs/getting-started.md)
+- [Category predictor](docs/category-predictor.md) — evaluation, calibration, and limits of the bundled `swissprot-categories` model
+- [Peptide-content models](docs/peptide-content.md) and [score policies](docs/score-policies.md) — variable-length 8–15mer models and host-specific scoring contracts
+- [Scorers & feature extraction](docs/scorers.md) and [amino-acid properties](docs/amino-acids.md) — the 592 physicochemical/composition features and `MLPScorer` training API
+- [Data sources](docs/data-sources.md) and [API reference](docs/api.md)
+- [Contributing](docs/contributing.md) and [changelog](docs/changelog.md)
 
 ## Citation
 
