@@ -104,7 +104,7 @@ from .scorers import (
 # ML scorer
 from .scorers import MLPScorer
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 
 __all__ = [
     "pmhc_weirdo_score",
