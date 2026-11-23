@@ -4,6 +4,7 @@ from weirdo.data_manager import DATASETS, DataManager
 
 
 def _seed_download(dm: DataManager, name: str = "swissprot-8mers"):
+    dm._ensure_dirs()
     filepath = dm.downloads_dir / DATASETS[name]["filename"]
     filepath.write_text("dummy\n")
     dm._metadata.setdefault("downloads", {})[name] = {
@@ -134,8 +135,8 @@ class TestDownloadFromUniProt:
         dm = DataManager(data_dir=tmp_path / "data", verbose=True, uniprot_url=mirror)
         monkeypatch.setattr(data_manager, "_default_manager", dm)
         assert run(["data", "download", "swissprot-sequences"]) == 0
-        out = capsys.readouterr().out
-        assert "UniProt release 2099_01" in out and dm.is_downloaded("swissprot-sequences")
+        err = capsys.readouterr().err
+        assert "UniProt release 2099_01" in err and dm.is_downloaded("swissprot-sequences")
         assert run(["data", "status"]) == 0
 
     def test_the_command_line_reports_failures_without_a_traceback(self, tmp_path, monkeypatch, capsys):

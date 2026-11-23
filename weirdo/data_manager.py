@@ -17,15 +17,37 @@ Example
 UniProt data are licensed CC BY 4.0 (https://www.uniprot.org/help/license).
 """
 
+import hashlib
 import json
 import os
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+from uuid import uuid4
 
 
-# Default data directory
+def resolve_data_dir(override: Optional[Union[str, Path]] = None):
+    """Resolve Weirdo's cache directory lazily without creating directories.
+
+    Precedence: explicit ``override`` -> ``WEIRDO_DATA_DIR`` ->
+    ``OPENVAX_DATA_CACHE/weirdo`` -> populated shared platform cache ->
+    populated legacy ``~/.weirdo`` or platform ``weirdo`` cache -> default
+    shared platform cache.
+    """
+    import datacache
+    from datacache.common import _platform_cache_dir
+
+    return datacache.resolve_cache_dir(
+        "weirdo",
+        "WEIRDO_DATA_DIR",
+        override=override,
+        legacy=(Path.home() / ".weirdo", Path(_platform_cache_dir("weirdo"))),
+    )
+
+
+# Backwards-compatible default path attribute; DataManager resolves dynamically.
 DEFAULT_DATA_DIR = Path(os.environ.get('WEIRDO_DATA_DIR', Path.home() / '.weirdo'))
 
 # Fixed taxonomy datasets, built from the UniProt SwissProt taxonomic-division
@@ -79,7 +101,8 @@ class DataManager:
         verbose: bool = True,
         uniprot_url: Optional[str] = None,
     ):
-        self.data_dir = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
+        self._location = resolve_data_dir(override=data_dir)
+        self.data_dir = Path(self._location.path)
         self.auto_download = auto_download
         self.verbose = verbose
         self.uniprot_url = uniprot_url
@@ -90,10 +113,7 @@ class DataManager:
         self.reference_proteomes_dir = self.downloads_dir / 'reference-proteomes'
         self.metadata_file = self.data_dir / 'metadata.json'
 
-        # Ensure directories exist
-        self._ensure_dirs()
-
-        # Load metadata
+        # Load metadata without creating directories on disk (read-only safe)
         self._metadata = self._load_metadata()
 
     def _ensure_dirs(self) -> None:
@@ -112,9 +132,25 @@ class DataManager:
         return {'downloads': {}}
 
     def _save_metadata(self) -> None:
-        """Save metadata to disk."""
-        with open(self.metadata_file, 'w') as f:
-            json.dump(self._metadata, f, indent=2, default=str)
+        """Atomically persist metadata to disk under a file lock."""
+        from filelock import FileLock
+
+        self._ensure_dirs()
+        lock = FileLock(str(self.data_dir / '.metadata.lock'))
+        with lock:
+            tmp_path = self.data_dir / f'.metadata-{uuid4().hex}.tmp'
+            try:
+                with open(tmp_path, 'w') as f:
+                    json.dump(self._metadata, f, indent=2, default=str)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_path, self.metadata_file)
+            finally:
+                if tmp_path.exists():
+                    try:
+                        tmp_path.unlink()
+                    except OSError:
+                        pass
 
     def reset_metadata(self) -> None:
         """Reset in-memory metadata and remove metadata file from disk."""
@@ -123,9 +159,9 @@ class DataManager:
             self.metadata_file.unlink()
 
     def _log(self, msg: str) -> None:
-        """Print message if verbose."""
+        """Print status message to stderr if verbose."""
         if self.verbose:
-            print(msg)
+            print(msg, file=sys.stderr)
 
     # -------------------------------------------------------------------------
     # Dataset queries
@@ -248,6 +284,7 @@ class DataManager:
             self._log(f"Dataset '{name}' already downloaded at {filepath}")
             return filepath
 
+        self._ensure_dirs()
         self._log(f"Building '{name}' ({info['source']})...")
         try:
             if name == 'swissprot-sequences':
@@ -300,6 +337,7 @@ class DataManager:
         """
         from .reference_proteomes import fetch_reference_proteome
 
+        self._ensure_dirs()
         try:
             downloaded = fetch_reference_proteome(
                 self.reference_proteomes_dir,
@@ -635,6 +673,75 @@ class DataManager:
             self.reset_metadata()
         return count
 
+    def verify(self) -> Dict[str, Any]:
+        """Verify downloaded datasets and recorded SHA-256 checksums offline (read-only)."""
+        checks = []
+        ok = True
+        downloads_meta = self._metadata.get('downloads', {})
+
+        for name, info in DATASETS.items():
+            filepath = self.downloads_dir / info['filename']
+            recorded = downloads_meta.get(name)
+            if not filepath.exists():
+                if recorded:
+                    checks.append(dict(
+                        name=name, kind="dataset", path=str(filepath),
+                        status="missing", detail="recorded in metadata.json but missing on disk",
+                    ))
+                    ok = False
+                continue
+            size = filepath.stat().st_size
+            if size == 0:
+                checks.append(dict(
+                    name=name, kind="dataset", path=str(filepath),
+                    status="corrupt", detail="file is empty",
+                ))
+                ok = False
+            elif recorded and 'size_bytes' in recorded and recorded['size_bytes'] != size:
+                checks.append(dict(
+                    name=name, kind="dataset", path=str(filepath),
+                    status="corrupt",
+                    detail=f"size mismatch: expected {recorded['size_bytes']}, found {size}",
+                ))
+                ok = False
+            else:
+                checks.append(dict(
+                    name=name, kind="dataset", path=str(filepath),
+                    status="ok", detail=f"{size} bytes",
+                ))
+
+        for key, record in sorted(downloads_meta.items()):
+            if not key.startswith("reference-proteome:"):
+                continue
+            name = key.split(":", 1)[1]
+            path = Path(record.get("path", ""))
+            if not path.is_file():
+                checks.append(dict(
+                    name=name, kind="reference-proteome", path=str(path),
+                    status="missing", detail="recorded in metadata.json but missing on disk",
+                ))
+                ok = False
+                continue
+            expected_sha = record.get("sha256")
+            if expected_sha:
+                with open(path, "rb") as handle:
+                    actual_sha = hashlib.file_digest(handle, "sha256").hexdigest()
+                if actual_sha.lower() != expected_sha.lower():
+                    checks.append(dict(
+                        name=name, kind="reference-proteome", path=str(path),
+                        status="corrupt",
+                        detail=f"sha256 mismatch: expected {expected_sha[:12]}..., found {actual_sha[:12]}...",
+                    ))
+                    ok = False
+                    continue
+            checks.append(dict(
+                name=name, kind="reference-proteome", path=str(path),
+                status="verified" if expected_sha else "ok",
+                detail="sha256 verified" if expected_sha else "present",
+            ))
+
+        return dict(data_dir=str(self.data_dir), ok=ok, checks=checks)
+
     def disk_usage(self) -> int:
         """Get total disk usage in bytes.
 
@@ -648,6 +755,11 @@ class DataManager:
 
 # Singleton instance for convenience
 _default_manager: Optional[DataManager] = None
+_default_manager_env: Optional[tuple[Optional[str], Optional[str]]] = None
+
+
+def _cache_env_snapshot() -> tuple[Optional[str], Optional[str]]:
+    return (os.environ.get('WEIRDO_DATA_DIR'), os.environ.get('OPENVAX_DATA_CACHE'))
 
 
 def get_data_manager(
@@ -671,14 +783,25 @@ def get_data_manager(
     manager : DataManager
         Data manager instance.
     """
-    global _default_manager
+    global _default_manager, _default_manager_env
 
-    if _default_manager is None or data_dir is not None:
+    env_now = _cache_env_snapshot()
+    if data_dir is not None:
         _default_manager = DataManager(
             data_dir=data_dir,
             auto_download=auto_download,
             verbose=verbose,
         )
+        _default_manager_env = None
+    elif _default_manager is None or (
+        _default_manager_env is not None and _default_manager_env != env_now
+    ):
+        _default_manager = DataManager(
+            data_dir=None,
+            auto_download=auto_download,
+            verbose=verbose,
+        )
+        _default_manager_env = env_now
 
     return _default_manager
 
