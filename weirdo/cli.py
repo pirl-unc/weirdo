@@ -13,6 +13,9 @@ Usage:
     weirdo models info NAME     # Show model info
 """
 
+from contextlib import contextmanager
+import json
+import os
 import sys
 import argparse
 
@@ -43,9 +46,36 @@ def create_parser():
     data_subparsers = data_parser.add_subparsers(dest='data_command', help='Data commands')
 
     # data list (aliased as 'ls' and 'status')
-    list_parser = data_subparsers.add_parser('list', help='List datasets with status')
-    data_subparsers.add_parser('ls', help='Alias for list')
-    data_subparsers.add_parser('status', help='Alias for list')
+    for alias, help_text in (
+        ('list', 'List datasets with status'),
+        ('ls', 'Alias for list'),
+        ('status', 'Alias for list'),
+    ):
+        p = data_subparsers.add_parser(alias, help=help_text)
+        p.add_argument('--json', action='store_true', help='Print machine-readable JSON')
+
+    # data dirs
+    dirs_parser = data_subparsers.add_parser(
+        'dirs',
+        help='Show where Weirdo cache lives, why it resolved there, and disk usage',
+    )
+    dirs_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
+
+    # data verify
+    verify_parser = data_subparsers.add_parser(
+        'verify',
+        help='Verify downloaded datasets and recorded SHA-256 checksums offline',
+    )
+    verify_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
+
+    # data prune
+    prune_parser = data_subparsers.add_parser(
+        'prune',
+        help='Remove stale datacache bundle generations (dry-run by default)',
+    )
+    prune_parser.add_argument('--keep', type=int, default=1, help='Generations to keep per store (default: 1)')
+    prune_parser.add_argument('-y', '--yes', action='store_true', help='Actually delete stale generations')
+    prune_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
     # data cohorts
     cohorts_parser = data_subparsers.add_parser(
@@ -81,6 +111,11 @@ def create_parser():
         '-f', '--force',
         action='store_true',
         help='Force re-download even if already present',
+    )
+    download_parser.add_argument(
+        '--offline',
+        action='store_true',
+        help='Forbid remote downloads (equivalent to OPENVAX_OFFLINE=1)',
     )
 
     host_reference_parser = data_subparsers.add_parser(
@@ -126,6 +161,11 @@ def create_parser():
         action='store_true',
         help='Re-download even if a verified local copy exists',
     )
+    host_reference_parser.add_argument(
+        '--offline',
+        action='store_true',
+        help='Forbid remote downloads (equivalent to OPENVAX_OFFLINE=1)',
+    )
 
     # data clear
     clear_parser = data_subparsers.add_parser('clear', help='Clear downloaded data')
@@ -147,6 +187,7 @@ def create_parser():
 
     # data path
     path_parser = data_subparsers.add_parser('path', help='Show path to data directory')
+    path_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
     # -------------------------------------------------------------------------
     # Score command
@@ -200,6 +241,11 @@ def create_parser():
     # Setup command
     # -------------------------------------------------------------------------
     setup_parser = subparsers.add_parser('setup', help='Initial setup - download reference data')
+    setup_parser.add_argument(
+        '--offline',
+        action='store_true',
+        help='Forbid remote downloads (equivalent to OPENVAX_OFFLINE=1)',
+    )
 
     # -------------------------------------------------------------------------
     # Model management commands
@@ -309,15 +355,161 @@ def create_parser():
         action='store_true',
         help='Overwrite existing local model with same name',
     )
+    models_download_parser.add_argument(
+        '--offline',
+        action='store_true',
+        help='Forbid remote downloads (equivalent to OPENVAX_OFFLINE=1)',
+    )
 
     return parser
+
+
+@contextmanager
+def _offline_override(offline):
+    if not offline:
+        yield
+        return
+    previous = os.environ.get("DATACACHE_OFFLINE")
+    os.environ["DATACACHE_OFFLINE"] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("DATACACHE_OFFLINE", None)
+        else:
+            os.environ["DATACACHE_OFFLINE"] = previous
+
+
+def _dir_stats(path):
+    if not os.path.exists(path):
+        return False, 0, 0
+    total_bytes = 0
+    file_count = 0
+    for root, _dirs, files in os.walk(path, followlinks=False):
+        for name in files:
+            try:
+                st = os.lstat(os.path.join(root, name))
+            except OSError:
+                continue
+            total_bytes += st.st_size
+            file_count += 1
+    return True, total_bytes, file_count
 
 
 def cmd_data_list(args):
     """Handle: weirdo data list/ls/status"""
     from .data_manager import get_data_manager
     dm = get_data_manager()
+    if getattr(args, 'json', False):
+        print(json.dumps(dm.status(), indent=2, default=str))
+        return 0
     dm.print_status()
+    return 0
+
+
+def cmd_data_dirs(args):
+    """Handle: weirdo data dirs"""
+    import datacache
+    from .data_manager import resolve_data_dir
+
+    loc = resolve_data_dir()
+    exists, total_bytes, file_count = _dir_stats(loc.path)
+    offline = datacache.offline_source()
+    entries = []
+    if os.path.isdir(loc.path):
+        try:
+            children = sorted(os.scandir(loc.path), key=lambda entry: entry.name)
+        except OSError:
+            children = []
+        for entry in children:
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+            _, sub_bytes, sub_files = _dir_stats(entry.path)
+            entries.append(dict(
+                name=entry.name,
+                path=entry.path,
+                size_bytes=sub_bytes,
+                file_count=sub_files,
+            ))
+    payload = dict(
+        data_dir=loc.path,
+        origin=loc.origin,
+        detail=loc.detail,
+        exists=exists,
+        size_bytes=total_bytes,
+        file_count=file_count,
+        offline=offline is not None,
+        offline_source=offline,
+        subdirectories=entries,
+    )
+    if getattr(args, 'json', False):
+        print(json.dumps(payload, indent=2))
+        return 0
+    print(f"Data directory: {loc.path}")
+    print(f"Origin:         {loc.detail} ({loc.origin})")
+    if exists:
+        print(f"Size:           {datacache.format_bytes(total_bytes)} ({file_count} file(s))")
+    else:
+        print("Size:           not created yet")
+    if offline:
+        print(f"Offline:        enabled ({offline})")
+    if entries:
+        print()
+        for entry in entries:
+            print(f"  {entry['name']:<24} {datacache.format_bytes(entry['size_bytes']):>10}  ({entry['file_count']} file(s))")
+    return 0
+
+
+def cmd_data_verify(args):
+    """Handle: weirdo data verify"""
+    from .data_manager import get_data_manager
+
+    dm = get_data_manager()
+    report = dm.verify()
+    if getattr(args, 'json', False):
+        print(json.dumps(report, indent=2))
+    else:
+        if not report['checks']:
+            print(f"No downloaded files found under {report['data_dir']}.")
+        else:
+            for check in report['checks']:
+                print(f"  [{check['status']:<8}] {check['kind']}:{check['name']}  ({check['detail']})")
+    return 0 if report['ok'] else 1
+
+
+def cmd_data_prune(args):
+    """Handle: weirdo data prune"""
+    import datacache
+    from datacache.cli import prune_root
+    from .data_manager import resolve_data_dir
+
+    root = resolve_data_dir().path
+    results = prune_root(root, keep=args.keep, apply=args.yes)
+    removed_count = sum(r['removed_count'] for r in results)
+    reclaimable = sum(r['reclaimable_bytes'] or 0 for r in results)
+    payload = dict(
+        data_dir=root,
+        dry_run=not args.yes,
+        keep=args.keep,
+        removed_count=removed_count,
+        reclaimable_bytes=reclaimable,
+        stores=results,
+    )
+    if getattr(args, 'json', False):
+        print(json.dumps(payload, indent=2))
+        return 0
+    if removed_count == 0:
+        print(f"Nothing to prune under {root}.")
+        return 0
+    verb = "Removed" if args.yes else "Would remove"
+    for r in results:
+        if r['removed_count']:
+            print(
+                f"{verb} {r['removed_count']} stale generation(s) "
+                f"({datacache.format_bytes(r['reclaimable_bytes'] or 0)}) from {r['store']}"
+            )
+    if not args.yes:
+        print("\nDry run only. Pass --yes to delete these stale generations.")
     return 0
 
 
@@ -454,9 +646,12 @@ def cmd_data_clear(args):
 
 def cmd_data_path(args):
     """Handle: weirdo data path"""
-    from .data_manager import get_data_manager
-    dm = get_data_manager()
-    print(dm.data_dir)
+    from .data_manager import resolve_data_dir
+    loc = resolve_data_dir()
+    if getattr(args, 'json', False):
+        print(json.dumps(dict(path=loc.path, origin=loc.origin, detail=loc.detail), indent=2))
+    else:
+        print(loc.path)
     return 0
 
 
@@ -899,52 +1094,59 @@ def run(args_list=None):
         parser.print_help()
         return 0
 
-    # Data commands
-    if args.command == 'data':
-        if args.data_command is None:
-            # Default to list
-            return cmd_data_list(args)
-        elif args.data_command in ('list', 'ls', 'status'):
-            return cmd_data_list(args)
-        elif args.data_command == 'cohorts':
-            return cmd_data_cohorts(args)
-        elif args.data_command == 'download':
-            return cmd_data_download(args)
-        elif args.data_command == 'reference-proteome':
-            return cmd_data_reference_proteome(args)
-        elif args.data_command == 'clear':
-            return cmd_data_clear(args)
-        elif args.data_command == 'path':
-            return cmd_data_path(args)
+    with _offline_override(getattr(args, 'offline', False)):
+        # Data commands
+        if args.command == 'data':
+            if args.data_command is None:
+                # Default to list
+                return cmd_data_list(args)
+            elif args.data_command in ('list', 'ls', 'status'):
+                return cmd_data_list(args)
+            elif args.data_command == 'dirs':
+                return cmd_data_dirs(args)
+            elif args.data_command == 'verify':
+                return cmd_data_verify(args)
+            elif args.data_command == 'prune':
+                return cmd_data_prune(args)
+            elif args.data_command == 'cohorts':
+                return cmd_data_cohorts(args)
+            elif args.data_command == 'download':
+                return cmd_data_download(args)
+            elif args.data_command == 'reference-proteome':
+                return cmd_data_reference_proteome(args)
+            elif args.data_command == 'clear':
+                return cmd_data_clear(args)
+            elif args.data_command == 'path':
+                return cmd_data_path(args)
 
-    elif args.command == 'score':
-        return cmd_score(args)
+        elif args.command == 'score':
+            return cmd_score(args)
 
-    elif args.command == 'translate':
-        return cmd_translate(args)
+        elif args.command == 'translate':
+            return cmd_translate(args)
 
-    elif args.command == 'setup':
-        return cmd_setup(args)
+        elif args.command == 'setup':
+            return cmd_setup(args)
 
-    elif args.command == 'models':
-        if args.models_command is None:
-            return cmd_models_list(args)
-        elif args.models_command in ('list', 'ls'):
-            return cmd_models_list(args)
-        elif args.models_command == 'info':
-            return cmd_models_info(args)
-        elif args.models_command == 'delete':
-            return cmd_models_delete(args)
-        elif args.models_command == 'train':
-            return cmd_models_train(args)
-        elif args.models_command == 'path':
-            return cmd_models_path(args)
-        elif args.models_command == 'available':
-            return cmd_models_available(args)
-        elif args.models_command == 'download':
-            return cmd_models_download(args)
-        elif args.models_command == 'scorers':
-            return cmd_models_scorers(args)
+        elif args.command == 'models':
+            if args.models_command is None:
+                return cmd_models_list(args)
+            elif args.models_command in ('list', 'ls'):
+                return cmd_models_list(args)
+            elif args.models_command == 'info':
+                return cmd_models_info(args)
+            elif args.models_command == 'delete':
+                return cmd_models_delete(args)
+            elif args.models_command == 'train':
+                return cmd_models_train(args)
+            elif args.models_command == 'path':
+                return cmd_models_path(args)
+            elif args.models_command == 'available':
+                return cmd_models_available(args)
+            elif args.models_command == 'download':
+                return cmd_models_download(args)
+            elif args.models_command == 'scorers':
+                return cmd_models_scorers(args)
 
     return 0
 

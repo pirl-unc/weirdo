@@ -141,7 +141,6 @@ class ModelManager:
 
     def __init__(self, model_dir: Optional[Union[str, Path]] = None):
         self._model_dir = Path(model_dir) if model_dir else DEFAULT_MODEL_DIR
-        self._model_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def model_dir(self) -> Path:
@@ -295,6 +294,7 @@ class ModelManager:
                 "Use overwrite=True to replace."
             )
 
+        self._model_dir.mkdir(parents=True, exist_ok=True)
         scorer.save(path)
         return path
 
@@ -407,6 +407,7 @@ class ModelManager:
             _safe_extract_tar(archive_path, extract_root)
             source_dir = self._find_extracted_model_dir(extract_root)
 
+            self._model_dir.mkdir(parents=True, exist_ok=True)
             shutil.copytree(source_dir, target_dir)
             return target_dir
         except Exception:
