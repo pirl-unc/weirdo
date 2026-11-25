@@ -3,6 +3,7 @@ site_description: Metrics of immunological foreignness for candidate T-cell epit
 site_url: https://pirl-unc.github.io/weirdo
 repo_url: https://github.com/pirl-unc/weirdo
 repo_name: pirl-unc/weirdo
+strict: true
 
 theme:
   name: material

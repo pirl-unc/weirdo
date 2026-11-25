@@ -10,24 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-class AminoAcid(object):
-    def __init__(
-            self, full_name, short_name, letter, contains=None):
-        self.letter = letter
-        self.full_name = full_name
-        self.short_name = short_name
-        if not contains:
-            contains = [letter]
-        self.contains = contains
+"""Re-exports from :mod:`pepdata.amino_acid` for backwards compatibility."""
 
-    def __str__(self):
-        return (
-            ("AminoAcid(full_name='%s', short_name='%s', letter='%s', "
-             "contains=%s)") % (
-            self.full_name, self.short_name, self.letter, self.contains))
+from pepdata.amino_acid import AminoAcid
 
-    def __repr__(self):
-        return str(self)
-
-    def __eq__(self, other):
-        return other.__class__ is AminoAcid and self.letter == other.letter
+__all__ = ["AminoAcid"]

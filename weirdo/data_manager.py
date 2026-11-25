@@ -37,13 +37,13 @@ def resolve_data_dir(override: Optional[Union[str, Path]] = None):
     shared platform cache.
     """
     import datacache
-    from datacache.common import _platform_cache_dir
+    from datacache.common import platform_cache_dir
 
     return datacache.resolve_cache_dir(
         "weirdo",
         "WEIRDO_DATA_DIR",
         override=override,
-        legacy=(Path.home() / ".weirdo", Path(_platform_cache_dir("weirdo"))),
+        legacy=(Path.home() / ".weirdo", Path(platform_cache_dir("weirdo"))),
     )
 
 

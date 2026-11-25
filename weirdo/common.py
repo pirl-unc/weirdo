@@ -10,13 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
+"""Re-exports from :mod:`pepdata.common` for backwards compatibility."""
 
-def transform_peptide(peptide, property_dict):
-    return np.array([property_dict[amino_acid] for amino_acid in peptide])
+from pepdata.common import transform_peptide, transform_peptides
 
-def transform_peptides(peptides, property_dict):
-    return np.array([
-        [property_dict[aa] for aa in peptide]
-        for peptide in peptides])
-
+__all__ = ["transform_peptide", "transform_peptides"]
