@@ -10,8 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Re-exports from :mod:`pepdata.static_data` for backwards compatibility."""
 
-from os.path import dirname, realpath, join
+from pepdata.static_data import MATRIX_DIR, PACKAGE_DIR
 
-PACKAGE_DIR = dirname(realpath(__file__))
-MATRIX_DIR = join(PACKAGE_DIR, 'matrices')
+__all__ = ["MATRIX_DIR", "PACKAGE_DIR"]

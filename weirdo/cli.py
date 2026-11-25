@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 """Command-line interface for Weirdo.
 
 Usage:
@@ -19,6 +20,9 @@ import os
 import sys
 import argparse
 
+from datacache.cli_help import HelpArgumentParser, enable_argcomplete
+
+from . import __version__
 from .data_manager import DATASETS as _DATASETS
 from .model_manager import DEFAULT_CATEGORY_MODEL
 from .reduced_alphabet import alphabets
@@ -31,18 +35,34 @@ def _translate_sequence(sequence, alphabet):
     return "".join([alphabet.get(aa, aa) for aa in sequence])
 
 
+def _add_cache_root_arg(parser, *, suppress_default=False):
+    """Add ``--cache-root`` / ``--data-dir`` to a data parser."""
+    kwargs = dict(
+        dest='cache_root',
+        metavar='DIR',
+        help='Override Weirdo cache/data directory (alias: --data-dir)',
+    )
+    if suppress_default:
+        kwargs['default'] = argparse.SUPPRESS
+    else:
+        kwargs['default'] = None
+    parser.add_argument('--cache-root', '--data-dir', **kwargs)
+
+
 def create_parser():
     """Create argument parser."""
-    parser = argparse.ArgumentParser(
+    parser = HelpArgumentParser(
         prog='weirdo',
         description='Weirdo: Widely Estimated Immunological Recognition and Detection of Outliers',
     )
+    parser.add_argument('--version', action='version', version=f'weirdo {__version__}')
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
     # -------------------------------------------------------------------------
     # Data management commands
     # -------------------------------------------------------------------------
     data_parser = subparsers.add_parser('data', help='Manage reference data')
+    _add_cache_root_arg(data_parser)
     data_subparsers = data_parser.add_subparsers(dest='data_command', help='Data commands')
 
     # data list (aliased as 'ls' and 'status')
@@ -52,6 +72,7 @@ def create_parser():
         ('status', 'Alias for list'),
     ):
         p = data_subparsers.add_parser(alias, help=help_text)
+        _add_cache_root_arg(p, suppress_default=True)
         p.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
     # data dirs
@@ -59,6 +80,7 @@ def create_parser():
         'dirs',
         help='Show where Weirdo cache lives, why it resolved there, and disk usage',
     )
+    _add_cache_root_arg(dirs_parser, suppress_default=True)
     dirs_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
     # data verify
@@ -66,6 +88,7 @@ def create_parser():
         'verify',
         help='Verify downloaded datasets and recorded SHA-256 checksums offline',
     )
+    _add_cache_root_arg(verify_parser, suppress_default=True)
     verify_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
     # data prune
@@ -73,6 +96,7 @@ def create_parser():
         'prune',
         help='Remove stale datacache bundle generations (dry-run by default)',
     )
+    _add_cache_root_arg(prune_parser, suppress_default=True)
     prune_parser.add_argument('--keep', type=int, default=1, help='Generations to keep per store (default: 1)')
     prune_parser.add_argument('-y', '--yes', action='store_true', help='Actually delete stale generations')
     prune_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
@@ -95,6 +119,7 @@ def create_parser():
             'swissprot-8mers also builds the k-mer table (several GB, some minutes).'
         ),
     )
+    _add_cache_root_arg(download_parser, suppress_default=True)
     download_parser.add_argument(
         'dataset',
         nargs='?',
@@ -122,6 +147,7 @@ def create_parser():
         'reference-proteome',
         help='Download a complete UniProt reference proteome for exact host-self lookup',
     )
+    _add_cache_root_arg(host_reference_parser, suppress_default=True)
     host_reference_parser.add_argument(
         'host',
         nargs='?',
@@ -169,6 +195,7 @@ def create_parser():
 
     # data clear
     clear_parser = data_subparsers.add_parser('clear', help='Clear downloaded data')
+    _add_cache_root_arg(clear_parser, suppress_default=True)
     clear_parser.add_argument(
         '--downloads',
         action='store_true',
@@ -187,6 +214,7 @@ def create_parser():
 
     # data path
     path_parser = data_subparsers.add_parser('path', help='Show path to data directory')
+    _add_cache_root_arg(path_parser, suppress_default=True)
     path_parser.add_argument('--json', action='store_true', help='Print machine-readable JSON')
 
     # -------------------------------------------------------------------------
@@ -396,10 +424,19 @@ def _dir_stats(path):
     return True, total_bytes, file_count
 
 
+def _get_cli_data_manager(args):
+    """Return a DataManager honoring an explicit ``--cache-root``/``--data-dir``."""
+    from .data_manager import DataManager, get_data_manager
+
+    cache_root = getattr(args, 'cache_root', None)
+    if cache_root is not None:
+        return DataManager(data_dir=cache_root)
+    return get_data_manager()
+
+
 def cmd_data_list(args):
     """Handle: weirdo data list/ls/status"""
-    from .data_manager import get_data_manager
-    dm = get_data_manager()
+    dm = _get_cli_data_manager(args)
     if getattr(args, 'json', False):
         print(json.dumps(dm.status(), indent=2, default=str))
         return 0
@@ -412,7 +449,7 @@ def cmd_data_dirs(args):
     import datacache
     from .data_manager import resolve_data_dir
 
-    loc = resolve_data_dir()
+    loc = resolve_data_dir(override=getattr(args, 'cache_root', None))
     exists, total_bytes, file_count = _dir_stats(loc.path)
     offline = datacache.offline_source()
     entries = []
@@ -462,9 +499,7 @@ def cmd_data_dirs(args):
 
 def cmd_data_verify(args):
     """Handle: weirdo data verify"""
-    from .data_manager import get_data_manager
-
-    dm = get_data_manager()
+    dm = _get_cli_data_manager(args)
     report = dm.verify()
     if getattr(args, 'json', False):
         print(json.dumps(report, indent=2))
@@ -483,7 +518,7 @@ def cmd_data_prune(args):
     from datacache.cli import prune_root
     from .data_manager import resolve_data_dir
 
-    root = resolve_data_dir().path
+    root = resolve_data_dir(override=getattr(args, 'cache_root', None)).path
     results = prune_root(root, keep=args.keep, apply=args.yes)
     removed_count = sum(r['removed_count'] for r in results)
     reclaimable = sum(r['reclaimable_bytes'] or 0 for r in results)
@@ -534,8 +569,8 @@ def cmd_data_cohorts(args):
 
 def cmd_data_download(args):
     """Handle: weirdo data download"""
-    from .data_manager import get_data_manager, DATASETS
-    dm = get_data_manager()
+    from .data_manager import DATASETS
+    dm = _get_cli_data_manager(args)
 
     try:
         if args.all:
@@ -554,7 +589,6 @@ def cmd_data_download(args):
 
 def cmd_data_reference_proteome(args):
     """Handle: weirdo data reference-proteome [HOST]."""
-    from .data_manager import get_data_manager
     from .reference_proteomes import (
         list_reference_proteome_manifests,
         list_reference_proteomes,
@@ -599,12 +633,12 @@ def cmd_data_reference_proteome(args):
             )
             if args.dry_run:
                 return 0
-            get_data_manager().download_reference_proteome_manifest(
+            _get_cli_data_manager(args).download_reference_proteome_manifest(
                 selection.name, groups=tuple(args.group), force=args.force
             )
             return 0
         target = reference_proteome_from_uniprot(args.proteome) if args.proteome else args.host
-        get_data_manager().download_host_reference(target, force=args.force)
+        _get_cli_data_manager(args).download_host_reference(target, force=args.force)
     except (ConnectionError, RuntimeError, ValueError) as error:
         print(f"Error: {error}")
         return 1
@@ -617,8 +651,7 @@ def cmd_data_clear(args):
         print("Choose either --downloads or --all, not both.")
         return 1
 
-    from .data_manager import get_data_manager
-    dm = get_data_manager()
+    dm = _get_cli_data_manager(args)
 
     # Confirm
     if not args.yes:
@@ -647,7 +680,7 @@ def cmd_data_clear(args):
 def cmd_data_path(args):
     """Handle: weirdo data path"""
     from .data_manager import resolve_data_dir
-    loc = resolve_data_dir()
+    loc = resolve_data_dir(override=getattr(args, 'cache_root', None))
     if getattr(args, 'json', False):
         print(json.dumps(dict(path=loc.path, origin=loc.origin, detail=loc.detail), indent=2))
     else:
@@ -1088,6 +1121,7 @@ def run(args_list=None):
         args_list = sys.argv[1:]
 
     parser = create_parser()
+    enable_argcomplete(parser)
     args = parser.parse_args(args_list)
 
     if args.command is None:
