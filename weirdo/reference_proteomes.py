@@ -12,6 +12,7 @@ their raw record counts as training weights.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
@@ -324,29 +325,33 @@ def reference_proteome_filename(proteome: Union[str, ReferenceProteome]) -> str:
 
 def iter_fasta_sequences(path: Union[str, os.PathLike]) -> Iterator[tuple[str, str]]:
     """Yield ``(identifier, sequence)`` from a plain or gzip-compressed FASTA file."""
-    from datacache.fasta import iter_fasta
-
     path = Path(path)
-    try:
-        yield from iter_fasta(
-            path,
-            encoding="ascii",
-            allow_empty_sequence=False,
-            require_non_empty=True,
-        )
-    except ValueError as error:
-        message = str(error)
-        if message.startswith("FASTA sequence before the first header:"):
-            line_number = message.rsplit(":", 1)[-1]
-            raise ValueError(
-                f"{path}: sequence before a FASTA header on line {line_number}"
-            ) from error
-        if message.startswith("FASTA header without an identifier:"):
-            line_number = message.rsplit(":", 1)[-1]
-            raise ValueError(
-                f"{path}: empty FASTA identifier on line {line_number}"
-            ) from error
-        raise
+    opener = gzip.open if path.suffix == ".gz" else open
+    identifier: Optional[str] = None
+    chunks: list[str] = []
+    with opener(path, "rt", encoding="ascii") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                if identifier is not None:
+                    if not chunks:
+                        raise ValueError(f"{path}: FASTA entry {identifier!r} has no sequence")
+                    yield identifier, "".join(chunks)
+                identifier = line[1:].split(maxsplit=1)[0]
+                if not identifier:
+                    raise ValueError(f"{path}: empty FASTA identifier on line {line_number}")
+                chunks = []
+            elif identifier is None:
+                raise ValueError(f"{path}: sequence before a FASTA header on line {line_number}")
+            else:
+                chunks.append(line)
+    if identifier is None:
+        raise ValueError(f"{path}: no FASTA entries")
+    if not chunks:
+        raise ValueError(f"{path}: FASTA entry {identifier!r} has no sequence")
+    yield identifier, "".join(chunks)
 
 
 def fasta_summary(path: Union[str, os.PathLike]) -> tuple[int, int]:
