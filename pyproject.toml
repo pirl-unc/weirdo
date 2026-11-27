@@ -30,7 +30,7 @@ version = {attr = "weirdo.__version__"}
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages.find]
-exclude = ["test", "test.*", "examples"]
+include = ["weirdo*"]
 
 [tool.setuptools.package-data]
 weirdo = [

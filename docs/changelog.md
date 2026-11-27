@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.9.2] - 2026-11-27
+
+### Changed
+
+- Removed obsolete repository-root files (`.travis.yml`, `pylintrc`, scratch
+  `test.py`, and the duplicate root `Process reference data.ipynb`, keeping
+  `notebooks/Process reference data.ipynb`).
+- Moved standalone ad-hoc research, evaluation, scoring, and remote-training
+  scripts into `scripts/experiments/` while keeping CI, release, cohort-builder,
+  documentation-referenced, and test-covered scripts in `scripts/`.
+
 ## [2.5.0] - 2026-10-31
 
 ### Added
