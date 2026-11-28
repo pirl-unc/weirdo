@@ -10,10 +10,10 @@ Seed full SwissProt data once into the Modal data volume:
     modal volume put weirdo-data-cache data/swissprot-8mers.csv downloads/swissprot-8mers.csv --force
 
 Run long training remotely:
-    modal run scripts/train_modal_long_run.py --model-name swissprot-mlp-modal --epochs 1000
+    modal run scripts/experiments/train_modal_long_run.py --model-name swissprot-mlp-modal --epochs 1000
 
 Download resulting weights to a local file:
-    modal run scripts/train_modal_long_run.py --model-name swissprot-mlp-modal --output-archive ./swissprot-mlp-modal.tar.gz
+    modal run scripts/experiments/train_modal_long_run.py --model-name swissprot-mlp-modal --output-archive ./swissprot-mlp-modal.tar.gz
 """
 
 from __future__ import annotations

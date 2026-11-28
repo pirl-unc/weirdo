@@ -10,7 +10,7 @@ import sys
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from mhctools.unsupported_allele import UnsupportedAllele  # noqa: E402
 from scripts.score_common_tcell_predictors import score_mhcflurry, score_netmhcpan  # noqa: E402

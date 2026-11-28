@@ -17,10 +17,10 @@ import sys
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from scripts.evaluate_lodo_weirdo_models import BA_RANK, PRESENTATION, load  # noqa: E402
-from scripts.evaluate_self_relative_face_weirdness import human_surprise  # noqa: E402
+from scripts.experiments.evaluate_self_relative_face_weirdness import human_surprise  # noqa: E402
 
 HEAD = "virus_foreign_like"
 POINTS = 1_001

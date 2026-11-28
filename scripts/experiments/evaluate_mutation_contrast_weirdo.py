@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from scripts.evaluate_lodo_weirdo_models import SUMMARY_HEADS, ecdf, load  # noqa: E402
 from scripts.evaluate_weirdo_term_null import fast_auc  # noqa: E402
