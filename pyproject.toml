@@ -70,6 +70,9 @@ benchmark = [
     "statsmodels>=0.14",
 ]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 [tool.ruff.lint]
 select = ["E", "F"]
 ignore = ["F821", "E501", "F841", "E731", "E741"]
